@@ -1,0 +1,168 @@
+// Cohort — data model.
+//
+// Ported from the Express MVP's JSON store (src/db.js). Notes on the port:
+//  - SQLite has no enums, so role/status are plain String (see comments for
+//    the allowed values). This also keeps the schema portable to Postgres later
+//    with a one-line datasource change (roadmap 6.2).
+//  - Date-only fields (attendance.date, dueDate, invoice periods) are stored as
+//    "YYYY-MM-DD" strings on purpose: the evidence and billing logic compares
+//    them lexicographically ("d >= start && d <= end"), which only works if they
+//    stay strings. Timestamps (submittedAt, gradedAt) are ISO strings for the
+//    same reason.
+//  - Work-sample files are stored as bytes IN the database, not on disk. The
+//    Express MVP wrote to data/uploads/, but Vercel's serverless filesystem is
+//    read-only and ephemeral, so binary lives in the FileRec.data column.
+
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "sqlite"
+}
+
+model School {
+  id        String   @id @default(cuid())
+  name      String
+  state     String
+  esaAmount Float
+  address   String   @default("")
+  createdAt DateTime @default(now())
+}
+
+model User {
+  id              String   @id @default(cuid())
+  schoolId        String
+  role            String // owner | teacher | parent | student
+  name            String
+  email           String   @unique
+  password        String
+  studentId       String? // set for role=student — the Student they represent
+  studentIdsJson  String? // set for role=parent — JSON array of Student ids
+  consentByUserId String? // parent user id that consented to a student account
+  createdByParent Boolean  @default(false)
+  consentGivenAt  String?
+  createdAt       DateTime @default(now())
+}
+
+model Student {
+  id            String   @id @default(cuid())
+  schoolId      String
+  name          String
+  grade         String
+  familyName    String
+  esaProgram    String? // two-letter state key into PROGRAMS, or null for private pay
+  esaAmount     Float    @default(0)
+  tuitionAnnual Float    @default(0)
+  createdAt     DateTime @default(now())
+}
+
+model Course {
+  id        String   @id @default(cuid())
+  schoolId  String
+  name      String
+  subject   String
+  createdAt DateTime @default(now())
+}
+
+model Assignment {
+  id           String   @id @default(cuid())
+  schoolId     String
+  courseId     String
+  title        String
+  instructions String   @default("")
+  dueDate      String // YYYY-MM-DD
+  points       Int      @default(20)
+  createdAt    DateTime @default(now())
+}
+
+model Submission {
+  id           String   @id @default(cuid())
+  schoolId     String
+  assignmentId String
+  studentId    String
+  status       String // assigned | submitted | graded
+  submittedAt  String? // ISO timestamp
+  responseText String   @default("")
+  score        Int?
+  feedback     String   @default("")
+  gradedAt     String? // ISO timestamp
+  createdAt    DateTime @default(now())
+}
+
+model Attendance {
+  id        String   @id @default(cuid())
+  schoolId  String
+  studentId String
+  date      String // YYYY-MM-DD
+  status    String // present | absent | excused
+  note      String   @default("")
+  createdAt DateTime @default(now())
+}
+
+model Observation {
+  id        String   @id @default(cuid())
+  schoolId  String
+  studentId String
+  date      String // YYYY-MM-DD
+  text      String
+  author    String
+  createdAt DateTime @default(now())
+}
+
+model FileRec {
+  id         String   @id @default(cuid())
+  schoolId   String
+  studentId  String
+  label      String
+  ext        String
+  mime       String
+  bytes      Int
+  data       Bytes
+  capturedAt String // ISO timestamp
+  createdAt  DateTime @default(now())
+}
+
+model Payment {
+  id         String   @id @default(cuid())
+  schoolId   String
+  studentId  String
+  payer      String // family
+  amount     Float
+  receivedAt String // ISO timestamp
+  method     String   @default("manual")
+  createdAt  DateTime @default(now())
+}
+
+model Invoice {
+  id              String   @id @default(cuid())
+  schoolId        String
+  studentId       String
+  periodStart     String // YYYY-MM-DD
+  periodEnd       String // YYYY-MM-DD
+  amount          Float
+  status          String // draft | submitted | paid | rejected
+  narrative       String   @default("")
+  narrativeSource String   @default("template") // template | ai | edited
+  evidenceScore   Int      @default(0)
+  railId          String?
+  submittedAt     String? // ISO timestamp
+  paidAt          String? // ISO timestamp
+  createdAt       DateTime @default(now())
+}
+
+model Session {
+  id        String   @id
+  userId    String
+  createdAt DateTime @default(now())
+}
+
+model Audit {
+  id        String   @id @default(cuid())
+  at        String // ISO timestamp
+  actorId   String?
+  action    String
+  detail    String   @default("")
+  createdAt DateTime @default(now())
+}
