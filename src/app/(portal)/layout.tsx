@@ -3,12 +3,14 @@
 
 import { requireUser } from "@/lib/auth";
 import { TopNav } from "@/components/TopNav";
+import { threadStudentIds, unreadForFamily } from "@/lib/messages";
 
 export default async function PortalLayout({ children }: { children: React.ReactNode }) {
   const { user } = await requireUser();
+  const messagesUnread = await unreadForFamily(await threadStudentIds(user));
   return (
     <>
-      <TopNav role={user.role} userName={user.name} />
+      <TopNav role={user.role} userName={user.name} messagesUnread={messagesUnread} />
       <div className="wrap">{children}</div>
     </>
   );

@@ -65,6 +65,41 @@ export async function submitWork(formData: FormData) {
   redirect("/student?sent=1");
 }
 
+// Parent reports an upcoming/known absence — posts an excused attendance record
+// with a note the teacher sees (and which feeds the evidence they rely on).
+export async function reportAbsence(formData: FormData) {
+  const { user } = await requireRole("parent");
+  const studentId = String(formData.get("studentId"));
+  const date = String(formData.get("date") || "");
+  const note = String(formData.get("note") || "").trim().slice(0, 300);
+
+  const ownStudentIds: string[] = user.studentIdsJson ? JSON.parse(user.studentIdsJson) : [];
+  if (!ownStudentIds.includes(studentId) || !date) redirect("/parent/feed");
+
+  const existing = await prisma.attendance.findFirst({ where: { studentId, date } });
+  if (existing) {
+    await prisma.attendance.update({
+      where: { id: existing.id },
+      data: { status: "excused", note: note || "Reported by parent" },
+    });
+  } else {
+    await prisma.attendance.create({
+      data: {
+        schoolId: user.schoolId,
+        studentId,
+        date,
+        status: "excused",
+        note: note || "Reported by parent",
+      },
+    });
+  }
+  await logAudit(user.id, "absence_reported", `${studentId} ${date}`);
+  revalidatePath("/parent/feed");
+  revalidatePath("/dashboard");
+  revalidatePath("/attendance");
+  redirect("/parent/feed?absence=1");
+}
+
 // COPPA right to deletion, exercised by the verified parent: permanently delete
 // their child and every record tied to them.
 export async function deleteChildData(formData: FormData) {

@@ -40,6 +40,10 @@ const NAV: { group: string; items: { href: string; label: string }[] }[] = [
     ],
   },
   {
+    group: "Family",
+    items: [{ href: "/messages", label: "Messages" }],
+  },
+  {
     group: "Admin",
     items: [
       { href: "/settings", label: "Settings" },
@@ -53,11 +57,13 @@ export function Sidebar({
   schoolState,
   railLabel,
   userName,
+  messagesUnread = 0,
 }: {
   schoolName: string;
   schoolState: string;
   railLabel: string;
   userName: string;
+  messagesUnread?: number;
 }) {
   const pathname = usePathname();
   const isOn = (href: string) =>
@@ -80,6 +86,9 @@ export function Sidebar({
           {section.items.map((item) => (
             <Link key={item.href} href={item.href} className={isOn(item.href) ? "on" : ""}>
               {item.label}
+              {item.href === "/messages" && messagesUnread > 0 && (
+                <span className="nav-badge">{messagesUnread}</span>
+              )}
             </Link>
           ))}
         </div>
