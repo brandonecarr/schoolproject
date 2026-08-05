@@ -5,14 +5,59 @@ import { evidenceFor } from "@/lib/evidence";
 import { readiness, RAILS } from "@/lib/rules";
 import { fmt } from "@/lib/dates";
 import { Pill, Notice, VerifyFlag } from "@/components/ui";
-import { saveNarrative, setInvoiceStatus } from "../../actions";
+import type { Tone } from "@/components/ui";
+import {
+  saveNarrative,
+  setInvoiceStatus,
+  rejectInvoice,
+  regenerateNarrative,
+} from "../../actions";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Invoice packet — Cohort" };
 
-export default async function InvoicePacketPage({ params }: { params: Promise<{ id: string }> }) {
+const STATUS_TONE: Record<string, Tone | "mark"> = {
+  draft: "warn",
+  submitted: "info",
+  approved: "mark",
+  paid: "good",
+  rejected: "bad",
+};
+
+const daysBetween = (a: string, b: string) =>
+  Math.round((Date.parse(b) - Date.parse(a)) / 86_400_000);
+
+// A single hidden-status transition button.
+function TransitionButton({
+  id,
+  status,
+  label,
+  className = "btn",
+}: {
+  id: string;
+  status: string;
+  label: string;
+  className?: string;
+}) {
+  return (
+    <form action={setInvoiceStatus}>
+      <input type="hidden" name="id" value={id} />
+      <input type="hidden" name="status" value={status} />
+      <button className={className}>{label}</button>
+    </form>
+  );
+}
+
+export default async function InvoicePacketPage({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ id: string }>;
+  searchParams: Promise<{ regenerated?: string }>;
+}) {
   const { school, rail: sessionRail } = await requireTeacher();
   const { id } = await params;
+  const { regenerated } = await searchParams;
 
   const inv = await prisma.invoice.findFirst({ where: { id, schoolId: school!.id } });
   if (!inv) notFound();
@@ -22,6 +67,10 @@ export default async function InvoicePacketPage({ params }: { params: Promise<{ 
   const e = await evidenceFor(inv.studentId, inv.periodStart, inv.periodEnd);
   const r = readiness(inv.evidenceScore);
   const graded = e.submissions.filter((x) => x.status === "graded");
+  const daysToCash =
+    inv.status === "paid" && inv.submittedAt && inv.paidAt
+      ? daysBetween(inv.submittedAt, inv.paidAt)
+      : null;
 
   return (
     <>
@@ -33,31 +82,67 @@ export default async function InvoicePacketPage({ params }: { params: Promise<{ 
           <h1>{s ? s.name : "—"}</h1>
         </div>
         <div className="row">
-          <Pill tone={r.tone}>{r.label}</Pill>
+          <Pill tone={STATUS_TONE[inv.status] ?? "warn"}>{inv.status}</Pill>
           <a className="btn mark" href={`/invoices/${inv.id}/print`} target="_blank" rel="noopener noreferrer">
             Print / Save as PDF
           </a>
-          <form action={setInvoiceStatus}>
-            <input type="hidden" name="id" value={inv.id} />
-            <input type="hidden" name="status" value="submitted" />
-            <button className="btn">Mark submitted</button>
-          </form>
+          {inv.status === "draft" && (
+            <TransitionButton id={inv.id} status="submitted" label="Mark submitted" />
+          )}
+          {inv.status === "submitted" && (
+            <>
+              <TransitionButton id={inv.id} status="approved" label="Mark approved" className="btn sec" />
+              <TransitionButton id={inv.id} status="paid" label="Mark paid" />
+            </>
+          )}
+          {inv.status === "approved" && (
+            <TransitionButton id={inv.id} status="paid" label="Mark paid" />
+          )}
+          {inv.status === "rejected" && (
+            <TransitionButton id={inv.id} status="submitted" label="Resubmit" />
+          )}
         </div>
       </div>
 
-      <Notice tone="warn">
-        Cohort prepares the packet. You review it and submit it in the state portal yourself — nothing
-        here is sent to {rail ? rail.label : "the state"} automatically.
-      </Notice>
+      {regenerated && (
+        <Notice tone="good">
+          Documentation regenerated from the latest evidence. Review it, then resubmit.
+        </Notice>
+      )}
+
+      {/* Lifecycle status banner */}
+      {inv.status === "paid" ? (
+        <Notice tone="good">
+          Paid{inv.paidAt ? ` on ${fmt(inv.paidAt)}` : ""}
+          {daysToCash != null ? ` — ${daysToCash} days from submission to cash` : ""}.
+          {inv.rejectionCount === 0
+            ? " Approved first-pass."
+            : ` Approved after ${inv.rejectionCount} rejection${inv.rejectionCount === 1 ? "" : "s"}.`}
+        </Notice>
+      ) : inv.status === "rejected" ? (
+        <Notice tone="bad">
+          <strong>Rejected{inv.rejectedAt ? ` ${fmt(inv.rejectedAt)}` : ""}:</strong>{" "}
+          {inv.rejectionReason || "No reason recorded"}. Regenerate the documentation from the latest
+          evidence, review it, then resubmit.
+        </Notice>
+      ) : (
+        <Notice tone="warn">
+          Cohort prepares the packet. You review it and submit it in the state portal yourself — nothing
+          here is sent to {rail ? rail.label : "the state"} automatically.
+        </Notice>
+      )}
 
       <div className="card">
-        <div className="eyebrow">
-          Educational purpose statement{" "}
-          {inv.narrativeSource === "template"
-            ? "· generated without AI (no API key set)"
-            : inv.narrativeSource === "ai"
-              ? "· AI draft, review before use"
-              : "· edited by you"}
+        <div className="spread">
+          <div className="eyebrow">
+            Educational purpose statement{" "}
+            {inv.narrativeSource === "template"
+              ? "· generated without AI (no API key set)"
+              : inv.narrativeSource === "ai"
+                ? "· AI draft, review before use"
+                : "· edited by you"}
+          </div>
+          <Pill tone={r.tone}>{r.label}</Pill>
         </div>
         <form action={saveNarrative}>
           <input type="hidden" name="id" value={inv.id} />
@@ -70,7 +155,42 @@ export default async function InvoicePacketPage({ params }: { params: Promise<{ 
             Save edits
           </button>
         </form>
+        {/* Separate form — regenerate the draft from the latest evidence */}
+        <form action={regenerateNarrative} style={{ marginTop: 10 }}>
+          <input type="hidden" name="id" value={inv.id} />
+          <button className="btn ghost">Regenerate from evidence</button>
+        </form>
       </div>
+
+      {/* Rejection capture — only while the invoice is out for review */}
+      {(inv.status === "submitted" || inv.status === "approved") && (
+        <div className="card" style={{ marginTop: 12 }}>
+          <div className="eyebrow">Log a rejection</div>
+          <p className="small muted" style={{ margin: "6px 0 10px" }}>
+            If {rail ? rail.label : "the state"} sends this back, record why — it feeds the rework loop
+            and your first-pass approval rate.
+          </p>
+          <form action={rejectInvoice} className="row" style={{ alignItems: "flex-end", gap: 12 }}>
+            <input type="hidden" name="id" value={inv.id} />
+            <div style={{ flex: 1, minWidth: 260 }}>
+              <label htmlFor="reason">Rejection reason</label>
+              {rail && rail.rejectionReasons.length ? (
+                <select id="reason" name="reason">
+                  {rail.rejectionReasons.map((x) => (
+                    <option key={x} value={x}>
+                      {x}
+                    </option>
+                  ))}
+                  <option value="Other (see portal notes)">Other (see portal notes)</option>
+                </select>
+              ) : (
+                <input id="reason" name="reason" placeholder="Why it was rejected" />
+              )}
+            </div>
+            <button className="btn ghost">Mark rejected</button>
+          </form>
+        </div>
+      )}
 
       <div className="sep" />
       <div className="grid g2">

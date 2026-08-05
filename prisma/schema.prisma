@@ -142,13 +142,17 @@ model Invoice {
   periodStart     String // YYYY-MM-DD
   periodEnd       String // YYYY-MM-DD
   amount          Float
-  status          String // draft | submitted | paid | rejected
+  status          String // draft | submitted | approved | paid | rejected
   narrative       String   @default("")
   narrativeSource String   @default("template") // template | ai | edited
   evidenceScore   Int      @default(0)
   railId          String?
-  submittedAt     String? // ISO timestamp
+  submittedAt     String? // ISO timestamp — latest submission
+  approvedAt      String? // ISO timestamp
   paidAt          String? // ISO timestamp
+  rejectedAt      String? // ISO timestamp — most recent rejection
+  rejectionReason String   @default("")
+  rejectionCount  Int      @default(0) // how many times this invoice was rejected (drives first-pass rate)
   createdAt       DateTime @default(now())
 }
 

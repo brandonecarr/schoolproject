@@ -6,6 +6,7 @@ import { readiness, PROGRAMS } from "@/lib/rules";
 import { today, fmt } from "@/lib/dates";
 import { EvidenceBar } from "@/components/EvidenceBar";
 import { Pill } from "@/components/ui";
+import { reimbursementMetrics, formatPct } from "@/lib/metrics";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Dashboard — Cohort" };
@@ -28,6 +29,10 @@ export default async function Dashboard() {
   const esaKids = students.filter((s) => s.esaProgram);
   const avg = Math.round(ev.reduce((a, x) => a + x.e.score, 0) / (ev.length || 1));
   const outstandingCash = esaKids.reduce((a, s) => a + Math.round(s.esaAmount / 10), 0);
+
+  const invoices = await prisma.invoice.findMany({ where: { schoolId } });
+  const m = reimbursementMetrics(invoices);
+  const hasReimbursementData = m.decided > 0 || m.inFlight > 0;
 
   return (
     <>
@@ -124,15 +129,30 @@ export default async function Dashboard() {
       <div className="sep" />
       <div className="grid g2">
         <div className="card">
-          <div className="eyebrow">Cash position</div>
-          <h3 style={{ margin: "6px 0 10px" }}>
-            About ${outstandingCash.toLocaleString()} sits in the next ESA cycle
-          </h3>
-          <p className="small muted" style={{ margin: 0 }}>
-            {esaKids.length} of {students.length} families are on {school!.railLabel}. Reimbursement
-            typically lands well after the month you taught — build the invoices before you need the
-            money, not after.
-          </p>
+          <div className="eyebrow">Getting paid</div>
+          {hasReimbursementData ? (
+            <>
+              <h3 style={{ margin: "6px 0 10px" }}>
+                {formatPct(m.firstPassRate)} first-pass approval
+                {m.avgDaysToCash != null ? ` · ${m.avgDaysToCash} days to cash` : ""}
+              </h3>
+              <p className="small muted" style={{ margin: 0 }}>
+                ${m.inFlight.toLocaleString()} in flight, ${m.paidTotal.toLocaleString()} paid this
+                year. <Link href="/invoices">Open ESA invoices</Link>.
+              </p>
+            </>
+          ) : (
+            <>
+              <h3 style={{ margin: "6px 0 10px" }}>
+                About ${outstandingCash.toLocaleString()} sits in the next ESA cycle
+              </h3>
+              <p className="small muted" style={{ margin: 0 }}>
+                {esaKids.length} of {students.length} families are on {school!.railLabel}.
+                Reimbursement typically lands well after the month you taught — build the invoices
+                before you need the money, not after.
+              </p>
+            </>
+          )}
         </div>
         <div className="card">
           <div className="eyebrow">Grading queue</div>

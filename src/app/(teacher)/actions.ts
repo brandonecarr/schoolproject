@@ -11,6 +11,7 @@ import { prisma } from "@/lib/db";
 import { requireTeacher, logAudit } from "@/lib/auth";
 import { evidenceFor } from "@/lib/evidence";
 import { purposeNarrative } from "@/lib/ai";
+import { PROGRAMS } from "@/lib/rules";
 import { today, periodStart } from "@/lib/dates";
 
 // --- Attendance ---
@@ -117,8 +118,28 @@ export async function buildInvoices() {
   const end = today();
   const students = await prisma.student.findMany({ where: { schoolId, NOT: { esaProgram: null } } });
 
+  // Dedup: skip students who already have an OPEN invoice for this exact period.
+  // "Open" = anything not yet resolved (draft/submitted/approved) or already
+  // paid — building again would only duplicate it. A rejected invoice is not
+  // open, so a rebuild is allowed as one way to redo a rejection.
+  const existing = await prisma.invoice.findMany({
+    where: {
+      schoolId,
+      periodStart: start,
+      periodEnd: end,
+      status: { in: ["draft", "submitted", "approved", "paid"] },
+    },
+    select: { studentId: true },
+  });
+  const covered = new Set(existing.map((i) => i.studentId));
+
   let built = 0;
+  let skipped = 0;
   for (const s of students) {
+    if (covered.has(s.id)) {
+      skipped++;
+      continue;
+    }
     const e = await evidenceFor(s.id, start, end);
     const nar = await purposeNarrative({
       student: s,
@@ -146,10 +167,10 @@ export async function buildInvoices() {
     });
     built++;
   }
-  await logAudit(user.id, "invoices_built", `${built} packets`);
+  await logAudit(user.id, "invoices_built", `${built} built, ${skipped} skipped`);
   revalidatePath("/invoices");
   revalidatePath("/cashflow");
-  redirect(`/invoices?built=${built}`);
+  redirect(`/invoices?built=${built}&skipped=${skipped}`);
 }
 
 export async function saveNarrative(formData: FormData) {
@@ -166,19 +187,84 @@ export async function saveNarrative(formData: FormData) {
   redirect(`/invoices/${id}`);
 }
 
+// Move an invoice forward through the reimbursement lifecycle:
+//   draft → submitted → approved → paid   (and resubmit: rejected → submitted)
 export async function setInvoiceStatus(formData: FormData) {
-  const { school } = await requireTeacher();
+  const { user, school } = await requireTeacher();
   const id = String(formData.get("id"));
   const status = String(formData.get("status"));
   const inv = await prisma.invoice.findFirst({ where: { id, schoolId: school!.id } });
   if (!inv) redirect("/invoices");
-  const data: { status: string; submittedAt?: string; paidAt?: string } = { status };
-  if (status === "submitted") data.submittedAt = new Date().toISOString();
-  if (status === "paid") data.paidAt = new Date().toISOString();
+  const now = new Date().toISOString();
+  const data: {
+    status: string;
+    submittedAt?: string;
+    approvedAt?: string;
+    paidAt?: string;
+  } = { status };
+  if (status === "submitted") data.submittedAt = now; // covers first submit AND resubmit
+  if (status === "approved") data.approvedAt = now;
+  if (status === "paid") data.paidAt = now;
   await prisma.invoice.update({ where: { id }, data });
+  await logAudit(user.id, "invoice_status", `${id} → ${status}`);
   revalidatePath("/invoices");
   revalidatePath("/cashflow");
-  redirect("/invoices");
+  revalidatePath("/dashboard");
+  redirect(`/invoices/${id}`);
+}
+
+// Reject an invoice with a reason. Increments rejectionCount so the first-pass
+// approval-rate metric can tell a clean approval from a reworked one.
+export async function rejectInvoice(formData: FormData) {
+  const { user, school } = await requireTeacher();
+  const id = String(formData.get("id"));
+  const reason = String(formData.get("reason") || "").trim();
+  const inv = await prisma.invoice.findFirst({ where: { id, schoolId: school!.id } });
+  if (!inv) redirect("/invoices");
+  await prisma.invoice.update({
+    where: { id },
+    data: {
+      status: "rejected",
+      rejectedAt: new Date().toISOString(),
+      rejectionReason: reason || "No reason recorded",
+      rejectionCount: { increment: 1 },
+    },
+  });
+  await logAudit(user.id, "invoice_rejected", `${id}: ${reason}`);
+  revalidatePath("/invoices");
+  revalidatePath("/cashflow");
+  redirect(`/invoices/${id}`);
+}
+
+// Rebuild the educational-purpose narrative from the latest evidence — the
+// "regenerate documentation" step of the rejection rework loop. Leaves the
+// status alone (the teacher resubmits after reviewing the fresh draft).
+export async function regenerateNarrative(formData: FormData) {
+  const { user, school, rail } = await requireTeacher();
+  const id = String(formData.get("id"));
+  const inv = await prisma.invoice.findFirst({ where: { id, schoolId: school!.id } });
+  if (!inv) redirect("/invoices");
+  const student = await prisma.student.findUnique({ where: { id: inv.studentId } });
+  if (!student) redirect("/invoices");
+
+  const e = await evidenceFor(inv.studentId, inv.periodStart, inv.periodEnd);
+  const nar = await purposeNarrative({
+    student,
+    school: school!,
+    rail,
+    period: { start: inv.periodStart, end: inv.periodEnd },
+    attendance: e.attendance,
+    assignments: e.assignments,
+    submissions: e.submissions,
+    observations: e.observations,
+  });
+  await prisma.invoice.update({
+    where: { id },
+    data: { narrative: nar.text, narrativeSource: nar.source, evidenceScore: e.score },
+  });
+  await logAudit(user.id, "narrative_regenerated", id);
+  revalidatePath(`/invoices/${id}`);
+  redirect(`/invoices/${id}?regenerated=1`);
 }
 
 // --- Invites (parent account creation) ---
@@ -218,6 +304,50 @@ export async function recordPayment(formData: FormData) {
   await logAudit(user.id, "payment_recorded", String(formData.get("studentId")));
   revalidatePath("/billing");
   redirect("/billing?paid=1");
+}
+
+// --- Roster CSV import ---
+// Columns: name, grade, familyName, esaProgram, esaAmount, tuitionAnnual.
+// Only `name` is required; a header row (first cell "name") is skipped.
+export async function importStudents(formData: FormData) {
+  const { user, school } = await requireTeacher();
+  const schoolId = school!.id;
+  const raw = String(formData.get("csv") || "");
+  const lines = raw.split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
+
+  let created = 0;
+  let skipped = 0;
+  for (const line of lines) {
+    const cols = line.split(",").map((c) => c.trim());
+    const name = cols[0] || "";
+    if (!name) {
+      skipped++;
+      continue;
+    }
+    if (name.toLowerCase() === "name") continue; // header row
+
+    const [, grade, familyName, esaProgram, esaAmount, tuitionAnnual] = cols;
+    const programKey = (esaProgram || "").toUpperCase();
+    const program = programKey && PROGRAMS[programKey] ? programKey : null;
+
+    await prisma.student.create({
+      data: {
+        schoolId,
+        name,
+        grade: grade || "",
+        familyName: familyName || name.split(" ").slice(-1)[0] || name,
+        esaProgram: program,
+        esaAmount: Number(esaAmount) || 0,
+        tuitionAnnual: Number(tuitionAnnual) || school!.esaAmount || 0,
+      },
+    });
+    created++;
+  }
+
+  await logAudit(user.id, "students_imported", `${created} created, ${skipped} skipped`);
+  revalidatePath("/students");
+  revalidatePath("/dashboard");
+  redirect(`/students?imported=${created}&skipped=${skipped}`);
 }
 
 // --- Work samples (multipart upload; bytes stored in the DB) ---

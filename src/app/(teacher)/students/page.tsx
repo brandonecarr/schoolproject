@@ -3,13 +3,18 @@ import { requireTeacher } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { evidenceFor } from "@/lib/evidence";
 import { readiness, PROGRAMS } from "@/lib/rules";
-import { Pill } from "@/components/ui";
+import { Pill, Notice } from "@/components/ui";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Students — Cohort" };
 
-export default async function StudentsPage() {
+export default async function StudentsPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ imported?: string; skipped?: string }>;
+}) {
   const { school } = await requireTeacher();
+  const sp = await searchParams;
   const students = await prisma.student.findMany({
     where: { schoolId: school!.id },
     orderBy: { createdAt: "asc" },
@@ -18,11 +23,20 @@ export default async function StudentsPage() {
 
   return (
     <>
+      {sp.imported && (
+        <Notice tone="good">
+          Imported {sp.imported} student(s)
+          {sp.skipped && Number(sp.skipped) > 0 ? `, skipped ${sp.skipped} blank row(s)` : ""}.
+        </Notice>
+      )}
       <div className="topbar">
         <div>
           <div className="eyebrow">Roster</div>
           <h1>Students</h1>
         </div>
+        <Link className="btn sec" href="/students/import">
+          Import roster (CSV)
+        </Link>
       </div>
       <div className="card" style={{ padding: "16px 10px" }}>
         <table>

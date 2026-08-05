@@ -4,6 +4,7 @@ import { prisma } from "@/lib/db";
 import { fmt } from "@/lib/dates";
 import { Pill, Notice, VerifyFlag } from "@/components/ui";
 import type { Tone } from "@/components/ui";
+import { reimbursementMetrics, formatPct } from "@/lib/metrics";
 import { buildInvoices } from "../actions";
 
 export const dynamic = "force-dynamic";
@@ -11,6 +12,7 @@ export const metadata = { title: "ESA invoices — Cohort" };
 
 const STATUS_TONE: Record<string, Tone | "mark"> = {
   paid: "good",
+  approved: "mark",
   submitted: "info",
   rejected: "bad",
   draft: "warn",
@@ -19,7 +21,7 @@ const STATUS_TONE: Record<string, Tone | "mark"> = {
 export default async function InvoicesPage({
   searchParams,
 }: {
-  searchParams: Promise<{ built?: string }>;
+  searchParams: Promise<{ built?: string; skipped?: string }>;
 }) {
   const { school, rail } = await requireTeacher();
   const schoolId = school!.id;
@@ -29,13 +31,20 @@ export default async function InvoicesPage({
   const invoices = await prisma.invoice.findMany({ where: { schoolId }, orderBy: { createdAt: "desc" } });
   const students = await prisma.student.findMany({ where: { schoolId } });
   const nameOf = (id: string) => students.find((s) => s.id === id)?.name || "—";
+  const m = reimbursementMetrics(invoices);
+  const built = sp.built ? Number(sp.built) : null;
+  const skipped = sp.skipped ? Number(sp.skipped) : 0;
 
   return (
     <>
-      {sp.built && (
-        <Notice tone="good">
-          Built {sp.built} draft invoice packet(s). Review each one before you submit — nothing has
-          been sent anywhere.
+      {built != null && (
+        <Notice tone={built > 0 ? "good" : "info"}>
+          {built > 0
+            ? `Built ${built} draft invoice packet(s). Review each one before you submit — nothing has been sent anywhere.`
+            : "No new packets to build for this period."}
+          {skipped > 0
+            ? ` ${skipped} student(s) already had a packet for this period and were skipped.`
+            : ""}
         </Notice>
       )}
       <div className="topbar">
@@ -62,7 +71,40 @@ export default async function InvoicesPage({
         </div>
       )}
 
-      <div className="card" style={{ padding: "16px 10px" }}>
+      <div className="grid g3" style={{ marginTop: 16 }}>
+        <div className="stat">
+          <div className="n">{formatPct(m.firstPassRate)}</div>
+          <div className="l">First-pass approval</div>
+          {m.decided > 0 && (
+            <div className="small muted" style={{ marginTop: 4 }}>
+              {m.firstPassPaid} of {m.decided} decided
+            </div>
+          )}
+        </div>
+        <div className="stat">
+          <div className="n">
+            {m.avgDaysToCash == null ? "—" : m.avgDaysToCash}
+            {m.avgDaysToCash != null && (
+              <span style={{ fontSize: 15, color: "var(--ink-soft)" }}> days</span>
+            )}
+          </div>
+          <div className="l">Avg days to cash</div>
+          {m.paidCount > 0 && (
+            <div className="small muted" style={{ marginTop: 4 }}>
+              over {m.paidCount} paid
+            </div>
+          )}
+        </div>
+        <div className="stat">
+          <div className="n">${m.inFlight.toLocaleString()}</div>
+          <div className="l">In flight</div>
+          <div className="small muted" style={{ marginTop: 4 }}>
+            ${m.paidTotal.toLocaleString()} paid · ${m.draftTotal.toLocaleString()} in draft
+          </div>
+        </div>
+      </div>
+
+      <div className="card" style={{ padding: "16px 10px", marginTop: 12 }}>
         <table>
           <thead>
             <tr>
