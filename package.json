@@ -12,7 +12,8 @@
     "db:reset": "prisma migrate reset --force && tsx prisma/seed.ts",
     "test": "vitest run",
     "test:watch": "vitest",
-    "smoke": "tsx scripts/smoke.ts"
+    "smoke": "tsx scripts/smoke.ts",
+    "purge": "tsx scripts/purge.ts"
   },
   "dependencies": {
     "@libsql/client": "^0.17.4",

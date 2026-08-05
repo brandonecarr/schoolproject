@@ -3,7 +3,8 @@ import { prisma } from "@/lib/db";
 import { evidenceFor } from "@/lib/evidence";
 import { fmt } from "@/lib/dates";
 import { Pill, Notice } from "@/components/ui";
-import { createStudentAccount } from "../actions";
+import { ConfirmSubmit } from "@/components/ConfirmSubmit";
+import { createStudentAccount, deleteChildData } from "../actions";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "My children — Cohort" };
@@ -11,7 +12,7 @@ export const metadata = { title: "My children — Cohort" };
 export default async function ParentPage({
   searchParams,
 }: {
-  searchParams: Promise<{ created?: string }>;
+  searchParams: Promise<{ created?: string; deleted?: string }>;
 }) {
   const { user } = await requireRole("parent");
   const sp = await searchParams;
@@ -37,6 +38,9 @@ export default async function ParentPage({
         <Notice tone="good">
           Your child&apos;s login is ready. They can sign in with the password you set.
         </Notice>
+      )}
+      {sp.deleted && (
+        <Notice tone="good">Your child&apos;s data has been permanently deleted.</Notice>
       )}
       {blocks.map(({ k, e, kidUser, graded, open }) => (
         <div key={k.id} className="card">
@@ -119,6 +123,26 @@ export default async function ParentPage({
               </form>
             </>
           )}
+
+          <div className="sep" style={{ margin: "16px 0" }} />
+          <details>
+            <summary className="small muted" style={{ cursor: "pointer" }}>
+              Delete {k.name.split(" ")[0]}&apos;s data
+            </summary>
+            <p className="small muted" style={{ margin: "8px 0 10px", maxWidth: "60ch" }}>
+              Permanently removes everything we hold about {k.name.split(" ")[0]} — coursework,
+              attendance, notes, work samples, and any login. This cannot be undone.
+            </p>
+            <form action={deleteChildData}>
+              <input type="hidden" name="studentId" value={k.id} />
+              <ConfirmSubmit
+                className="btn ghost sm"
+                message={`Permanently delete all of ${k.name}'s data? This cannot be undone.`}
+              >
+                Delete my child&apos;s data
+              </ConfirmSubmit>
+            </form>
+          </details>
         </div>
       ))}
     </>

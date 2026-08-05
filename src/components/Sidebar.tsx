@@ -39,6 +39,13 @@ const NAV: { group: string; items: { href: string; label: string }[] }[] = [
       { href: "/cashflow", label: "Cash flow" },
     ],
   },
+  {
+    group: "Admin",
+    items: [
+      { href: "/settings", label: "Settings" },
+      { href: "/audit", label: "Audit log" },
+    ],
+  },
 ];
 
 export function Sidebar({

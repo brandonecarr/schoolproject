@@ -7,7 +7,8 @@ import { readiness, PROGRAMS } from "@/lib/rules";
 import { fmt, today } from "@/lib/dates";
 import { EvidenceBar } from "@/components/EvidenceBar";
 import { Pill, Notice } from "@/components/ui";
-import { uploadSample, deleteSample } from "../../actions";
+import { ConfirmSubmit } from "@/components/ConfirmSubmit";
+import { uploadSample, deleteSample, deleteStudent } from "../../actions";
 
 export const dynamic = "force-dynamic";
 
@@ -187,6 +188,26 @@ export default async function StudentPage({
             </p>
           )}
         </div>
+      </div>
+
+      <div className="card" style={{ marginTop: 12, borderColor: "var(--bad-soft)" }}>
+        <div className="eyebrow" style={{ color: "var(--bad)" }}>
+          Delete this student&apos;s data
+        </div>
+        <p className="small muted" style={{ margin: "6px 0 12px", maxWidth: "64ch" }}>
+          Permanently removes {s.name} and every record tied to them — attendance, observations,
+          submissions, work samples, invoices, payments, and any login. This is the family&apos;s
+          right-to-deletion under COPPA and cannot be undone.
+        </p>
+        <form action={deleteStudent}>
+          <input type="hidden" name="studentId" value={s.id} />
+          <ConfirmSubmit
+            className="btn ghost"
+            message={`Permanently delete ${s.name} and ALL of their data? This cannot be undone.`}
+          >
+            Delete student &amp; all data
+          </ConfirmSubmit>
+        </form>
       </div>
     </>
   );

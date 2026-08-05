@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import { login } from "./actions";
 
 export const metadata: Metadata = { title: "Sign in — Cohort" };
@@ -7,9 +8,9 @@ export const dynamic = "force-dynamic";
 export default async function LoginPage({
   searchParams,
 }: {
-  searchParams: Promise<{ e?: string }>;
+  searchParams: Promise<{ e?: string; reset?: string }>;
 }) {
-  const { e: error } = await searchParams;
+  const { e: error, reset } = await searchParams;
 
   return (
     <div style={{ minHeight: "100vh", display: "grid", placeItems: "center", padding: 24 }}>
@@ -25,6 +26,7 @@ export default async function LoginPage({
           Attendance, coursework, grading, families, and ESA invoicing in one place.
         </p>
         {error && <div className="notice bad">{error}</div>}
+        {reset && <div className="notice good">Password updated. Sign in with your new password.</div>}
         <form action={login} className="card">
           <label htmlFor="email">Email</label>
           <input id="email" name="email" type="email" required autoComplete="username" />
@@ -34,6 +36,9 @@ export default async function LoginPage({
             Sign in
           </button>
         </form>
+        <p className="small muted" style={{ margin: "12px 0 0", textAlign: "center" }}>
+          New here? <Link href="/signup">Create your school</Link>.
+        </p>
         <div className="card" style={{ marginTop: 12, background: "#FAFBF8" }}>
           <div className="eyebrow">Demo accounts</div>
           <div className="small mono" style={{ marginTop: 8, lineHeight: 1.9 }}>

@@ -11,7 +11,7 @@ export const metadata = { title: "Students — Cohort" };
 export default async function StudentsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ imported?: string; skipped?: string }>;
+  searchParams: Promise<{ imported?: string; skipped?: string; deleted?: string }>;
 }) {
   const { school } = await requireTeacher();
   const sp = await searchParams;
@@ -29,6 +29,7 @@ export default async function StudentsPage({
           {sp.skipped && Number(sp.skipped) > 0 ? `, skipped ${sp.skipped} blank row(s)` : ""}.
         </Notice>
       )}
+      {sp.deleted && <Notice tone="good">Student and all associated data permanently deleted.</Notice>}
       <div className="topbar">
         <div>
           <div className="eyebrow">Roster</div>

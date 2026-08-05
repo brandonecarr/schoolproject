@@ -28,6 +28,9 @@ model School {
   state     String
   esaAmount Float
   address   String   @default("")
+  // COPPA: child data may not be kept indefinitely. Records older than this are
+  // purged by the retention job. Configurable per school; 730 days = ~2 school years.
+  retentionDays Int   @default(730)
   createdAt DateTime @default(now())
 }
 
@@ -168,5 +171,21 @@ model Audit {
   actorId   String?
   action    String
   detail    String   @default("")
+  createdAt DateTime @default(now())
+}
+
+// One-time links for onboarding + password reset. Replaces the shared demo1234
+// password. Link-based (no email dependency): the teacher/owner shares the URL.
+model Token {
+  id        String   @id @default(cuid())
+  token     String   @unique // the secret in the URL
+  type      String // parent_invite | password_reset
+  schoolId  String
+  userId    String? // password_reset: the existing user
+  email     String? // parent_invite: email of the account to create
+  name      String? // parent_invite: parent name
+  studentId String? // parent_invite: child to link
+  expiresAt String // ISO timestamp
+  usedAt    String? // ISO timestamp — null until consumed
   createdAt DateTime @default(now())
 }

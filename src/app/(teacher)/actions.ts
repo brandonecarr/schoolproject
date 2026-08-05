@@ -12,6 +12,8 @@ import { requireTeacher, logAudit } from "@/lib/auth";
 import { evidenceFor } from "@/lib/evidence";
 import { purposeNarrative } from "@/lib/ai";
 import { PROGRAMS } from "@/lib/rules";
+import { deleteStudentData } from "@/lib/retention";
+import { newTokenValue, tokenExpiry } from "@/lib/tokens";
 import { today, periodStart } from "@/lib/dates";
 
 // --- Attendance ---
@@ -267,25 +269,46 @@ export async function regenerateNarrative(formData: FormData) {
   redirect(`/invoices/${id}?regenerated=1`);
 }
 
-// --- Invites (parent account creation) ---
+// --- Invites + password reset (tokenized links, no shared password) ---
+// Generate a one-time invite link. The parent opens it and sets their OWN
+// password (replaces the old shared demo1234). Verifiable consent is preserved:
+// the parent still creates the child's login themselves from their portal.
 export async function createParentInvite(formData: FormData) {
-  const { school } = await requireTeacher();
+  const { user, school } = await requireTeacher();
   const email = String(formData.get("email") || "").trim().toLowerCase();
   const existing = await prisma.user.findUnique({ where: { email } });
-  if (existing) redirect("/invites");
-  await prisma.user.create({
+  if (existing) redirect("/invites?exists=1");
+  const token = newTokenValue();
+  await prisma.token.create({
     data: {
+      token,
+      type: "parent_invite",
       schoolId: school!.id,
-      role: "parent",
-      name: String(formData.get("name") || ""),
       email,
-      password: (await import("@/lib/password")).hashPassword("demo1234"),
-      studentIdsJson: JSON.stringify([String(formData.get("studentId"))]),
-      consentGivenAt: new Date().toISOString(),
+      name: String(formData.get("name") || ""),
+      studentId: String(formData.get("studentId")),
+      expiresAt: tokenExpiry(14),
     },
   });
+  await logAudit(user.id, "parent_invite_created", email);
   revalidatePath("/invites");
-  redirect("/invites?invited=1");
+  redirect(`/invites?invite=${token}`);
+}
+
+// Generate a one-time password-reset link for an existing account (parent or
+// student). The owner shares it out-of-band; the user sets a new password.
+export async function generateResetLink(formData: FormData) {
+  const { user, school } = await requireTeacher();
+  const userId = String(formData.get("userId"));
+  const target = await prisma.user.findFirst({ where: { id: userId, schoolId: school!.id } });
+  if (!target) redirect("/invites");
+  const token = newTokenValue();
+  await prisma.token.create({
+    data: { token, type: "password_reset", schoolId: school!.id, userId, expiresAt: tokenExpiry(2) },
+  });
+  await logAudit(user.id, "reset_link_created", target.email);
+  revalidatePath("/invites");
+  redirect(`/invites?reset=${token}`);
 }
 
 // --- Tuition ---
@@ -348,6 +371,27 @@ export async function importStudents(formData: FormData) {
   revalidatePath("/students");
   revalidatePath("/dashboard");
   redirect(`/students?imported=${created}&skipped=${skipped}`);
+}
+
+// --- Data governance (COPPA) ---
+// Hard-delete a student and everything tied to them (right to deletion).
+export async function deleteStudent(formData: FormData) {
+  const { user, school } = await requireTeacher();
+  const studentId = String(formData.get("studentId"));
+  await deleteStudentData(studentId, school!.id, user.id);
+  revalidatePath("/students");
+  revalidatePath("/dashboard");
+  redirect("/students?deleted=1");
+}
+
+// Set the retention window that governs the nightly purge.
+export async function updateRetention(formData: FormData) {
+  const { user, school } = await requireTeacher();
+  const days = Math.max(1, Math.min(3650, Number(formData.get("retentionDays")) || 730));
+  await prisma.school.update({ where: { id: school!.id }, data: { retentionDays: days } });
+  await logAudit(user.id, "retention_updated", `${days} days`);
+  revalidatePath("/settings");
+  redirect("/settings?saved=1");
 }
 
 // --- Work samples (multipart upload; bytes stored in the DB) ---

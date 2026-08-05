@@ -12,6 +12,7 @@ import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/db";
 import { requireRole, logAudit } from "@/lib/auth";
 import { hashPassword } from "@/lib/password";
+import { deleteStudentData } from "@/lib/retention";
 
 export async function createStudentAccount(formData: FormData) {
   const { user } = await requireRole("parent");
@@ -62,4 +63,17 @@ export async function submitWork(formData: FormData) {
   await logAudit(user.id, "submitted_work", id);
   revalidatePath("/student");
   redirect("/student?sent=1");
+}
+
+// COPPA right to deletion, exercised by the verified parent: permanently delete
+// their child and every record tied to them.
+export async function deleteChildData(formData: FormData) {
+  const { user } = await requireRole("parent");
+  const studentId = String(formData.get("studentId"));
+  const ownStudentIds: string[] = user.studentIdsJson ? JSON.parse(user.studentIdsJson) : [];
+  if (!ownStudentIds.includes(studentId)) redirect("/parent"); // not your child
+
+  await deleteStudentData(studentId, user.schoolId, user.id);
+  revalidatePath("/parent");
+  redirect("/parent?deleted=1");
 }
