@@ -671,6 +671,237 @@ export async function deleteSample(formData: FormData) {
   redirect(`/students/${studentId}`);
 }
 
+// --- Pages (teaching content) ---
+export async function createPage(formData: FormData) {
+  const { user, school } = await requireTeacher();
+  const title = String(formData.get("title") || "").trim();
+  if (!title) redirect("/pages?err=title");
+  const courseId = String(formData.get("courseId") || "");
+  const page = await prisma.page.create({
+    data: {
+      schoolId: school!.id,
+      courseId: courseId || null,
+      title,
+      body: String(formData.get("body") || ""),
+      format: "markdown",
+      published: formData.get("published") === "on",
+    },
+  });
+  await logAudit(user.id, "page_created", title);
+  revalidatePath("/pages");
+  redirect(`/pages/${page.id}`);
+}
+
+export async function updatePage(formData: FormData) {
+  const { user, school } = await requireTeacher();
+  const id = String(formData.get("id"));
+  const page = await prisma.page.findFirst({ where: { id, schoolId: school!.id } });
+  if (!page) redirect("/pages");
+  const courseId = String(formData.get("courseId") || "");
+  await prisma.page.update({
+    where: { id },
+    data: {
+      title: String(formData.get("title") || page.title),
+      body: String(formData.get("body") || ""),
+      courseId: courseId || null,
+      published: formData.get("published") === "on",
+    },
+  });
+  await logAudit(user.id, "page_updated", id);
+  revalidatePath("/pages");
+  revalidatePath(`/pages/${id}`);
+  revalidatePath("/student/path");
+  redirect(`/pages/${id}?saved=1`);
+}
+
+export async function deletePage(formData: FormData) {
+  const { user, school } = await requireTeacher();
+  const id = String(formData.get("id"));
+  const page = await prisma.page.findFirst({ where: { id, schoolId: school!.id } });
+  if (page) {
+    // Remove it from any module it was placed in, then delete it.
+    await prisma.moduleItem.deleteMany({ where: { schoolId: school!.id, kind: "page", refId: id } });
+    await prisma.page.delete({ where: { id } });
+    await logAudit(user.id, "page_deleted", page.title);
+  }
+  revalidatePath("/pages");
+  revalidatePath("/modules");
+  redirect("/pages?deleted=1");
+}
+
+// --- Modules (sequenced curriculum) ---
+export async function createModule(formData: FormData) {
+  const { user, school } = await requireTeacher();
+  const name = String(formData.get("name") || "").trim();
+  if (!name) redirect("/modules?err=name");
+  const courseId = String(formData.get("courseId") || "");
+  const last = await prisma.module.findFirst({
+    where: { schoolId: school!.id },
+    orderBy: { position: "desc" },
+  });
+  const m = await prisma.module.create({
+    data: {
+      schoolId: school!.id,
+      courseId: courseId || null,
+      name,
+      description: String(formData.get("description") || ""),
+      position: (last?.position ?? 0) + 1,
+    },
+  });
+  await logAudit(user.id, "module_created", name);
+  revalidatePath("/modules");
+  redirect(`/modules/${m.id}`);
+}
+
+export async function updateModule(formData: FormData) {
+  const { user, school } = await requireTeacher();
+  const id = String(formData.get("id"));
+  const m = await prisma.module.findFirst({ where: { id, schoolId: school!.id } });
+  if (!m) redirect("/modules");
+  const prereq = String(formData.get("prereqModuleId") || "");
+  const courseId = String(formData.get("courseId") || "");
+  await prisma.module.update({
+    where: { id },
+    data: {
+      name: String(formData.get("name") || m.name),
+      description: String(formData.get("description") || ""),
+      courseId: courseId || null,
+      unlockAt: String(formData.get("unlockAt") || ""),
+      requireSequential: formData.get("requireSequential") === "on",
+      published: formData.get("published") === "on",
+      // A module can't be its own prerequisite.
+      prereqModuleId: prereq && prereq !== id ? prereq : null,
+    },
+  });
+  await logAudit(user.id, "module_updated", id);
+  revalidatePath("/modules");
+  revalidatePath(`/modules/${id}`);
+  revalidatePath("/student/path");
+  redirect(`/modules/${id}?saved=1`);
+}
+
+export async function deleteModule(formData: FormData) {
+  const { user, school } = await requireTeacher();
+  const id = String(formData.get("id"));
+  const m = await prisma.module.findFirst({ where: { id, schoolId: school!.id } });
+  if (m) {
+    const items = await prisma.moduleItem.findMany({ where: { moduleId: id } });
+    await prisma.moduleProgress.deleteMany({
+      where: { moduleItemId: { in: items.map((i) => i.id) } },
+    });
+    await prisma.moduleItem.deleteMany({ where: { moduleId: id } });
+    // Anything that depended on this module is no longer gated by it.
+    await prisma.module.updateMany({
+      where: { schoolId: school!.id, prereqModuleId: id },
+      data: { prereqModuleId: null },
+    });
+    await prisma.module.delete({ where: { id } });
+    await logAudit(user.id, "module_deleted", m.name);
+  }
+  revalidatePath("/modules");
+  redirect("/modules?deleted=1");
+}
+
+export async function moveModule(formData: FormData) {
+  const { school } = await requireTeacher();
+  const id = String(formData.get("id"));
+  const dir = String(formData.get("dir")); // up | down
+  const all = await prisma.module.findMany({
+    where: { schoolId: school!.id },
+    orderBy: { position: "asc" },
+  });
+  const idx = all.findIndex((m) => m.id === id);
+  const swapWith = dir === "up" ? idx - 1 : idx + 1;
+  if (idx >= 0 && swapWith >= 0 && swapWith < all.length) {
+    await prisma.module.update({
+      where: { id: all[idx].id },
+      data: { position: all[swapWith].position },
+    });
+    await prisma.module.update({
+      where: { id: all[swapWith].id },
+      data: { position: all[idx].position },
+    });
+  }
+  revalidatePath("/modules");
+  redirect("/modules");
+}
+
+// --- Module items ---
+export async function addModuleItem(formData: FormData) {
+  const { user, school } = await requireTeacher();
+  const moduleId = String(formData.get("moduleId"));
+  const m = await prisma.module.findFirst({ where: { id: moduleId, schoolId: school!.id } });
+  if (!m) redirect("/modules");
+
+  const kind = String(formData.get("kind") || "page");
+  const refId = String(formData.get("refId") || "");
+  const title = String(formData.get("title") || "");
+  if (kind !== "header" && !refId) redirect(`/modules/${moduleId}?err=ref`);
+
+  const last = await prisma.moduleItem.findFirst({
+    where: { moduleId },
+    orderBy: { position: "desc" },
+  });
+  const minScoreRaw = String(formData.get("minScore") || "").trim();
+  await prisma.moduleItem.create({
+    data: {
+      schoolId: school!.id,
+      moduleId,
+      kind,
+      refId: kind === "header" ? "" : refId,
+      title,
+      position: (last?.position ?? 0) + 1,
+      required: formData.get("required") !== "off",
+      minScore: kind === "assignment" && minScoreRaw ? Number(minScoreRaw) : null,
+    },
+  });
+  await logAudit(user.id, "module_item_added", `${m.name}: ${kind}`);
+  revalidatePath(`/modules/${moduleId}`);
+  revalidatePath("/student/path");
+  redirect(`/modules/${moduleId}?added=1`);
+}
+
+export async function removeModuleItem(formData: FormData) {
+  const { school } = await requireTeacher();
+  const id = String(formData.get("id"));
+  const it = await prisma.moduleItem.findFirst({ where: { id, schoolId: school!.id } });
+  if (it) {
+    await prisma.moduleProgress.deleteMany({ where: { moduleItemId: id } });
+    await prisma.moduleItem.delete({ where: { id } });
+    revalidatePath(`/modules/${it.moduleId}`);
+    revalidatePath("/student/path");
+    redirect(`/modules/${it.moduleId}`);
+  }
+  redirect("/modules");
+}
+
+export async function moveModuleItem(formData: FormData) {
+  const { school } = await requireTeacher();
+  const id = String(formData.get("id"));
+  const dir = String(formData.get("dir"));
+  const it = await prisma.moduleItem.findFirst({ where: { id, schoolId: school!.id } });
+  if (!it) redirect("/modules");
+  const all = await prisma.moduleItem.findMany({
+    where: { moduleId: it.moduleId },
+    orderBy: { position: "asc" },
+  });
+  const idx = all.findIndex((x) => x.id === id);
+  const swapWith = dir === "up" ? idx - 1 : idx + 1;
+  if (idx >= 0 && swapWith >= 0 && swapWith < all.length) {
+    await prisma.moduleItem.update({
+      where: { id: all[idx].id },
+      data: { position: all[swapWith].position },
+    });
+    await prisma.moduleItem.update({
+      where: { id: all[swapWith].id },
+      data: { position: all[idx].position },
+    });
+  }
+  revalidatePath(`/modules/${it.moduleId}`);
+  revalidatePath("/student/path");
+  redirect(`/modules/${it.moduleId}`);
+}
+
 // --- Progress reports ---
 // AI drafts, a human approves, nothing reaches a family on its own. A report is
 // invisible to parents until a teacher has read it and pressed approve.

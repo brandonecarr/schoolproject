@@ -206,6 +206,32 @@ export async function submitWork(formData: FormData) {
   redirect("/student/work?sent=1");
 }
 
+// Mark a module page as read. Pages are the only item kind with no other record
+// of being done — assignment completion is derived from the submission itself.
+export async function markPageRead(formData: FormData) {
+  const { user } = await requireRole("student");
+  const moduleItemId = String(formData.get("moduleItemId"));
+
+  const item = await prisma.moduleItem.findFirst({
+    where: { id: moduleItemId, schoolId: user.schoolId, kind: "page" },
+  });
+  if (!item) redirect("/student/path");
+
+  await prisma.moduleProgress.upsert({
+    where: { studentId_moduleItemId: { studentId: user.studentId!, moduleItemId } },
+    create: {
+      schoolId: user.schoolId,
+      studentId: user.studentId!,
+      moduleItemId,
+      completedAt: new Date().toISOString(),
+    },
+    update: {},
+  });
+  await logAudit(user.id, "page_read", moduleItemId);
+  revalidatePath("/student/path");
+  redirect("/student/path?done=1");
+}
+
 // Save progress without turning in. Keeps the work in a "draft" state the
 // student can return to. Not available once graded.
 export async function saveDraft(formData: FormData) {

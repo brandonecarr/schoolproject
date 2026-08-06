@@ -21,6 +21,9 @@ const NAV: { group: string; items: { href: string; label: string; icon: string }
     group: "Learning",
     items: [
       { href: "/courses", label: "Courses", icon: "courses" },
+      { href: "/pages", label: "Pages", icon: "courses" },
+      { href: "/modules", label: "Modules", icon: "courses" },
+      { href: "/syllabus", label: "Syllabus", icon: "courses" },
       { href: "/assignments", label: "Assignments", icon: "assignments" },
       { href: "/worksheets", label: "Worksheets", icon: "assignments" },
       { href: "/grading", label: "Grading queue", icon: "grading" },

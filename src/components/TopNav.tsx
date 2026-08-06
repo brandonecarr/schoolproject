@@ -19,6 +19,7 @@ const STUDENT_LINKS = [
   { href: "/student", label: "Home" },
   { href: "/student/notifications", label: "Alerts" },
   { href: "/student/work", label: "My work" },
+  { href: "/student/path", label: "My path" },
   { href: "/student/portfolio", label: "Portfolio" },
   { href: "/student/messages", label: "Messages" },
 ];

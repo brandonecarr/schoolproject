@@ -128,6 +128,71 @@ model Worksheet {
   createdAt    DateTime @default(now())
 }
 
+// --- Curriculum structure ------------------------------------------------
+// Pages are teaching content (a lesson, a reading, a reference sheet). Modules
+// sequence pages and assignments into a path a student works through in order.
+// Structured, delivered instruction is also better ESA evidence than a flat
+// pile of assignments.
+
+model Page {
+  id        String   @id @default(cuid())
+  schoolId  String
+  courseId  String? // null = school-wide
+  title     String
+  body      String   @default("")
+  format    String   @default("markdown") // plain | markdown
+  published Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([schoolId])
+}
+
+model Module {
+  id             String   @id @default(cuid())
+  schoolId       String
+  courseId       String? // null = school-wide (orientation, etc.)
+  name           String
+  description    String   @default("")
+  position       Int      @default(0)
+  published      Boolean  @default(false)
+  unlockAt       String   @default("") // YYYY-MM-DD; "" = available now
+  requireSequential Boolean @default(false) // items must be done in order
+  prereqModuleId String? // locked until that module is complete
+  createdAt      DateTime @default(now())
+
+  @@index([schoolId])
+}
+
+model ModuleItem {
+  id       String  @id @default(cuid())
+  schoolId String
+  moduleId String
+  kind     String // page | assignment | header
+  refId    String  @default("") // Page id or Assignment id; empty for header
+  title    String  @default("") // header text, or a label override
+  position Int     @default(0)
+  required Boolean @default(true) // counts toward module completion
+  minScore Int? // assignment items: score needed to count as complete
+
+  @@index([moduleId])
+  @@index([schoolId])
+}
+
+// Completion for items that have no other record of being done — i.e. pages.
+// Assignment completion is derived from Submission so the two can never drift.
+model ModuleProgress {
+  id           String   @id @default(cuid())
+  schoolId     String
+  studentId    String
+  moduleItemId String
+  completedAt  String // ISO timestamp
+  createdAt    DateTime @default(now())
+
+  @@unique([studentId, moduleItemId])
+  @@index([schoolId])
+}
+
 // In-app notification for one user. Cohort's promise is "on time", so the
 // people who need to act have to be told: a grade posted, work sent back, an
 // absence reported, a report approved.
