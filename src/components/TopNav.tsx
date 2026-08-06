@@ -7,6 +7,7 @@ import { usePathname } from "next/navigation";
 
 const PARENT_LINKS = [
   { href: "/parent", label: "Home" },
+  { href: "/parent/notifications", label: "Alerts" },
   { href: "/parent/feed", label: "Feed" },
   { href: "/parent/children", label: "Children" },
   { href: "/parent/reports", label: "Reports" },
@@ -16,6 +17,7 @@ const PARENT_LINKS = [
 
 const STUDENT_LINKS = [
   { href: "/student", label: "Home" },
+  { href: "/student/notifications", label: "Alerts" },
   { href: "/student/work", label: "My work" },
   { href: "/student/portfolio", label: "Portfolio" },
   { href: "/student/messages", label: "Messages" },
@@ -25,10 +27,12 @@ export function TopNav({
   role,
   userName,
   messagesUnread = 0,
+  notificationsUnread = 0,
 }: {
   role: string;
   userName: string;
   messagesUnread?: number;
+  notificationsUnread?: number;
 }) {
   const pathname = usePathname();
   const on = (href: string) =>
@@ -46,6 +50,9 @@ export function TopNav({
           {l.label}
           {l.href.endsWith("/messages") && messagesUnread > 0 && (
             <span className="nav-badge">{messagesUnread}</span>
+          )}
+          {l.href.endsWith("/notifications") && notificationsUnread > 0 && (
+            <span className="nav-badge">{notificationsUnread}</span>
           )}
         </Link>
       ))}

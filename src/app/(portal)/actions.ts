@@ -15,6 +15,7 @@ import { hashPassword } from "@/lib/password";
 import { deleteStudentData } from "@/lib/retention";
 import { autoScoreQuiz, parseItems, parseQuizAnswers } from "@/lib/lms";
 import { recordOutcomesForSubmission } from "@/lib/mastery";
+import { notifyUsers, staffUserIdsFor } from "@/lib/notify";
 
 // Image/PDF types a student may turn in (bytes stored in the DB, like samples).
 const ALLOWED: Record<string, string> = {
@@ -183,6 +184,20 @@ export async function submitWork(formData: FormData) {
     });
   }
 
+  // Only tell the teacher when there's actually something to mark — a quiz that
+  // auto-graded itself doesn't need to land in anyone's queue.
+  const stillNeedsGrading = (await prisma.submission.findUnique({ where: { id } }))?.status === "submitted";
+  if (stillNeedsGrading) {
+    const student = await prisma.student.findUnique({ where: { id: user.studentId! } });
+    await notifyUsers(await staffUserIdsFor(user.schoolId), {
+      schoolId: user.schoolId,
+      type: "submitted",
+      title: `${student?.name ?? "A student"} turned in ${asg.title}`,
+      body: "Waiting in the grading queue.",
+      linkPath: "/grading",
+    });
+  }
+
   await logAudit(user.id, "submitted_work", id);
   revalidatePath("/student");
   revalidatePath("/student/work");
@@ -244,6 +259,15 @@ export async function reportAbsence(formData: FormData) {
       },
     });
   }
+  const absStudent = await prisma.student.findUnique({ where: { id: studentId } });
+  await notifyUsers(await staffUserIdsFor(user.schoolId), {
+    schoolId: user.schoolId,
+    type: "absence",
+    title: `${absStudent?.name ?? "A student"} reported absent on ${date}`,
+    body: note || "Reported by parent.",
+    linkPath: `/attendance?date=${date}`,
+  });
+
   await logAudit(user.id, "absence_reported", `${studentId} ${date}`);
   revalidatePath("/parent/feed");
   revalidatePath("/dashboard");

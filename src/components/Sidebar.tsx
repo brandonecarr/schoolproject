@@ -12,6 +12,7 @@ const NAV: { group: string; items: { href: string; label: string; icon: string }
     group: "Today",
     items: [
       { href: "/dashboard", label: "Dashboard", icon: "dashboard" },
+      { href: "/notifications", label: "Notifications", icon: "messages" },
       { href: "/attendance", label: "Attendance", icon: "attendance" },
       { href: "/observations", label: "Observations", icon: "observations" },
     ],
@@ -64,12 +65,14 @@ export function Sidebar({
   railLabel,
   userName,
   messagesUnread = 0,
+  notificationsUnread = 0,
 }: {
   schoolName: string;
   schoolState: string;
   railLabel: string;
   userName: string;
   messagesUnread?: number;
+  notificationsUnread?: number;
 }) {
   const pathname = usePathname();
   const isOn = (href: string) =>
@@ -95,6 +98,9 @@ export function Sidebar({
               <span style={{ flex: 1 }}>{item.label}</span>
               {item.href === "/messages" && messagesUnread > 0 && (
                 <span className="nav-badge">{messagesUnread}</span>
+              )}
+              {item.href === "/notifications" && notificationsUnread > 0 && (
+                <span className="nav-badge">{notificationsUnread}</span>
               )}
             </Link>
           ))}

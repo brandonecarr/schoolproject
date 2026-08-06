@@ -22,6 +22,7 @@ import {
 } from "@/lib/lms";
 import { packByKey } from "@/lib/outcomes";
 import { recordOutcomesForSubmission, masteryForStudent } from "@/lib/mastery";
+import { notifyUsers, parentUserIdsFor, studentUserIdFor } from "@/lib/notify";
 import { deleteStudentData } from "@/lib/retention";
 import { newTokenValue, tokenExpiry } from "@/lib/tokens";
 import { today, periodStart } from "@/lib/dates";
@@ -231,6 +232,25 @@ export async function saveGrade(formData: FormData) {
     possible: asg.points,
   });
 
+  // Tell the family it's been marked. Parents and students read this in
+  // different places, so each gets a link that works for them.
+  const gradedNote = {
+    schoolId: school!.id,
+    type: "graded" as const,
+    title: `${asg.title} was graded`,
+    body: `Scored ${score} out of ${asg.points}.`,
+  };
+  await notifyUsers(
+    await parentUserIdsFor(sub.studentId, school!.id),
+    { ...gradedNote, linkPath: "/parent/feed" },
+    user.id
+  );
+  await notifyUsers(
+    await studentUserIdFor(sub.studentId),
+    { ...gradedNote, linkPath: "/student/work" },
+    user.id
+  );
+
   await logAudit(user.id, "graded", id);
   revalidatePath("/grading");
   revalidatePath("/dashboard");
@@ -255,6 +275,24 @@ export async function returnSubmission(formData: FormData) {
       revisionNote: String(formData.get("note") || "").slice(0, 500),
     },
   });
+  const rAsg = await prisma.assignment.findUnique({ where: { id: sub.assignmentId } });
+  const returnedNote = {
+    schoolId: school!.id,
+    type: "returned" as const,
+    title: `${rAsg?.title ?? "Work"} needs changes`,
+    body: String(formData.get("note") || "Your teacher sent this back for revision."),
+  };
+  await notifyUsers(
+    await parentUserIdsFor(sub.studentId, school!.id),
+    { ...returnedNote, linkPath: "/parent/feed" },
+    user.id
+  );
+  await notifyUsers(
+    await studentUserIdFor(sub.studentId),
+    { ...returnedNote, linkPath: "/student/work" },
+    user.id
+  );
+
   await logAudit(user.id, "submission_returned", id);
   revalidatePath("/grading");
   revalidatePath("/student");
@@ -724,6 +762,19 @@ export async function approveProgressReport(formData: FormData) {
     where: { id },
     data: { status: "approved", approvedAt: new Date().toISOString(), approvedByName: user.name },
   });
+  const rStudent = await prisma.student.findUnique({ where: { id: rep.studentId } });
+  await notifyUsers(
+    await parentUserIdsFor(rep.studentId, school!.id),
+    {
+      schoolId: school!.id,
+      type: "report",
+      title: `Progress report ready for ${rStudent?.name.split(" ")[0] ?? "your child"}`,
+      body: `Covering ${rep.periodStart} to ${rep.periodEnd}.`,
+      linkPath: "/parent/reports",
+    },
+    user.id
+  );
+
   await logAudit(user.id, "progress_report_approved", id);
   revalidatePath(`/reports/progress/${id}`);
   revalidatePath("/reports");

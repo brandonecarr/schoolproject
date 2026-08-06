@@ -124,6 +124,27 @@ model Worksheet {
   createdAt    DateTime @default(now())
 }
 
+// In-app notification for one user. Cohort's promise is "on time", so the
+// people who need to act have to be told: a grade posted, work sent back, an
+// absence reported, a report approved.
+//
+// In-app only for now — no email or push, and therefore no per-channel
+// preferences yet. Those arrive together when a mail provider is chosen.
+model Notification {
+  id        String   @id @default(cuid())
+  schoolId  String
+  userId    String // recipient
+  type      String // graded | returned | submitted | absence | message | report | invoice
+  title     String
+  body      String   @default("")
+  linkPath  String   @default("") // where clicking it should go
+  readAt    String? // ISO timestamp — null = unread
+  createdAt DateTime @default(now())
+
+  @@index([userId, readAt])
+  @@index([schoolId])
+}
+
 // A narrative progress report for one student over one period.
 //
 // GUARDRAIL: AI drafts, a human approves, nothing reaches a family on its own.

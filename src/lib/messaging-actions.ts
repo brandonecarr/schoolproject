@@ -9,6 +9,12 @@ import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/db";
 import { getSession, logAudit } from "@/lib/auth";
 import { canAccessThread, isStaff } from "@/lib/messages";
+import {
+  notifyUsers,
+  staffUserIdsFor,
+  parentUserIdsFor,
+  studentUserIdFor,
+} from "@/lib/notify";
 
 export async function sendMessage(formData: FormData) {
   const session = await getSession();
@@ -34,6 +40,29 @@ export async function sendMessage(formData: FormData) {
     },
   });
   await logAudit(user.id, "message_sent", studentId);
+
+  // Notify the other side of the thread. Each role gets a link that works for
+  // them — parents, students, and staff read messages at different paths.
+  const base = {
+    schoolId: user.schoolId,
+    type: "message" as const,
+    title: `New message from ${user.name}`,
+    body: body.slice(0, 140),
+  };
+  if (staff) {
+    const [parents, studentUser] = await Promise.all([
+      parentUserIdsFor(studentId, user.schoolId),
+      studentUserIdFor(studentId),
+    ]);
+    await notifyUsers(parents, { ...base, linkPath: "/parent/messages" }, user.id);
+    await notifyUsers(studentUser, { ...base, linkPath: "/student/messages" }, user.id);
+  } else {
+    await notifyUsers(
+      await staffUserIdsFor(user.schoolId),
+      { ...base, linkPath: `/messages/${studentId}` },
+      user.id
+    );
+  }
 
   // Refresh every surface that shows this thread or an unread badge.
   revalidatePath("/messages");

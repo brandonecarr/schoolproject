@@ -5,10 +5,14 @@
 import { requireTeacher } from "@/lib/auth";
 import { Sidebar } from "@/components/Sidebar";
 import { unreadForStaff } from "@/lib/messages";
+import { unreadCountFor } from "@/lib/notify";
 
 export default async function TeacherLayout({ children }: { children: React.ReactNode }) {
   const { user, school } = await requireTeacher();
-  const messagesUnread = school ? await unreadForStaff(school.id) : 0;
+  const [messagesUnread, notificationsUnread] = await Promise.all([
+    school ? unreadForStaff(school.id) : Promise.resolve(0),
+    unreadCountFor(user.id),
+  ]);
   return (
     <div className="shell">
       <Sidebar
@@ -17,6 +21,7 @@ export default async function TeacherLayout({ children }: { children: React.Reac
         railLabel={school?.railLabel ?? ""}
         userName={user.name}
         messagesUnread={messagesUnread}
+        notificationsUnread={notificationsUnread}
       />
       <main className="main">{children}</main>
     </div>

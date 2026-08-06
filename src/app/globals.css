@@ -1765,6 +1765,80 @@ a.due-row:hover {
 }
 
 /* ============================================================
+   Notification centre
+   ============================================================ */
+.notif-list {
+  display: grid;
+  gap: 8px;
+}
+.notif {
+  background: var(--card);
+  border: 1px solid var(--rule);
+  border-left: 3px solid var(--rule);
+  border-radius: var(--radius-sm);
+  transition: box-shadow 0.15s var(--ease), transform 0.12s var(--ease);
+}
+.notif:hover {
+  box-shadow: var(--shadow-sm);
+  transform: translateY(-1px);
+}
+.notif.unread {
+  border-left-color: var(--mark-deep);
+  background: rgba(200, 230, 75, 0.07);
+}
+.notif-btn {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  width: 100%;
+  padding: 13px 15px;
+  background: transparent;
+  border: 0;
+  cursor: pointer;
+  text-align: left;
+  font: inherit;
+  color: inherit;
+}
+.notif-ic {
+  width: 30px;
+  height: 30px;
+  flex: 0 0 auto;
+  border-radius: 8px;
+  background: var(--blue-soft);
+  color: var(--blue);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 15px;
+}
+.notif.unread .notif-ic {
+  background: var(--mark);
+  color: #2f3908;
+}
+.notif-main {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.notif-title {
+  font-weight: 600;
+}
+.notif-body {
+  font-size: 13.5px;
+  color: var(--ink-soft);
+}
+.notif-when {
+  font-size: 11.5px;
+  color: var(--ink-soft);
+  margin-top: 2px;
+}
+.notif.unread .notif-when {
+  color: var(--mark-deep);
+  font-weight: 600;
+}
+
+/* ============================================================
    Gradebook grid
    ============================================================ */
 .gb-grid {
