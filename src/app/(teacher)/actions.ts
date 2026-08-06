@@ -1070,6 +1070,7 @@ export async function assignWorksheet(formData: FormData) {
       courseId: String(formData.get("courseId")),
       title: ws.title,
       instructions: ws.instructions,
+      instructionsFormat: ws.instructionsFormat,
       dueDate: String(formData.get("dueDate") || today()),
       assignedAt: String(formData.get("assignedAt") || ""),
       points: assignmentMax("quiz", ws.itemsJson, 20),

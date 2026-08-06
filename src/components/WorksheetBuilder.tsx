@@ -7,6 +7,7 @@
 import { useMemo, useState } from "react";
 import { quizMax, type Item } from "@/lib/lms";
 import { ItemsEditor, blankItem } from "@/components/ItemsEditor";
+import { MarkdownField } from "@/components/MarkdownField";
 
 export function WorksheetBuilder({ action }: { action: (fd: FormData) => void }) {
   // Fixed ids for initial rows to keep SSR and client hydration identical.
@@ -28,8 +29,13 @@ export function WorksheetBuilder({ action }: { action: (fd: FormData) => void })
           <input id="ws" name="subject" placeholder="Math" />
         </div>
       </div>
-      <label htmlFor="wi">Instructions (printed at the top)</label>
-      <textarea id="wi" name="instructions" placeholder="Show your work. Circle your final answer." />
+      <MarkdownField
+        name="instructions"
+        id="wi"
+        label="Instructions (printed at the top)"
+        rows={4}
+        placeholder="Show your work. Circle your final answer."
+      />
 
       <ItemsEditor items={items} setItems={setItems} />
 

@@ -48,6 +48,7 @@ export default async function StudentWorkPage({
     title: a.title,
     type: a.type,
     instructions: a.instructions,
+    instructionsFormat: a.instructionsFormat,
     points: a.points,
     dueDate: a.dueDate,
     configJson: a.configJson,

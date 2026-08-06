@@ -1765,6 +1765,133 @@ a.due-row:hover {
 }
 
 /* ============================================================
+   Rich text — editor + rendered output
+   ============================================================ */
+.mdfield {
+  display: block;
+}
+.mdbar {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-wrap: wrap;
+  padding: 6px;
+  border: 1px solid var(--rule);
+  border-bottom: 0;
+  border-radius: var(--radius-sm) var(--radius-sm) 0 0;
+  background: #fafbf8;
+}
+.mdbtn {
+  min-width: 30px;
+  height: 28px;
+  padding: 0 8px;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  background: transparent;
+  cursor: pointer;
+  font: inherit;
+  font-size: 13px;
+  color: var(--ink);
+  transition: background 0.12s var(--ease), border-color 0.12s var(--ease);
+}
+.mdbtn:hover:not(:disabled) {
+  background: var(--card);
+  border-color: var(--rule);
+}
+.mdbtn.on {
+  background: var(--blue);
+  color: #fff;
+}
+.mdbtn:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+.mdfield textarea {
+  border-radius: 0 0 var(--radius-sm) var(--radius-sm);
+  box-shadow: none;
+}
+.mdpreview {
+  border: 1px solid var(--rule);
+  border-radius: 0 0 var(--radius-sm) var(--radius-sm);
+  padding: 12px 14px;
+  min-height: 96px;
+  background: var(--card);
+}
+.mdhint {
+  margin: 6px 0 0;
+}
+
+/* rendered markdown */
+.md > *:first-child {
+  margin-top: 0;
+}
+.md > *:last-child {
+  margin-bottom: 0;
+}
+.md p {
+  margin: 0 0 10px;
+}
+.md h2 {
+  font-size: 19px;
+  margin: 16px 0 8px;
+}
+.md h3 {
+  font-size: 16px;
+  margin: 14px 0 6px;
+}
+.md h4 {
+  font-size: 14.5px;
+  margin: 12px 0 6px;
+}
+.md ul,
+.md ol {
+  margin: 0 0 10px;
+  padding-left: 22px;
+}
+.md li {
+  margin: 3px 0;
+}
+.md blockquote {
+  margin: 0 0 10px;
+  padding: 2px 0 2px 14px;
+  border-left: 3px solid var(--rule);
+  color: var(--ink-soft);
+}
+.md code {
+  font-family: var(--mono);
+  font-size: 0.9em;
+  background: #f2f3ef;
+  padding: 1px 5px;
+  border-radius: 4px;
+}
+.md pre {
+  background: #f2f3ef;
+  padding: 12px 14px;
+  border-radius: var(--radius-sm);
+  overflow-x: auto;
+  margin: 0 0 10px;
+}
+.md pre code {
+  background: none;
+  padding: 0;
+}
+.md hr {
+  border: 0;
+  border-top: 1px solid var(--rule);
+  margin: 14px 0;
+}
+.md img {
+  max-width: 100%;
+  border: 1px solid var(--rule);
+  border-radius: var(--radius-sm);
+  display: block;
+  margin: 10px 0;
+}
+.md a {
+  color: var(--blue);
+}
+
+/* ============================================================
    Notification centre
    ============================================================ */
 .notif-list {

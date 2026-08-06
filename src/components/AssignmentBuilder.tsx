@@ -16,6 +16,7 @@ import {
   type Criterion,
 } from "@/lib/lms";
 import { ItemsEditor, blankItem, uid } from "@/components/ItemsEditor";
+import { MarkdownField } from "@/components/MarkdownField";
 
 type CourseOpt = { id: string; name: string };
 type StudentOpt = { id: string; name: string; grade: string };
@@ -116,10 +117,11 @@ export function AssignmentBuilder({
         </div>
       </div>
 
-      <label htmlFor="i">Instructions for the student</label>
-      <textarea
-        id="i"
+      <MarkdownField
         name="instructions"
+        id="i"
+        label="Instructions for the student"
+        rows={5}
         placeholder="Place each fraction on the number line, then explain in one sentence how you decided."
       />
 

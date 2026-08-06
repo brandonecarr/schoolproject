@@ -6,6 +6,7 @@ import { NextResponse } from "next/server";
 import { getSession, logAudit } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { parseItems, quizMax } from "@/lib/lms";
+import { renderText } from "@/lib/markdown";
 
 export const dynamic = "force-dynamic";
 
@@ -104,7 +105,14 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
   <div class="sub">${esc(ws.subject || "")} · ${items.length} question${
     items.length === 1 ? "" : "s"
   } · ${quizMax(items)} points</div>
-  ${ws.instructions ? `<div class="instr">${esc(ws.instructions)}</div>` : ""}
+  ${
+    ws.instructions
+      ? `<div class="instr">${renderText(
+          ws.instructions,
+          ws.instructionsFormat === "markdown" ? "markdown" : "plain"
+        )}</div>`
+      : ""
+  }
   <ol class="qs">${questions || "<li>No questions.</li>"}</ol>
 
   <div class="foot">Generated with Cohort${showKey ? " · answer key — do not distribute" : ""}.</div>

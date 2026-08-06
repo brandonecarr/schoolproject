@@ -14,6 +14,7 @@ import {
   type Item,
   type QuizAnswer,
 } from "@/lib/lms";
+import { renderText } from "@/lib/markdown";
 
 export type SubData = {
   id: string;
@@ -31,6 +32,7 @@ export type AsgData = {
   title: string;
   type: string;
   instructions: string;
+  instructionsFormat: string;
   points: number;
   dueDate: string;
   configJson: string;
@@ -77,9 +79,16 @@ export function WorkCard({
       </div>
 
       {asg.instructions && (
-        <p className="small" style={{ margin: "10px 0 4px" }}>
-          {asg.instructions}
-        </p>
+        <div
+          className="md small"
+          style={{ margin: "10px 0 4px" }}
+          dangerouslySetInnerHTML={{
+            __html: renderText(
+              asg.instructions,
+              asg.instructionsFormat === "markdown" ? "markdown" : "plain"
+            ),
+          }}
+        />
       )}
 
       {asg.resourceFileId && (

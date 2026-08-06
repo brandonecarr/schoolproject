@@ -78,6 +78,9 @@ model Assignment {
   courseId     String
   title        String
   instructions String   @default("")
+  // "plain" for anything written before rich text existed, so old content keeps
+  // rendering exactly as it always did. New content is authored as markdown.
+  instructionsFormat String @default("markdown")
   dueDate      String // YYYY-MM-DD
   points       Int      @default(20)
   // How the work is given + completed. Drives the student completion UI and the
@@ -120,6 +123,7 @@ model Worksheet {
   title        String
   subject      String   @default("")
   instructions String   @default("")
+  instructionsFormat String @default("markdown")
   itemsJson    String   @default("[]")
   createdAt    DateTime @default(now())
 }

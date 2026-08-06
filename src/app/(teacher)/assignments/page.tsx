@@ -3,6 +3,7 @@ import { requireTeacher } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { today, fmt } from "@/lib/dates";
 import { typeMeta } from "@/lib/lms";
+import { stripMarkdown } from "@/lib/markdown";
 import { addAssignment, setAssignmentOutcomes } from "../actions";
 import { AssignmentBuilder } from "@/components/AssignmentBuilder";
 
@@ -100,7 +101,11 @@ export default async function AssignmentsPage({
             {list.map((a) => {
               const mine = subs.filter((s) => s.assignmentId === a.id);
               const m = typeMeta(a.type);
-              const instr = a.instructions || "";
+              // Snippets show readable text, not raw markdown syntax.
+              const instr =
+                a.instructionsFormat === "markdown"
+                  ? stripMarkdown(a.instructions || "")
+                  : a.instructions || "";
               return (
                 <tr key={a.id}>
                   <td>
@@ -109,6 +114,7 @@ export default async function AssignmentsPage({
                       {instr.slice(0, 70)}
                       {instr.length > 70 ? "…" : ""}
                     </div>
+                    {a.resourceFileId && <span className="small muted">▤ resource attached</span>}
                   </td>
                   <td className="small">
                     <span className="typechip">

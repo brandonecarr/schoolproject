@@ -4,6 +4,7 @@ import { requireTeacher } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { today } from "@/lib/dates";
 import { parseItems, quizMax, ITEM_KIND_LABEL } from "@/lib/lms";
+import { Markdown } from "@/components/Markdown";
 import { assignWorksheet, deleteWorksheet } from "../../actions";
 
 export const dynamic = "force-dynamic";
@@ -47,7 +48,11 @@ export default async function WorksheetDetail({
           {/* preview */}
           <div className="card">
             <div className="eyebrow">Preview</div>
-            {ws.instructions && <p style={{ margin: "6px 0 14px" }}>{ws.instructions}</p>}
+            {ws.instructions && (
+              <div style={{ margin: "6px 0 14px" }}>
+                <Markdown text={ws.instructions} format={ws.instructionsFormat} />
+              </div>
+            )}
             <ol className="ws-preview">
               {items.map((it) => (
                 <li key={it.id}>
