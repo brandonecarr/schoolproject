@@ -5,6 +5,8 @@ import { periodStart, today } from "@/lib/dates";
 import { computeAchievements } from "@/lib/achievements";
 import { dueSoonForStudents, dueLabel } from "@/lib/due";
 import { typeMeta } from "@/lib/lms";
+import { masteryForStudent } from "@/lib/mastery";
+import { StandardsSummary } from "@/components/StandardsSummary";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Home — Cohort" };
@@ -14,10 +16,11 @@ export default async function StudentHomePage() {
   const sid = user.studentId ?? "";
 
   const student = sid ? await prisma.student.findUnique({ where: { id: sid } }) : null;
-  const [subsRaw, attendance, due] = await Promise.all([
+  const [subsRaw, attendance, due, mastery] = await Promise.all([
     prisma.submission.findMany({ where: { studentId: sid } }),
     prisma.attendance.findMany({ where: { studentId: sid } }),
     dueSoonForStudents(sid ? [sid] : []),
+    masteryForStudent(sid, user.schoolId),
   ]);
   const aIds = [...new Set(subsRaw.map((s) => s.assignmentId))];
   const assignments = await prisma.assignment.findMany({ where: { id: { in: aIds } } });
@@ -167,6 +170,21 @@ export default async function StudentHomePage() {
               </Link>
             );
           })}
+        </div>
+      )}
+
+      {/* skills mastered */}
+      {mastery.summary.assessed > 0 && (
+        <div className="card" style={{ marginTop: 22 }}>
+          <StandardsSummary
+            outcomes={mastery.outcomes}
+            rollups={mastery.rollups}
+            summary={mastery.summary}
+            heading="Skills you've shown"
+            audience="family"
+            limit={5}
+            showEmpty={false}
+          />
         </div>
       )}
 

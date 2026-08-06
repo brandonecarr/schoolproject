@@ -7,6 +7,7 @@
 
 import { prisma } from "@/lib/db";
 import { scoreEvidence, type ScoredEvidence } from "@/lib/rules";
+import { rollup } from "@/lib/outcomes";
 import { periodStart, today } from "@/lib/dates";
 
 export type EvidenceSubmission = {
@@ -40,12 +41,22 @@ export type EvidenceSample = {
   mime: string;
 };
 
+export type EvidenceStandard = {
+  code: string;
+  title: string;
+  pct: number;
+  mastered: boolean;
+};
+
 export type Evidence = ScoredEvidence & {
   attendance: { id: string; date: string; status: string }[];
   submissions: EvidenceSubmission[];
   observations: { id: string; date: string; text: string; author: string }[];
   assignments: EvidenceAssignment[];
   samples: EvidenceSample[];
+  // Standards demonstrated in this window (empty when the school tracks none).
+  standards: EvidenceStandard[];
+  standardsMastered: number;
 };
 
 export async function evidenceFor(
@@ -57,11 +68,12 @@ export async function evidenceFor(
 
   // Pull everything for this student, then join in memory (small per-student
   // sets — the same shape as the MVP's JSON store did it).
-  const [attendanceAll, subsRaw, observationsAll, filesAll] = await Promise.all([
+  const [attendanceAll, subsRaw, observationsAll, filesAll, outcomeResultsAll] = await Promise.all([
     prisma.attendance.findMany({ where: { studentId } }),
     prisma.submission.findMany({ where: { studentId } }),
     prisma.observation.findMany({ where: { studentId } }),
     prisma.fileRec.findMany({ where: { studentId } }),
+    prisma.outcomeResult.findMany({ where: { studentId } }),
   ]);
 
   const attendance = attendanceAll.filter((a) => inRange(a.date));
@@ -111,7 +123,57 @@ export async function evidenceFor(
     .filter((f) => inRange((f.capturedAt || "").slice(0, 10)))
     .map((f) => ({ id: f.id, label: f.label, ext: f.ext, mime: f.mime }));
 
-  const scored = scoreEvidence({ attendance, submissions, observations, assignments, samples });
+  // Standards demonstrated in this window. Rolled up per outcome (highest
+  // attempt wins), so re-attempts read as growth rather than extra rows.
+  const resultsInRange = outcomeResultsAll.filter((r) => inRange((r.recordedAt || "").slice(0, 10)));
+  let standards: EvidenceStandard[] = [];
+  if (resultsInRange.length > 0) {
+    const outcomeIds = [...new Set(resultsInRange.map((r) => r.outcomeId))];
+    const outcomeRows = await prisma.outcome.findMany({ where: { id: { in: outcomeIds } } });
+    const school = await prisma.school.findUnique({ where: { id: outcomeRows[0]?.schoolId ?? "" } });
+    const threshold = school?.masteryThreshold ?? 0.8;
 
-  return { attendance, submissions, observations, assignments, samples, ...scored };
+    standards = outcomeIds
+      .map((id) => {
+        const o = outcomeRows.find((x) => x.id === id);
+        const r = rollup(
+          id,
+          resultsInRange.map((x) => ({
+            outcomeId: x.outcomeId,
+            score: x.score,
+            possible: x.possible,
+            recordedAt: x.recordedAt,
+          })),
+          threshold
+        );
+        return {
+          code: o?.code ?? "—",
+          title: o?.title ?? "—",
+          pct: r.pct ?? 0,
+          mastered: r.mastered,
+        };
+      })
+      .sort((a, b) => (a.code < b.code ? -1 : 1));
+  }
+  const standardsMastered = standards.filter((s) => s.mastered).length;
+
+  const scored = scoreEvidence({
+    attendance,
+    submissions,
+    observations,
+    assignments,
+    samples,
+    standards: standards.length > 0 ? { assessed: standards.length, mastered: standardsMastered } : null,
+  });
+
+  return {
+    attendance,
+    submissions,
+    observations,
+    assignments,
+    samples,
+    standards,
+    standardsMastered,
+    ...scored,
+  };
 }

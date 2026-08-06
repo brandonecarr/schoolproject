@@ -5,6 +5,8 @@ import { evidenceFor } from "@/lib/evidence";
 import { fmt } from "@/lib/dates";
 import { Pill, Notice } from "@/components/ui";
 import { ConfirmSubmit } from "@/components/ConfirmSubmit";
+import { StandardsSummary } from "@/components/StandardsSummary";
+import { masteryForStudent } from "@/lib/mastery";
 import { createStudentAccount, deleteChildData } from "../../actions";
 
 export const dynamic = "force-dynamic";
@@ -29,7 +31,8 @@ export default async function ParentChildrenPage({
       const kidUser = await prisma.user.findFirst({ where: { role: "student", studentId: k.id } });
       const graded = e.submissions.filter((s) => s.status === "graded");
       const open = e.submissions.filter((s) => s.status === "assigned");
-      return { k, e, kidUser, graded, open };
+      const mastery = await masteryForStudent(k.id, user.schoolId);
+      return { k, e, kidUser, graded, open, mastery };
     })
   );
 
@@ -53,7 +56,7 @@ export default async function ParentChildrenPage({
       {sp.deleted && (
         <Notice tone="good">Your child&apos;s data has been permanently deleted.</Notice>
       )}
-      {blocks.map(({ k, e, kidUser, graded, open }) => (
+      {blocks.map(({ k, e, kidUser, graded, open, mastery }) => (
         <div key={k.id} className="card">
           <div className="spread">
             <div>
@@ -89,6 +92,21 @@ export default async function ParentChildrenPage({
                 <strong>{s.assignmentTitle}:</strong> {s.feedback}
               </p>
             ))}
+
+          {mastery.summary.assessed > 0 && (
+            <>
+              <div className="sep" style={{ margin: "16px 0" }} />
+              <StandardsSummary
+                outcomes={mastery.outcomes}
+                rollups={mastery.rollups}
+                summary={mastery.summary}
+                heading="Standards progress"
+                audience="family"
+                limit={6}
+                showEmpty={false}
+              />
+            </>
+          )}
 
           <div className="sep" style={{ margin: "16px 0" }} />
           <div className="eyebrow">Still to do</div>

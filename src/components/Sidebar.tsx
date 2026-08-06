@@ -23,6 +23,8 @@ const NAV: { group: string; items: { href: string; label: string; icon: string }
       { href: "/assignments", label: "Assignments", icon: "assignments" },
       { href: "/worksheets", label: "Worksheets", icon: "assignments" },
       { href: "/grading", label: "Grading queue", icon: "grading" },
+      { href: "/outcomes", label: "Standards", icon: "evidence" },
+      { href: "/mastery", label: "Mastery board", icon: "evidence" },
     ],
   },
   {

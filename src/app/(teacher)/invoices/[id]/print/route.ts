@@ -83,6 +83,21 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
   <h2>Attendance summary</h2>
   <p style="margin:0">Present <strong>${e.presentDays}</strong> of <strong>${e.attendance.length}</strong> logged instructional days during the service period.</p>
 
+  ${
+    e.standards.length
+      ? `<h2>Standards demonstrated</h2>
+  <p style="margin:0 0 4px">Mastered <strong>${e.standardsMastered}</strong> of <strong>${e.standards.length}</strong> standards assessed during the service period.</p>
+  <table><thead><tr><th style="width:110px">Standard</th><th>Skill demonstrated</th><th style="width:90px">Level</th></tr></thead><tbody>
+  ${e.standards
+    .map(
+      (st) =>
+        `<tr><td>${esc(st.code)}</td><td>${esc(st.title)}</td><td>${Math.round(st.pct * 100)}%${st.mastered ? " · mastered" : ""}</td></tr>`
+    )
+    .join("")}
+  </tbody></table>`
+      : ""
+  }
+
   <h2>Instruction delivered</h2>
   <table><thead><tr><th>Course</th><th>Assignment</th><th style="width:90px">Due</th></tr></thead><tbody>
   ${

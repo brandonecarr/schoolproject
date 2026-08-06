@@ -6,6 +6,8 @@ import { ledgerFor } from "@/lib/billing";
 import { dueSoonForStudents, dueLabel } from "@/lib/due";
 import { threadStudentIds, unreadForFamily } from "@/lib/messages";
 import { typeMeta } from "@/lib/lms";
+import { masteryForStudent } from "@/lib/mastery";
+import { StandardsBars } from "@/components/StandardsSummary";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Home — Cohort" };
@@ -42,7 +44,16 @@ export default async function ParentHomePage() {
         invoices.filter((i) => i.studentId === k.id)
       );
       const openCount = due.filter((d) => d.studentId === k.id).length;
-      return { k, presentDays: e.presentDays, loggedDays: e.attendance.length, avgPct, openCount, ledger };
+      const mastery = await masteryForStudent(k.id, user.schoolId);
+      return {
+        k,
+        presentDays: e.presentDays,
+        loggedDays: e.attendance.length,
+        avgPct,
+        openCount,
+        ledger,
+        mastery,
+      };
     })
   );
 
@@ -119,7 +130,7 @@ export default async function ParentHomePage() {
         {multi ? "Each child" : "Snapshot"}
       </div>
       <div className="child-grid" style={{ marginTop: 10 }}>
-        {perChild.map(({ k, presentDays, loggedDays, avgPct, openCount, ledger }) => (
+        {perChild.map(({ k, presentDays, loggedDays, avgPct, openCount, ledger, mastery }) => (
           <div key={k.id} className="card child-card">
             <div className="spread">
               <div>
@@ -150,6 +161,17 @@ export default async function ParentHomePage() {
                 <div className="cs-l">You owe</div>
               </div>
             </div>
+            {mastery.summary.assessed > 0 && (
+              <div style={{ marginTop: 14 }}>
+                <div className="spread" style={{ alignItems: "baseline" }}>
+                  <span className="small muted">Standards mastered</span>
+                  <span className="small">
+                    <strong>{mastery.summary.mastered}</strong> of {mastery.summary.assessed}
+                  </span>
+                </div>
+                <StandardsBars summary={mastery.summary} />
+              </div>
+            )}
             <div className="row" style={{ gap: 10, marginTop: 12 }}>
               <Link className="btn ghost sm" href="/parent/feed">
                 Feed

@@ -14,6 +14,7 @@ import { requireRole, logAudit } from "@/lib/auth";
 import { hashPassword } from "@/lib/password";
 import { deleteStudentData } from "@/lib/retention";
 import { autoScoreQuiz, parseItems, parseQuizAnswers } from "@/lib/lms";
+import { recordOutcomesForSubmission } from "@/lib/mastery";
 
 // Image/PDF types a student may turn in (bytes stored in the DB, like samples).
 const ALLOWED: Record<string, string> = {
@@ -120,6 +121,17 @@ export async function submitWork(formData: FormData) {
         ...cleared,
       },
     });
+    // Fully auto-graded quizzes are final, so they count toward mastery now.
+    if (!needsManual) {
+      await recordOutcomesForSubmission({
+        schoolId: user.schoolId,
+        studentId: user.studentId!,
+        assignmentId: asg.id,
+        submissionId: id,
+        score: auto,
+        possible: asg.points,
+      });
+    }
   } else if (asg.type === "checkoff") {
     const reflection = String(formData.get("reflection") || "").trim().slice(0, 500);
     await prisma.submission.update({
@@ -134,6 +146,14 @@ export async function submitWork(formData: FormData) {
         feedback: "Completed.",
         ...cleared,
       },
+    });
+    await recordOutcomesForSubmission({
+      schoolId: user.schoolId,
+      studentId: user.studentId!,
+      assignmentId: asg.id,
+      submissionId: id,
+      score: asg.points,
+      possible: asg.points,
     });
   } else if (asg.type === "upload") {
     const fileId = await saveFile(`${asg.title} — turned in`);

@@ -3,7 +3,7 @@ import { requireTeacher } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { today, fmt } from "@/lib/dates";
 import { typeMeta } from "@/lib/lms";
-import { addAssignment } from "../actions";
+import { addAssignment, setAssignmentOutcomes } from "../actions";
 import { AssignmentBuilder } from "@/components/AssignmentBuilder";
 
 export const dynamic = "force-dynamic";
@@ -12,7 +12,7 @@ export const metadata = { title: "Assignments — Cohort" };
 export default async function AssignmentsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ course?: string; created?: string }>;
+  searchParams: Promise<{ course?: string; created?: string; aligned?: string }>;
 }) {
   const { school } = await requireTeacher();
   const schoolId = school!.id;
@@ -26,8 +26,18 @@ export default async function AssignmentsPage({
   const where = sp.course ? { schoolId, courseId: sp.course } : { schoolId };
   const list = await prisma.assignment.findMany({ where, orderBy: { dueDate: "desc" } });
   const subs = await prisma.submission.findMany({ where: { schoolId } });
+  const outcomes = await prisma.outcome.findMany({
+    where: { schoolId },
+    orderBy: [{ subject: "asc" }, { code: "asc" }],
+  });
+  const alignments = await prisma.outcomeAlignment.findMany({ where: { schoolId } });
 
   const courseName = (id: string) => courses.find((c) => c.id === id)?.name || "—";
+  const alignedTo = (assignmentId: string) =>
+    alignments
+      .filter((a) => a.assignmentId === assignmentId)
+      .map((a) => outcomes.find((o) => o.id === a.outcomeId))
+      .filter(Boolean) as typeof outcomes;
 
   return (
     <>
@@ -36,6 +46,7 @@ export default async function AssignmentsPage({
           Assignment created and assigned to {sp.created} student{sp.created === "1" ? "" : "s"}.
         </div>
       )}
+      {sp.aligned && <div className="notice good">Standards updated for that assignment.</div>}
       <div className="topbar">
         <div>
           <div className="eyebrow">Work assigned</div>
@@ -55,8 +66,20 @@ export default async function AssignmentsPage({
           action={addAssignment}
           courses={courses.map((c) => ({ id: c.id, name: c.name }))}
           students={students.map((s) => ({ id: s.id, name: s.name, grade: s.grade }))}
+          outcomes={outcomes.map((o) => ({
+            id: o.id,
+            code: o.code,
+            title: o.title,
+            subject: o.subject,
+          }))}
           today={today()}
         />
+      )}
+      {outcomes.length === 0 && courses.length > 0 && (
+        <p className="small muted" style={{ margin: "10px 2px 0" }}>
+          Tip: <Link href="/outcomes">add standards</Link> and you can align assignments to them —
+          Cohort then tracks mastery automatically as you grade.
+        </p>
       )}
 
       <div className="sep" />
@@ -67,6 +90,7 @@ export default async function AssignmentsPage({
               <th>Assignment</th>
               <th>Type</th>
               <th>Course</th>
+              <th>Standards</th>
               <th>Due</th>
               <th>Turned in</th>
               <th>Graded</th>
@@ -92,6 +116,46 @@ export default async function AssignmentsPage({
                     </span>
                   </td>
                   <td className="small">{courseName(a.courseId)}</td>
+                  <td className="small">
+                    {outcomes.length === 0 ? (
+                      <span className="muted">—</span>
+                    ) : (
+                      <details className="align-cell">
+                        <summary>
+                          {alignedTo(a.id).length ? (
+                            alignedTo(a.id).map((o) => (
+                              <span key={o.id} className="typechip" style={{ marginRight: 4 }}>
+                                {o.code}
+                              </span>
+                            ))
+                          ) : (
+                            <span className="muted">Align…</span>
+                          )}
+                        </summary>
+                        <form action={setAssignmentOutcomes} className="align-pop">
+                          <input type="hidden" name="assignmentId" value={a.id} />
+                          <div className="stu-check">
+                            {outcomes.map((o) => (
+                              <label key={o.id} className="check" title={o.title}>
+                                <input
+                                  type="checkbox"
+                                  name="outcomeId"
+                                  value={o.id}
+                                  defaultChecked={alignments.some(
+                                    (x) => x.assignmentId === a.id && x.outcomeId === o.id
+                                  )}
+                                />
+                                {o.code}
+                              </label>
+                            ))}
+                          </div>
+                          <button className="btn sec sm" style={{ marginTop: 8 }}>
+                            Save standards
+                          </button>
+                        </form>
+                      </details>
+                    )}
+                  </td>
                   <td className="small">{fmt(a.dueDate)}</td>
                   <td className="mono">
                     {mine.filter((s) => s.status !== "assigned" && s.status !== "draft").length}/
@@ -103,7 +167,7 @@ export default async function AssignmentsPage({
             })}
             {list.length === 0 && (
               <tr>
-                <td colSpan={6} className="muted small" style={{ padding: 16 }}>
+                <td colSpan={7} className="muted small" style={{ padding: 16 }}>
                   No assignments yet. Build your first one above.
                 </td>
               </tr>

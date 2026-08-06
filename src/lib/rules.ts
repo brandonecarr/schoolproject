@@ -120,6 +120,9 @@ type ScoreInput = {
   observations: unknown[];
   assignments: unknown[];
   samples?: unknown[];
+  // Standards mastery, when the school tracks standards. Omit (or pass null) and
+  // scoring is unchanged — schools that don't use standards aren't penalised.
+  standards?: { assessed: number; mastered: number } | null;
 };
 
 export function scoreEvidence({
@@ -128,6 +131,7 @@ export function scoreEvidence({
   observations,
   assignments,
   samples = [],
+  standards = null,
 }: ScoreInput): ScoredEvidence {
   const present = attendance.filter((a) => a.status === "present").length;
   const graded = submissions.filter((s) => s.status === "graded").length;
@@ -186,10 +190,27 @@ export function scoreEvidence({
     },
   ];
 
-  const score = parts.reduce(
+  // Standards mastery is the strongest single statement of educational progress
+  // a reviewer can read, so it earns its own part — but only for schools that
+  // actually track standards. The score is normalised by the weight of the parts
+  // in play, so adding this part can't silently deflate everyone else's score.
+  if (standards) {
+    parts.push({
+      key: "standards",
+      label: "Standards mastery demonstrated",
+      count: standards.mastered,
+      ok: standards.mastered >= 1,
+      need: "At least 1 standard demonstrated as mastered from aligned work",
+      weight: 10,
+    });
+  }
+
+  const earned = parts.reduce(
     (sum, p) => sum + (p.ok ? p.weight : Math.round(p.weight * 0.35)),
     0
   );
+  const possible = parts.reduce((sum, p) => sum + p.weight, 0) || 1;
+  const score = Math.round((earned / possible) * 100);
   return { score: Math.min(100, score), parts, presentDays: present };
 }
 

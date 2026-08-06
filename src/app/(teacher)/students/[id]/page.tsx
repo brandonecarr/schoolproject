@@ -8,6 +8,8 @@ import { fmt, today } from "@/lib/dates";
 import { EvidenceBar } from "@/components/EvidenceBar";
 import { Pill, Notice } from "@/components/ui";
 import { ConfirmSubmit } from "@/components/ConfirmSubmit";
+import { StandardsSummary } from "@/components/StandardsSummary";
+import { masteryForStudent } from "@/lib/mastery";
 import { uploadSample, deleteSample, deleteStudent } from "../../actions";
 
 export const dynamic = "force-dynamic";
@@ -34,6 +36,7 @@ export default async function StudentPage({
   if (!s) notFound();
 
   const e = await evidenceFor(s.id);
+  const mastery = await masteryForStudent(s.id, school!.id);
   const r = readiness(e.score);
   const missing = e.parts.filter((p) => !p.ok);
   const msg = upload ? UPLOAD_MSG[upload] : null;
@@ -77,6 +80,20 @@ export default async function StudentPage({
           </div>
         )}
       </div>
+
+      {mastery.outcomes.length > 0 && (
+        <div className="card">
+          <StandardsSummary
+            outcomes={mastery.outcomes}
+            rollups={mastery.rollups}
+            summary={mastery.summary}
+            limit={8}
+          />
+          <Link className="small" href="/mastery" style={{ display: "inline-block", marginTop: 10 }}>
+            Full mastery board →
+          </Link>
+        </div>
+      )}
 
       <div className="sep" />
       <div className="grid g2">

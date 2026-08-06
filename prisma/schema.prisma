@@ -31,6 +31,9 @@ model School {
   // COPPA: child data may not be kept indefinitely. Records older than this are
   // purged by the retention job. Configurable per school; 730 days = ~2 school years.
   retentionDays Int   @default(730)
+  // Standards mastery: fraction of an aligned assignment's points a student must
+  // earn for that attempt to count as "mastered" (0.8 = 80%).
+  masteryThreshold Float @default(0.8)
   createdAt DateTime @default(now())
 }
 
@@ -119,6 +122,60 @@ model Worksheet {
   instructions String   @default("")
   itemsJson    String   @default("[]")
   createdAt    DateTime @default(now())
+}
+
+// --- Standards / learning outcomes -------------------------------------
+// The strongest ESA evidence a microschool can produce is documented progress
+// against named standards. An Outcome is a standard the school teaches to;
+// alignments tie it to the work that demonstrates it; results record each
+// student attempt so mastery can be rolled up over a period.
+
+model Outcome {
+  id          String   @id @default(cuid())
+  schoolId    String
+  code        String // e.g. "4.NBT.B.5" — short label shown in grids
+  title       String
+  description String   @default("")
+  subject     String   @default("")
+  gradeBand   String   @default("") // e.g. "3-5"
+  source      String   @default("custom") // custom | pack:<packKey>
+  createdAt   DateTime @default(now())
+
+  @@index([schoolId])
+}
+
+// An assignment (optionally one rubric criterion of it) demonstrates an outcome.
+model OutcomeAlignment {
+  id           String   @id @default(cuid())
+  schoolId     String
+  outcomeId    String
+  assignmentId String
+  criterionId  String? // rubric criterion id from Assignment.configJson, when scoped
+  createdAt    DateTime @default(now())
+
+  @@unique([outcomeId, assignmentId, criterionId])
+  @@index([assignmentId])
+  @@index([outcomeId])
+}
+
+// One recorded attempt at an outcome. Written automatically when aligned work is
+// graded, or by hand from the mastery board.
+model OutcomeResult {
+  id           String   @id @default(cuid())
+  schoolId     String
+  studentId    String
+  outcomeId    String
+  assignmentId String?
+  submissionId String?
+  score        Float // points earned on the aligned work (or criterion)
+  possible     Float // points available
+  mastered     Boolean  @default(false)
+  source       String   @default("graded") // graded | manual
+  recordedAt   String // ISO timestamp — period filtering uses this
+  createdAt    DateTime @default(now())
+
+  @@index([studentId, outcomeId])
+  @@index([schoolId])
 }
 
 model Attendance {

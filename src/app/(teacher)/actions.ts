@@ -20,6 +20,8 @@ import {
   autoScoreQuiz,
   itemIsAuto,
 } from "@/lib/lms";
+import { packByKey } from "@/lib/outcomes";
+import { recordOutcomesForSubmission } from "@/lib/mastery";
 import { deleteStudentData } from "@/lib/retention";
 import { newTokenValue, tokenExpiry } from "@/lib/tokens";
 import { today, periodStart } from "@/lib/dates";
@@ -122,6 +124,17 @@ export async function addAssignment(formData: FormData) {
     },
   });
 
+  // Standards this work demonstrates (CSV of outcome ids from the builder).
+  const outcomeIds = String(formData.get("outcomes") || "")
+    .split(",")
+    .map((s) => s.trim())
+    .filter(Boolean);
+  for (const outcomeId of outcomeIds) {
+    await prisma.outcomeAlignment.create({
+      data: { schoolId, outcomeId, assignmentId: a.id, criterionId: null },
+    });
+  }
+
   // Targeting: "*" (or empty) = whole class; otherwise a CSV of student ids.
   const targets = String(formData.get("students") || "*").trim();
   const students =
@@ -189,10 +202,22 @@ export async function saveGrade(formData: FormData) {
       ...(rubricJson ? { answersJson: rubricJson } : {}),
     },
   });
+
+  // Standards mastery accrues automatically from graded work.
+  await recordOutcomesForSubmission({
+    schoolId: school!.id,
+    studentId: sub.studentId,
+    assignmentId: asg.id,
+    submissionId: id,
+    score,
+    possible: asg.points,
+  });
+
   await logAudit(user.id, "graded", id);
   revalidatePath("/grading");
   revalidatePath("/dashboard");
   revalidatePath("/student");
+  revalidatePath("/mastery");
   redirect("/grading?graded=1");
 }
 
@@ -259,6 +284,7 @@ export async function buildInvoices() {
       assignments: e.assignments,
       submissions: e.submissions,
       observations: e.observations,
+      standards: e.standards,
     });
     await prisma.invoice.create({
       data: {
@@ -366,6 +392,7 @@ export async function regenerateNarrative(formData: FormData) {
     assignments: e.assignments,
     submissions: e.submissions,
     observations: e.observations,
+    standards: e.standards,
   });
   await prisma.invoice.update({
     where: { id },
@@ -585,6 +612,135 @@ export async function deleteSample(formData: FormData) {
   }
   revalidatePath(`/students/${studentId}`);
   redirect(`/students/${studentId}`);
+}
+
+// --- Standards / learning outcomes ---
+// Outcomes are the standards this school teaches to. Aligning work to them and
+// recording results is what turns teaching into "demonstrated progress against
+// standards" — the strongest evidence an ESA reviewer can be handed.
+export async function addOutcome(formData: FormData) {
+  const { user, school } = await requireTeacher();
+  const code = String(formData.get("code") || "").trim();
+  const title = String(formData.get("title") || "").trim();
+  if (!title) redirect("/outcomes?err=title");
+
+  await prisma.outcome.create({
+    data: {
+      schoolId: school!.id,
+      code: code || title.slice(0, 12).toUpperCase(),
+      title,
+      description: String(formData.get("description") || "").trim(),
+      subject: String(formData.get("subject") || "").trim(),
+      gradeBand: String(formData.get("gradeBand") || "").trim(),
+      source: "custom",
+    },
+  });
+  await logAudit(user.id, "outcome_added", `${code} ${title}`);
+  revalidatePath("/outcomes");
+  revalidatePath("/mastery");
+  redirect("/outcomes?added=1");
+}
+
+export async function deleteOutcome(formData: FormData) {
+  const { user, school } = await requireTeacher();
+  const id = String(formData.get("id"));
+  const o = await prisma.outcome.findFirst({ where: { id, schoolId: school!.id } });
+  if (o) {
+    // Remove the outcome and everything hanging off it.
+    await prisma.outcomeResult.deleteMany({ where: { outcomeId: id, schoolId: school!.id } });
+    await prisma.outcomeAlignment.deleteMany({ where: { outcomeId: id, schoolId: school!.id } });
+    await prisma.outcome.delete({ where: { id } });
+    await logAudit(user.id, "outcome_deleted", `${o.code} ${o.title}`);
+  }
+  revalidatePath("/outcomes");
+  revalidatePath("/mastery");
+  redirect("/outcomes?deleted=1");
+}
+
+// Copy a starter pack into this school. Skips codes that already exist so the
+// action is safe to run twice.
+export async function importOutcomePack(formData: FormData) {
+  const { user, school } = await requireTeacher();
+  const key = String(formData.get("packKey") || "");
+  const pack = packByKey(key);
+  if (!pack) redirect("/outcomes");
+
+  const existing = await prisma.outcome.findMany({
+    where: { schoolId: school!.id },
+    select: { code: true },
+  });
+  const have = new Set(existing.map((o) => o.code));
+
+  let added = 0;
+  for (const o of pack.outcomes) {
+    if (have.has(o.code)) continue;
+    await prisma.outcome.create({
+      data: {
+        schoolId: school!.id,
+        code: o.code,
+        title: o.title,
+        description: o.description || "",
+        subject: pack.subject,
+        gradeBand: pack.gradeBand,
+        source: `pack:${pack.key}`,
+      },
+    });
+    added++;
+  }
+  await logAudit(user.id, "outcome_pack_imported", `${pack.key}: ${added} added`);
+  revalidatePath("/outcomes");
+  revalidatePath("/mastery");
+  redirect(`/outcomes?imported=${added}`);
+}
+
+// Replace the set of standards an existing assignment demonstrates.
+export async function setAssignmentOutcomes(formData: FormData) {
+  const { user, school } = await requireTeacher();
+  const assignmentId = String(formData.get("assignmentId"));
+  const a = await prisma.assignment.findFirst({ where: { id: assignmentId, schoolId: school!.id } });
+  if (!a) redirect("/assignments");
+
+  const chosen = formData.getAll("outcomeId").map(String).filter(Boolean);
+  await prisma.outcomeAlignment.deleteMany({ where: { assignmentId, schoolId: school!.id } });
+  for (const outcomeId of chosen) {
+    await prisma.outcomeAlignment.create({
+      data: { schoolId: school!.id, outcomeId, assignmentId, criterionId: null },
+    });
+  }
+  await logAudit(user.id, "assignment_outcomes_set", `${a.title}: ${chosen.length}`);
+  revalidatePath("/assignments");
+  revalidatePath("/mastery");
+  redirect("/assignments?aligned=1");
+}
+
+// Record (or correct) a mastery result by hand from the mastery board — for
+// evidence a teacher observed off-platform.
+export async function recordOutcomeResult(formData: FormData) {
+  const { user, school } = await requireTeacher();
+  const studentId = String(formData.get("studentId"));
+  const outcomeId = String(formData.get("outcomeId"));
+  const level = Number(formData.get("level")); // 0..1
+  const student = await prisma.student.findFirst({ where: { id: studentId, schoolId: school!.id } });
+  const outcome = await prisma.outcome.findFirst({ where: { id: outcomeId, schoolId: school!.id } });
+  if (!student || !outcome || Number.isNaN(level)) redirect("/mastery");
+
+  const pct = Math.max(0, Math.min(1, level));
+  await prisma.outcomeResult.create({
+    data: {
+      schoolId: school!.id,
+      studentId,
+      outcomeId,
+      score: pct * 100,
+      possible: 100,
+      mastered: pct >= (school!.masteryThreshold ?? 0.8),
+      source: "manual",
+      recordedAt: new Date().toISOString(),
+    },
+  });
+  await logAudit(user.id, "outcome_result_manual", `${student.name} · ${outcome.code} · ${Math.round(pct * 100)}%`);
+  revalidatePath("/mastery");
+  revalidatePath(`/students/${studentId}`);
+  redirect("/mastery?recorded=1");
 }
 
 // --- Worksheets (reusable question sets) ---

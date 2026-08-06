@@ -19,6 +19,7 @@ import { ItemsEditor, blankItem, uid } from "@/components/ItemsEditor";
 
 type CourseOpt = { id: string; name: string };
 type StudentOpt = { id: string; name: string; grade: string };
+type OutcomeOpt = { id: string; code: string; title: string; subject: string };
 
 const blankCriterion = (id?: string): Criterion => ({ id: id ?? uid(), label: "", max: 5 });
 
@@ -26,11 +27,13 @@ export function AssignmentBuilder({
   action,
   courses,
   students,
+  outcomes = [],
   today,
 }: {
   action: (fd: FormData) => void;
   courses: CourseOpt[];
   students: StudentOpt[];
+  outcomes?: OutcomeOpt[];
   today: string;
 }) {
   const [type, setType] = useState<AssignmentType>("written");
@@ -45,6 +48,7 @@ export function AssignmentBuilder({
   const [flatPoints, setFlatPoints] = useState(20);
   const [targetAll, setTargetAll] = useState(true);
   const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [standards, setStandards] = useState<Set<string>>(new Set());
 
   const configJson = useMemo(() => {
     if (type === "quiz") return JSON.stringify(items);
@@ -67,6 +71,7 @@ export function AssignmentBuilder({
       <input type="hidden" name="type" value={type} />
       <input type="hidden" name="config" value={configJson} />
       <input type="hidden" name="students" value={targetsValue} />
+      <input type="hidden" name="outcomes" value={[...standards].join(",")} />
       {(type === "quiz" || type === "rubric") && <input type="hidden" name="points" value={total} />}
 
       {/* type picker */}
@@ -183,6 +188,43 @@ export function AssignmentBuilder({
           <input type="file" name="resource" accept="image/*,application/pdf" />
         </label>
       </div>
+
+      {/* standards alignment — what this work demonstrates */}
+      {outcomes.length > 0 && (
+        <div className="subcard" style={{ marginTop: 14 }}>
+          <div className="spread">
+            <div className="eyebrow" style={{ margin: 0 }}>
+              Standards this demonstrates
+            </div>
+            <span className="small muted">
+              {standards.size ? `${standards.size} selected` : "optional, but strong evidence"}
+            </span>
+          </div>
+          <div className="chip-wrap" style={{ marginTop: 10 }}>
+            {outcomes.map((o) => {
+              const on = standards.has(o.id);
+              return (
+                <button
+                  type="button"
+                  key={o.id}
+                  className={`chip ${on ? "on" : ""}`}
+                  title={`${o.subject ? o.subject + " · " : ""}${o.title}`}
+                  onClick={() =>
+                    setStandards((prev) => {
+                      const next = new Set(prev);
+                      if (next.has(o.id)) next.delete(o.id);
+                      else next.add(o.id);
+                      return next;
+                    })
+                  }
+                >
+                  <strong>{o.code}</strong> <span className="muted">{o.title.slice(0, 34)}</span>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
 
       {/* targeting */}
       <div className="subcard" style={{ marginTop: 14 }}>

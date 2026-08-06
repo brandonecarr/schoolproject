@@ -69,12 +69,23 @@ type PurposeContext = {
     feedback: string;
   }[];
   observations: { date: string; text: string }[];
+  standards?: { code: string; title: string; pct: number; mastered: boolean }[];
 };
 
 // --- ESA educational purpose narrative -------------------------------------
 
 export async function purposeNarrative(ctx: PurposeContext): Promise<NarrativeResult> {
-  const { student, school, rail, period, attendance, assignments, submissions, observations } = ctx;
+  const {
+    student,
+    school,
+    rail,
+    period,
+    attendance,
+    assignments,
+    submissions,
+    observations,
+    standards = [],
+  } = ctx;
 
   const facts = [
     `School: ${school.name} (${school.state})`,
@@ -92,6 +103,15 @@ export async function purposeNarrative(ctx: PurposeContext): Promise<NarrativeRe
       ),
     `Teacher observations:`,
     ...observations.map((o) => `  - ${fmtDate(o.date)}: ${o.text}`),
+    ...(standards.length
+      ? [
+          `Standards assessed this period (${standards.filter((s) => s.mastered).length} of ${standards.length} mastered):`,
+          ...standards.map(
+            (s) =>
+              `  - ${s.code} ${s.title}: ${Math.round(s.pct * 100)}%${s.mastered ? " (mastered)" : ""}`
+          ),
+        ]
+      : []),
   ].join("\n");
 
   const system = `You write educational purpose statements that accompany Education Savings Account reimbursement invoices for small independent schools.
@@ -101,6 +121,7 @@ Rules:
 - Write 120-180 words in plain administrative prose. No marketing language, no adjectives about quality.
 - Structure: what instruction was delivered, what the student did, how it was assessed, what the tuition covered.
 - Name specific assignments and courses from the facts.
+- If standards are listed, state plainly which ones the student demonstrated — this is the clearest evidence of educational progress.
 - If evidence is thin, say plainly what was delivered rather than padding.
 - Output the statement only. No preamble, no headings.`;
 
@@ -136,6 +157,16 @@ Write the educational purpose statement.`;
           .join(" and ")}. `
       : "") +
     (observations.length ? `Instructor observation on ${fmtDate(observations[0].date)}: ${observations[0].text} ` : "") +
+    (standards.length
+      ? `Against the standards assessed this period, the student demonstrated mastery of ${standards.filter((s) => s.mastered).length} of ${standards.length}` +
+        (standards.filter((s) => s.mastered).length
+          ? `, including ${standards
+              .filter((s) => s.mastered)
+              .slice(0, 3)
+              .map((s) => `${s.code} (${s.title})`)
+              .join(", ")}. `
+          : ". ")
+      : "") +
     `Tuition for this period covered small-group instruction, curriculum materials, and assessment of the coursework described above.`;
 
   return { text, source: "template" };
