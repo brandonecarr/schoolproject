@@ -10,7 +10,7 @@ import { Pill, Notice } from "@/components/ui";
 import { ConfirmSubmit } from "@/components/ConfirmSubmit";
 import { StandardsSummary } from "@/components/StandardsSummary";
 import { masteryForStudent } from "@/lib/mastery";
-import { uploadSample, deleteSample, deleteStudent } from "../../actions";
+import { uploadSample, deleteSample, deleteStudent, generateProgressReport } from "../../actions";
 
 export const dynamic = "force-dynamic";
 
@@ -41,6 +41,11 @@ export default async function StudentPage({
     where: { schoolId: school!.id, studentId: s.id },
     orderBy: { at: "desc" },
     take: 8,
+  });
+  const reports = await prisma.progressReport.findMany({
+    where: { schoolId: school!.id, studentId: s.id },
+    orderBy: { createdAt: "desc" },
+    take: 5,
   });
   const r = readiness(e.score);
   const missing = e.parts.filter((p) => !p.ok);
@@ -157,6 +162,43 @@ export default async function StudentPage({
             </>
           )}
         </div>
+      </div>
+
+      <div className="card" style={{ marginTop: 12 }}>
+        <div className="spread">
+          <div className="eyebrow">Progress reports</div>
+          <form action={generateProgressReport}>
+            <input type="hidden" name="studentId" value={s.id} />
+            <button className="btn sec sm">Draft a progress report</button>
+          </form>
+        </div>
+        <p className="small muted" style={{ margin: "8px 0 0", maxWidth: "62ch" }}>
+          Cohort assembles a narrative from this period&apos;s attendance, graded work, standards, and
+          observations. You review and edit it, and it only reaches the family once you approve.
+        </p>
+        {reports.length > 0 && (
+          <div style={{ marginTop: 12 }}>
+            {reports.map((rp) => (
+              <div
+                key={rp.id}
+                className="spread"
+                style={{ padding: "10px 0", borderTop: "1px solid var(--rule)", gap: 10 }}
+              >
+                <div>
+                  <Link href={`/reports/progress/${rp.id}`} style={{ fontWeight: 600 }}>
+                    {fmt(rp.periodStart)} – {fmt(rp.periodEnd)}
+                  </Link>
+                  <div className="small muted">
+                    {rp.createdByName} · {rp.narrative.slice(0, 60)}…
+                  </div>
+                </div>
+                <Pill tone={rp.status === "approved" ? "good" : "warn"}>
+                  {rp.status === "approved" ? "Approved" : "Draft"}
+                </Pill>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
 
       <div className="card" style={{ marginTop: 12 }}>

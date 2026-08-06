@@ -10,7 +10,7 @@ import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/db";
 import { requireTeacher, logAudit } from "@/lib/auth";
 import { evidenceFor } from "@/lib/evidence";
-import { purposeNarrative } from "@/lib/ai";
+import { purposeNarrative, progressNarrative } from "@/lib/ai";
 import { PROGRAMS } from "@/lib/rules";
 import {
   assignmentMax,
@@ -21,7 +21,7 @@ import {
   itemIsAuto,
 } from "@/lib/lms";
 import { packByKey } from "@/lib/outcomes";
-import { recordOutcomesForSubmission } from "@/lib/mastery";
+import { recordOutcomesForSubmission, masteryForStudent } from "@/lib/mastery";
 import { deleteStudentData } from "@/lib/retention";
 import { newTokenValue, tokenExpiry } from "@/lib/tokens";
 import { today, periodStart } from "@/lib/dates";
@@ -631,6 +631,133 @@ export async function deleteSample(formData: FormData) {
   }
   revalidatePath(`/students/${studentId}`);
   redirect(`/students/${studentId}`);
+}
+
+// --- Progress reports ---
+// AI drafts, a human approves, nothing reaches a family on its own. A report is
+// invisible to parents until a teacher has read it and pressed approve.
+export async function generateProgressReport(formData: FormData) {
+  const { user, school } = await requireTeacher();
+  const schoolId = school!.id;
+  const studentId = String(formData.get("studentId"));
+  const student = await prisma.student.findFirst({ where: { id: studentId, schoolId } });
+  if (!student) redirect("/students");
+
+  const start = String(formData.get("start") || periodStart());
+  const end = String(formData.get("end") || today());
+
+  const [e, mastery] = await Promise.all([
+    evidenceFor(studentId, start, end),
+    masteryForStudent(studentId, schoolId, { start, end }),
+  ]);
+
+  const graded = e.submissions.filter((s) => s.status === "graded" && s.score != null);
+  const earned = graded.reduce((n, s) => n + (s.score ?? 0), 0);
+  const possible = graded.reduce((n, s) => n + s.points, 0);
+  const td = today();
+  const missingCount = e.submissions.filter(
+    (s) => (s.status === "assigned" || s.status === "draft") && (s.dueDate ?? "") < td
+  ).length;
+
+  const nar = await progressNarrative({
+    student,
+    school: school!,
+    period: { start, end },
+    presentDays: e.presentDays,
+    loggedDays: e.attendance.length,
+    graded: graded.map((g) => ({
+      assignmentTitle: g.assignmentTitle,
+      courseName: g.courseName,
+      score: g.score,
+      points: g.points,
+      feedback: g.feedback,
+    })),
+    missingCount,
+    overallPct: possible > 0 ? earned / possible : null,
+    standards: e.standards,
+    observations: e.observations,
+  });
+
+  const report = await prisma.progressReport.create({
+    data: {
+      schoolId,
+      studentId,
+      periodStart: start,
+      periodEnd: end,
+      narrative: nar.text,
+      source: nar.source,
+      status: "draft",
+      createdById: user.id,
+      createdByName: user.name,
+    },
+  });
+  await logAudit(user.id, "progress_report_drafted", `${student.name} (${start}..${end}) via ${nar.source}`);
+  revalidatePath(`/students/${studentId}`);
+  revalidatePath("/reports");
+  redirect(`/reports/progress/${report.id}`);
+}
+
+export async function saveProgressReport(formData: FormData) {
+  const { user, school } = await requireTeacher();
+  const id = String(formData.get("id"));
+  const rep = await prisma.progressReport.findFirst({ where: { id, schoolId: school!.id } });
+  if (!rep) redirect("/reports");
+
+  await prisma.progressReport.update({
+    where: { id },
+    data: { narrative: String(formData.get("narrative") || "").slice(0, 8000), source: "edited" },
+  });
+  await logAudit(user.id, "progress_report_edited", id);
+  revalidatePath(`/reports/progress/${id}`);
+  redirect(`/reports/progress/${id}?saved=1`);
+}
+
+// The approval gate: only after this can a family see it.
+export async function approveProgressReport(formData: FormData) {
+  const { user, school } = await requireTeacher();
+  const id = String(formData.get("id"));
+  const rep = await prisma.progressReport.findFirst({ where: { id, schoolId: school!.id } });
+  if (!rep) redirect("/reports");
+  if (!rep.narrative.trim()) redirect(`/reports/progress/${id}?err=empty`);
+
+  await prisma.progressReport.update({
+    where: { id },
+    data: { status: "approved", approvedAt: new Date().toISOString(), approvedByName: user.name },
+  });
+  await logAudit(user.id, "progress_report_approved", id);
+  revalidatePath(`/reports/progress/${id}`);
+  revalidatePath("/reports");
+  revalidatePath("/parent/reports");
+  redirect(`/reports/progress/${id}?approved=1`);
+}
+
+// Pull a report back from the family view (e.g. an error was spotted).
+export async function unapproveProgressReport(formData: FormData) {
+  const { user, school } = await requireTeacher();
+  const id = String(formData.get("id"));
+  const rep = await prisma.progressReport.findFirst({ where: { id, schoolId: school!.id } });
+  if (!rep) redirect("/reports");
+  await prisma.progressReport.update({
+    where: { id },
+    data: { status: "draft", approvedAt: null, approvedByName: null },
+  });
+  await logAudit(user.id, "progress_report_unapproved", id);
+  revalidatePath(`/reports/progress/${id}`);
+  revalidatePath("/parent/reports");
+  redirect(`/reports/progress/${id}?pulled=1`);
+}
+
+export async function deleteProgressReport(formData: FormData) {
+  const { user, school } = await requireTeacher();
+  const id = String(formData.get("id"));
+  const rep = await prisma.progressReport.findFirst({ where: { id, schoolId: school!.id } });
+  if (rep) {
+    await prisma.progressReport.delete({ where: { id } });
+    await logAudit(user.id, "progress_report_deleted", id);
+  }
+  revalidatePath("/reports");
+  revalidatePath("/parent/reports");
+  redirect("/reports?deleted=1");
 }
 
 // --- Gradebook ---

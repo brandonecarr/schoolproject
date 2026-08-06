@@ -172,6 +172,103 @@ Write the educational purpose statement.`;
   return { text, source: "template" };
 }
 
+// --- Progress report (period narrative for a family) -------------------------
+//
+// Longer and more considered than the weekly note: this is the report a parent
+// keeps, and it also rides along in the printable student record. A teacher
+// always reviews and approves it before a family sees it.
+
+type ProgressContext = {
+  student: { name: string; grade: string };
+  school: { name: string };
+  period: { start: string; end: string };
+  presentDays: number;
+  loggedDays: number;
+  graded: { assignmentTitle: string; courseName: string; score: number | null; points: number; feedback: string }[];
+  missingCount: number;
+  overallPct: number | null;
+  standards: { code: string; title: string; pct: number; mastered: boolean }[];
+  observations: { date: string; text: string }[];
+};
+
+export async function progressNarrative(ctx: ProgressContext): Promise<NarrativeResult> {
+  const {
+    student,
+    school,
+    period,
+    presentDays,
+    loggedDays,
+    graded,
+    missingCount,
+    overallPct,
+    standards,
+    observations,
+  } = ctx;
+
+  const masteredList = standards.filter((s) => s.mastered);
+  const facts = [
+    `Student: ${student.name}, grade ${student.grade}`,
+    `School: ${school.name}`,
+    `Reporting period: ${fmtDate(period.start)} – ${fmtDate(period.end)}`,
+    `Attendance: present ${presentDays} of ${loggedDays} logged days`,
+    `Overall grade on graded work: ${overallPct != null ? Math.round(overallPct * 100) + "%" : "nothing graded yet"}`,
+    `Work missing (past due, not turned in): ${missingCount}`,
+    `Graded work:`,
+    ...graded.map(
+      (g) =>
+        `  - ${g.courseName}: "${g.assignmentTitle}" ${g.score}/${g.points}${g.feedback ? `. Teacher note: ${g.feedback}` : ""}`
+    ),
+    `Standards assessed (${masteredList.length} of ${standards.length} mastered):`,
+    ...standards.map(
+      (s) => `  - ${s.code} ${s.title}: ${Math.round(s.pct * 100)}%${s.mastered ? " (mastered)" : ""}`
+    ),
+    `Teacher observations:`,
+    ...observations.map((o) => `  - ${fmtDate(o.date)}: ${o.text}`),
+  ].join("\n");
+
+  const system = `You write end-of-period progress reports from a small-school teacher to a parent.
+
+Rules:
+- Use ONLY the facts provided. Never invent a score, a skill, an event, or a feeling. If something is not in the facts, do not mention it.
+- 150-220 words, three short paragraphs: how the period went overall; what specific skills and standards the child demonstrated; what to work on next.
+- Warm, plain, specific. Write as the teacher ("we", "I"). No marketing language, no empty praise, no exclamation marks.
+- Name real assignments and standards from the facts.
+- If work is missing or a standard is not yet mastered, say so kindly and concretely rather than glossing over it.
+- Do not invent next steps that the facts do not support; base them on what is incomplete or not yet mastered.
+- Output the report body only. No greeting, no sign-off, no headings.`;
+
+  const out = await callClaude(system, `FACTS:\n${facts}\n\nWrite the progress report.`, 1200);
+  if (out) return { text: out, source: "ai" };
+
+  // Deterministic fallback — same facts, no model required.
+  const top = graded.slice(0, 3).map((g) => `"${g.assignmentTitle}" (${g.score}/${g.points})`);
+  const text =
+    `${student.name} was present for ${presentDays} of ${loggedDays} logged instructional days between ` +
+    `${fmtDate(period.start)} and ${fmtDate(period.end)}. ` +
+    (overallPct != null
+      ? `Across ${graded.length} graded assignment${graded.length === 1 ? "" : "s"}, ${student.name.split(" ")[0]} is at ${Math.round(overallPct * 100)}%. `
+      : `No work has been graded yet this period. `) +
+    (top.length ? `Recent graded work includes ${top.join(", ")}. ` : "") +
+    (standards.length
+      ? `Against the standards assessed this period, ${student.name.split(" ")[0]} has mastered ${masteredList.length} of ${standards.length}` +
+        (masteredList.length
+          ? `, including ${masteredList
+              .slice(0, 3)
+              .map((s) => `${s.title.toLowerCase()} (${s.code})`)
+              .join(", ")}. `
+          : ". ") +
+        (standards.length - masteredList.length > 0
+          ? `${standards.length - masteredList.length} standard${standards.length - masteredList.length === 1 ? " is" : "s are"} still in progress. `
+          : "")
+      : "") +
+    (observations.length ? `Classroom note from ${fmtDate(observations[0].date)}: ${observations[0].text} ` : "") +
+    (missingCount > 0
+      ? `There ${missingCount === 1 ? "is 1 assignment" : `are ${missingCount} assignments`} past due and not yet turned in — that is where we will focus next.`
+      : `Nothing is outstanding at the close of this period.`);
+
+  return { text, source: "template" };
+}
+
 // --- Weekly parent report ---------------------------------------------------
 
 type WeeklyContext = {

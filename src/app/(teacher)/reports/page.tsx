@@ -17,7 +17,7 @@ const PRESETS = [
 export default async function ReportsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ start?: string; end?: string; p?: string }>;
+  searchParams: Promise<{ start?: string; end?: string; p?: string; deleted?: string }>;
 }) {
   const { school } = await requireTeacher();
   const sp = await searchParams;
@@ -27,10 +27,16 @@ export default async function ReportsPage({
   const end = sp.end || today();
   const q = `start=${start}&end=${end}`;
 
-  const students = await prisma.student.findMany({
-    where: { schoolId: school!.id },
-    orderBy: { name: "asc" },
-  });
+  const [students, progressReports] = await Promise.all([
+    prisma.student.findMany({ where: { schoolId: school!.id }, orderBy: { name: "asc" } }),
+    prisma.progressReport.findMany({
+      where: { schoolId: school!.id },
+      orderBy: { createdAt: "desc" },
+      take: 15,
+    }),
+  ]);
+  const studentName = (id: string) => students.find((s) => s.id === id)?.name ?? "—";
+  const draftCount = progressReports.filter((r) => r.status === "draft").length;
 
   return (
     <>
@@ -98,6 +104,48 @@ export default async function ReportsPage({
           </a>
         ))}
       </div>
+
+      {/* progress reports */}
+      <div className="sep" />
+      <div className="spread">
+        <div className="eyebrow">Progress reports</div>
+        {draftCount > 0 && (
+          <span className="small" style={{ color: "var(--warn)" }}>
+            {draftCount} draft{draftCount === 1 ? "" : "s"} awaiting your approval
+          </span>
+        )}
+      </div>
+      {progressReports.length === 0 ? (
+        <div className="card" style={{ marginTop: 10 }}>
+          <p className="muted small" style={{ margin: 0 }}>
+            No progress reports yet. Open a student and choose{" "}
+            <strong>Draft a progress report</strong> — Cohort writes the first pass from the records,
+            you edit it, and it reaches the family only once you approve.
+          </p>
+        </div>
+      ) : (
+        <div className="card" style={{ marginTop: 10, padding: "6px 18px" }}>
+          {progressReports.map((r) => (
+            <div
+              key={r.id}
+              className="spread"
+              style={{ padding: "12px 0", borderTop: "1px solid var(--rule)", gap: 12 }}
+            >
+              <div style={{ flex: 1 }}>
+                <Link href={`/reports/progress/${r.id}`} style={{ fontWeight: 600 }}>
+                  {studentName(r.studentId)}
+                </Link>
+                <div className="small muted">
+                  {fmt(r.periodStart)} – {fmt(r.periodEnd)} · {r.createdByName}
+                </div>
+              </div>
+              <span className={`pill ${r.status === "approved" ? "good" : "warn"}`}>
+                {r.status === "approved" ? "Approved" : "Draft"}
+              </span>
+            </div>
+          ))}
+        </div>
+      )}
 
       {/* student records */}
       <div className="sep" />

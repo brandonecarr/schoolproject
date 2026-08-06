@@ -124,6 +124,30 @@ model Worksheet {
   createdAt    DateTime @default(now())
 }
 
+// A narrative progress report for one student over one period.
+//
+// GUARDRAIL: AI drafts, a human approves, nothing reaches a family on its own.
+// A report is only visible to parents once status = "approved", and the record
+// keeps who wrote it and who approved it.
+model ProgressReport {
+  id             String   @id @default(cuid())
+  schoolId       String
+  studentId      String
+  periodStart    String // YYYY-MM-DD
+  periodEnd      String // YYYY-MM-DD
+  narrative      String   @default("")
+  source         String   @default("template") // ai | template | edited
+  status         String   @default("draft") // draft | approved
+  createdById    String
+  createdByName  String
+  approvedAt     String? // ISO timestamp
+  approvedByName String?
+  createdAt      DateTime @default(now())
+
+  @@index([schoolId])
+  @@index([studentId])
+}
+
 // Every change to a score, with who made it and what it was before. Grades are
 // the part of the record a state reviewer or a parent is most likely to
 // challenge, so they need a defensible history — not just a current value.

@@ -51,10 +51,15 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
   const start = url.searchParams.get("start") || periodStart();
   const end = url.searchParams.get("end") || today();
 
-  const [e, mastery, courses] = await Promise.all([
+  const [e, mastery, courses, report] = await Promise.all([
     evidenceFor(id, start, end),
     masteryForStudent(id, student.schoolId, { start, end }),
     prisma.course.findMany({ where: { schoolId: student.schoolId } }),
+    // Only an approved narrative belongs in a record that leaves the building.
+    prisma.progressReport.findFirst({
+      where: { studentId: id, status: "approved" },
+      orderBy: { periodEnd: "desc" },
+    }),
   ]);
   const schoolRow = school ?? (await prisma.school.findUnique({ where: { id: student.schoolId } }));
 
@@ -92,6 +97,7 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
   .m{background:#E8F2B8;color:#3F4A0C}
   .n{background:#F7EEDC;color:#8A5C0C}
   .d{background:#F6E4E1;color:#8A2E20}
+  .narrative{border-left:3px solid #141C26;padding:2px 0 2px 16px;margin:6px 0 0;white-space:pre-wrap}
   .samples{display:flex;gap:10px;flex-wrap:wrap;margin-top:8px}
   .samples figure{margin:0;width:168px}
   .samples img{width:100%;border:1px solid #DCDFD8;border-radius:4px}
@@ -167,6 +173,20 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
     <div class="kpi"><div class="n">${masteredCount}/${assessed.length || 0}</div><div class="l">Standards mastered</div></div>
     <div class="kpi"><div class="n">${missing}</div><div class="l">Missing work</div></div>
   </div>
+
+  ${
+    report
+      ? `<h2>Instructor summary</h2>
+  <p class="narrative">${esc(report.narrative)}</p>
+  <p class="sub" style="margin:6px 0 0">${esc(report.createdByName)}${
+    report.approvedByName && report.approvedByName !== report.createdByName
+      ? `, approved by ${esc(report.approvedByName)}`
+      : ""
+  }${report.approvedAt ? ` &middot; ${esc(fmt(report.approvedAt.slice(0, 10)))}` : ""} &middot; covering ${esc(
+    fmt(report.periodStart)
+  )} – ${esc(fmt(report.periodEnd))}</p>`
+      : ""
+  }
 
   <h2>Attendance</h2>
   <p style="margin:0">Present <strong>${e.presentDays}</strong> of <strong>${e.attendance.length}</strong> logged instructional days during the reporting period.</p>
