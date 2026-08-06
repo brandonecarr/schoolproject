@@ -5,49 +5,51 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { Icon } from "@/components/icons";
 
-const NAV: { group: string; items: { href: string; label: string }[] }[] = [
+const NAV: { group: string; items: { href: string; label: string; icon: string }[] }[] = [
   {
     group: "Today",
     items: [
-      { href: "/dashboard", label: "Dashboard" },
-      { href: "/attendance", label: "Attendance" },
-      { href: "/observations", label: "Observations" },
+      { href: "/dashboard", label: "Dashboard", icon: "dashboard" },
+      { href: "/attendance", label: "Attendance", icon: "attendance" },
+      { href: "/observations", label: "Observations", icon: "observations" },
     ],
   },
   {
     group: "Learning",
     items: [
-      { href: "/courses", label: "Courses" },
-      { href: "/assignments", label: "Assignments" },
-      { href: "/grading", label: "Grading queue" },
+      { href: "/courses", label: "Courses", icon: "courses" },
+      { href: "/assignments", label: "Assignments", icon: "assignments" },
+      { href: "/worksheets", label: "Worksheets", icon: "assignments" },
+      { href: "/grading", label: "Grading queue", icon: "grading" },
     ],
   },
   {
     group: "People",
     items: [
-      { href: "/students", label: "Students" },
-      { href: "/invites", label: "Invite families" },
+      { href: "/students", label: "Students", icon: "students" },
+      { href: "/invites", label: "Invite families", icon: "invites" },
     ],
   },
   {
     group: "Money",
     items: [
-      { href: "/evidence", label: "Evidence board" },
-      { href: "/invoices", label: "ESA invoices" },
-      { href: "/billing", label: "Tuition" },
-      { href: "/cashflow", label: "Cash flow" },
+      { href: "/evidence", label: "Evidence board", icon: "evidence" },
+      { href: "/invoices", label: "ESA invoices", icon: "invoices" },
+      { href: "/billing", label: "Tuition", icon: "billing" },
+      { href: "/cashflow", label: "Cash flow", icon: "cashflow" },
     ],
   },
   {
     group: "Family",
-    items: [{ href: "/messages", label: "Messages" }],
+    items: [{ href: "/messages", label: "Messages", icon: "messages" }],
   },
   {
     group: "Admin",
     items: [
-      { href: "/settings", label: "Settings" },
-      { href: "/audit", label: "Audit log" },
+      { href: "/settings", label: "Settings", icon: "settings" },
+      { href: "/audit", label: "Audit log", icon: "audit" },
     ],
   },
 ];
@@ -85,7 +87,8 @@ export function Sidebar({
           <div className="navgroup">{section.group}</div>
           {section.items.map((item) => (
             <Link key={item.href} href={item.href} className={isOn(item.href) ? "on" : ""}>
-              {item.label}
+              <Icon name={item.icon} />
+              <span style={{ flex: 1 }}>{item.label}</span>
               {item.href === "/messages" && messagesUnread > 0 && (
                 <span className="nav-badge">{messagesUnread}</span>
               )}

@@ -1,150 +1,186 @@
+import Link from "next/link";
 import { requireRole } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { evidenceFor } from "@/lib/evidence";
-import { fmt } from "@/lib/dates";
-import { Pill, Notice } from "@/components/ui";
-import { ConfirmSubmit } from "@/components/ConfirmSubmit";
-import { createStudentAccount, deleteChildData } from "../actions";
+import { ledgerFor } from "@/lib/billing";
+import { dueSoonForStudents, dueLabel } from "@/lib/due";
+import { threadStudentIds, unreadForFamily } from "@/lib/messages";
+import { typeMeta } from "@/lib/lms";
 
 export const dynamic = "force-dynamic";
-export const metadata = { title: "My children — Cohort" };
+export const metadata = { title: "Home — Cohort" };
 
-export default async function ParentPage({
-  searchParams,
-}: {
-  searchParams: Promise<{ created?: string; deleted?: string }>;
-}) {
+export default async function ParentHomePage() {
   const { user } = await requireRole("parent");
-  const sp = await searchParams;
-
   const ids: string[] = user.studentIdsJson ? JSON.parse(user.studentIdsJson) : [];
-  const kids = (
-    await prisma.student.findMany({ where: { id: { in: ids } } })
-  ).sort((a, b) => ids.indexOf(a.id) - ids.indexOf(b.id));
+  const kids = (await prisma.student.findMany({ where: { id: { in: ids } } })).sort(
+    (a, b) => ids.indexOf(a.id) - ids.indexOf(b.id)
+  );
+  const firstOf = (id: string) => kids.find((k) => k.id === id)?.name.split(" ")[0] ?? "";
 
-  const blocks = await Promise.all(
+  const [due, payments, invoices, unread] = await Promise.all([
+    dueSoonForStudents(ids),
+    prisma.payment.findMany({ where: { studentId: { in: ids } } }),
+    prisma.invoice.findMany({ where: { studentId: { in: ids } } }),
+    unreadForFamily(await threadStudentIds(user)),
+  ]);
+
+  const perChild = await Promise.all(
     kids.map(async (k) => {
       const e = await evidenceFor(k.id);
-      const kidUser = await prisma.user.findFirst({ where: { role: "student", studentId: k.id } });
-      const graded = e.submissions.filter((s) => s.status === "graded");
-      const open = e.submissions.filter((s) => s.status === "assigned");
-      return { k, e, kidUser, graded, open };
+      const graded = e.submissions.filter((s) => s.status === "graded" && s.score != null);
+      let earned = 0;
+      let possible = 0;
+      for (const s of graded) {
+        earned += s.score ?? 0;
+        possible += s.points;
+      }
+      const avgPct = possible > 0 ? Math.round((earned / possible) * 100) : null;
+      const ledger = ledgerFor(
+        k,
+        payments.filter((p) => p.studentId === k.id),
+        invoices.filter((i) => i.studentId === k.id)
+      );
+      const openCount = due.filter((d) => d.studentId === k.id).length;
+      return { k, presentDays: e.presentDays, loggedDays: e.attendance.length, avgPct, openCount, ledger };
     })
   );
 
+  const returned = due.filter((d) => d.status === "returned");
+  const familyBalance = perChild.reduce((a, c) => a + c.ledger.familyBalance, 0);
+  const multi = kids.length > 1;
+
   return (
     <>
-      {sp.created && (
-        <Notice tone="good">
-          Your child&apos;s login is ready. They can sign in with the password you set.
-        </Notice>
-      )}
-      {sp.deleted && (
-        <Notice tone="good">Your child&apos;s data has been permanently deleted.</Notice>
-      )}
-      {blocks.map(({ k, e, kidUser, graded, open }) => (
-        <div key={k.id} className="card">
-          <div className="spread">
-            <div>
-              <div className="eyebrow">Grade {k.grade}</div>
-              <h2>{k.name}</h2>
-            </div>
-            <Pill tone="info">
-              {e.presentDays} of {e.attendance.length} days present
-            </Pill>
-          </div>
+      <div className="eyebrow">Your family</div>
+      <h1 style={{ margin: "2px 0 16px" }}>
+        {multi ? "Everyone at a glance" : `${firstOf(kids[0]?.id) || "Your child"}’s week`}
+      </h1>
 
-          <div className="sep" style={{ margin: "16px 0" }} />
-          <div className="eyebrow">Graded work</div>
-          <div className="rollbook" style={{ marginTop: 8 }}>
-            {graded.length ? (
-              graded.map((s) => (
-                <div key={s.id} className="line">
-                  <span style={{ flex: 1 }}>{s.assignmentTitle}</span>
-                  <span className="mono">
-                    {s.score}/{s.points}
-                  </span>
-                </div>
-              ))
-            ) : (
-              <div className="line muted">Nothing graded yet</div>
-            )}
-          </div>
-          {graded
-            .filter((s) => s.feedback)
-            .slice(0, 2)
-            .map((s) => (
-              <p key={s.id} className="small" style={{ margin: "10px 0 0" }}>
-                <strong>{s.assignmentTitle}:</strong> {s.feedback}
-              </p>
-            ))}
-
-          <div className="sep" style={{ margin: "16px 0" }} />
-          <div className="eyebrow">Still to do</div>
-          <div className="rollbook" style={{ marginTop: 8 }}>
-            {open.length ? (
-              open.map((s) => (
-                <div key={s.id} className="line">
-                  <span style={{ flex: 1 }}>{s.assignmentTitle}</span>
-                  <span className="mono">due {fmt(s.dueDate)}</span>
-                </div>
-              ))
-            ) : (
-              <div className="line muted">All caught up</div>
-            )}
-          </div>
-
-          <div className="sep" style={{ margin: "16px 0" }} />
-          {kidUser ? (
-            <p className="small muted" style={{ margin: 0 }}>
-              {k.name.split(" ")[0]} has a login (<span className="mono">{kidUser.email}</span>) and can
-              submit work from home.
-            </p>
-          ) : (
-            <>
-              <div className="eyebrow">Give {k.name.split(" ")[0]} a login</div>
-              <p className="small muted" style={{ margin: "6px 0 10px" }}>
-                You create your child&apos;s account yourself. Nobody else can — that&apos;s how we make
-                sure a parent has actually consented.
-              </p>
-              <form action={createStudentAccount}>
-                <input type="hidden" name="studentId" value={k.id} />
-                <div className="row" style={{ gap: 12, alignItems: "flex-end" }}>
-                  <div style={{ flex: 1, minWidth: 200 }}>
-                    <label htmlFor={`e_${k.id}`}>Login email for your child</label>
-                    <input id={`e_${k.id}`} name="email" type="email" required />
-                  </div>
-                  <div style={{ width: 180 }}>
-                    <label htmlFor={`p_${k.id}`}>Password</label>
-                    <input id={`p_${k.id}`} name="password" type="password" minLength={8} required />
-                  </div>
-                  <button className="btn mark">Create login</button>
-                </div>
-              </form>
-            </>
-          )}
-
-          <div className="sep" style={{ margin: "16px 0" }} />
-          <details>
-            <summary className="small muted" style={{ cursor: "pointer" }}>
-              Delete {k.name.split(" ")[0]}&apos;s data
-            </summary>
-            <p className="small muted" style={{ margin: "8px 0 10px", maxWidth: "60ch" }}>
-              Permanently removes everything we hold about {k.name.split(" ")[0]} — coursework,
-              attendance, notes, work samples, and any login. This cannot be undone.
-            </p>
-            <form action={deleteChildData}>
-              <input type="hidden" name="studentId" value={k.id} />
-              <ConfirmSubmit
-                className="btn ghost sm"
-                message={`Permanently delete all of ${k.name}'s data? This cannot be undone.`}
-              >
-                Delete my child&apos;s data
-              </ConfirmSubmit>
-            </form>
-          </details>
+      {/* alerts */}
+      {returned.length > 0 && (
+        <div className="notice bad">
+          <strong>{returned.length}</strong>{" "}
+          {returned.length === 1 ? "assignment was returned" : "assignments were returned"} for
+          changes. <Link href="/parent/feed">See what changed</Link>.
         </div>
-      ))}
+      )}
+      {unread > 0 && (
+        <div className="notice info">
+          You have <strong>{unread}</strong> unread {unread === 1 ? "message" : "messages"} from the
+          school. <Link href="/parent/messages">Open messages</Link>.
+        </div>
+      )}
+
+      {/* coming due soon across all children */}
+      <div className="spread" style={{ margin: "20px 2px 10px" }}>
+        <div className="eyebrow" style={{ margin: 0 }}>
+          Coming due soon
+        </div>
+        <Link className="small" href="/parent/feed">
+          Activity feed →
+        </Link>
+      </div>
+      {due.length === 0 ? (
+        <div className="card">
+          <p className="muted" style={{ margin: 0 }}>
+            Nothing due right now — {multi ? "everyone is" : "they’re"} all caught up.
+          </p>
+        </div>
+      ) : (
+        <div className="due-list">
+          {due.slice(0, 6).map((d) => {
+            const m = typeMeta(d.type);
+            const tone = d.daysLeft < 0 ? "bad" : d.daysLeft <= 1 ? "warn" : "info";
+            return (
+              <div key={d.submissionId} className={`due-row ${tone}`}>
+                <span className="due-ic" aria-hidden>
+                  {m.icon}
+                </span>
+                <span className="due-main">
+                  <span className="due-title">
+                    {multi && <span className="who-tag">{firstOf(d.studentId)}</span>}
+                    {d.title}
+                  </span>
+                  <span className="small muted">
+                    {d.courseName} · {m.label}
+                    {d.status === "returned" ? " · needs changes" : ""}
+                  </span>
+                </span>
+                <span className={`due-when ${tone}`}>{dueLabel(d.daysLeft)}</span>
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {/* per-child snapshot */}
+      <div className="eyebrow" style={{ marginTop: 22 }}>
+        {multi ? "Each child" : "Snapshot"}
+      </div>
+      <div className="child-grid" style={{ marginTop: 10 }}>
+        {perChild.map(({ k, presentDays, loggedDays, avgPct, openCount, ledger }) => (
+          <div key={k.id} className="card child-card">
+            <div className="spread">
+              <div>
+                <div className="eyebrow" style={{ margin: 0 }}>
+                  Grade {k.grade}
+                </div>
+                <h3 style={{ margin: "2px 0 0" }}>{k.name}</h3>
+              </div>
+            </div>
+            <div className="child-stats">
+              <div>
+                <div className="cs-n">{openCount}</div>
+                <div className="cs-l">To do</div>
+              </div>
+              <div>
+                <div className="cs-n">{avgPct != null ? `${avgPct}%` : "—"}</div>
+                <div className="cs-l">Avg grade</div>
+              </div>
+              <div>
+                <div className="cs-n">
+                  {presentDays}
+                  <span className="cs-sub">/{loggedDays}</span>
+                </div>
+                <div className="cs-l">Present</div>
+              </div>
+              <div>
+                <div className="cs-n">${Math.round(ledger.familyBalance).toLocaleString()}</div>
+                <div className="cs-l">You owe</div>
+              </div>
+            </div>
+            <div className="row" style={{ gap: 10, marginTop: 12 }}>
+              <Link className="btn ghost sm" href="/parent/feed">
+                Feed
+              </Link>
+              <Link className="btn ghost sm" href="/parent/children">
+                Details
+              </Link>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {/* tuition */}
+      <div className="card" style={{ marginTop: 16 }}>
+        <div className="spread">
+          <div>
+            <div className="eyebrow">Tuition</div>
+            <h3 style={{ margin: "4px 0 0" }}>
+              {familyBalance > 0
+                ? `$${Math.round(familyBalance).toLocaleString()} due from your family`
+                : "You’re all paid up"}
+            </h3>
+            <p className="small muted" style={{ margin: "4px 0 0" }}>
+              ESA funding is billed to the state by the school — you only cover the family portion.
+            </p>
+          </div>
+          <Link className="btn sec" href="/parent/tuition">
+            Tuition & funding
+          </Link>
+        </div>
+      </div>
     </>
   );
 }

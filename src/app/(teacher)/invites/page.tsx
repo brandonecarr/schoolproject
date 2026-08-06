@@ -1,4 +1,5 @@
 import { headers } from "next/headers";
+import Link from "next/link";
 import { requireTeacher } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { Pill, Notice } from "@/components/ui";
@@ -87,7 +88,7 @@ export default async function InvitesPage({
           </div>
           <div style={{ flex: 1, minWidth: 180 }}>
             <label htmlFor="ps">Child</label>
-            <select id="ps" name="studentId">
+            <select id="ps" name="studentId" required disabled={students.length === 0}>
               {students.map((s) => (
                 <option key={s.id} value={s.id}>
                   {s.name}
@@ -96,12 +97,12 @@ export default async function InvitesPage({
             </select>
           </div>
         </div>
-        <button className="btn" style={{ marginTop: 12 }}>
+        <button className="btn" style={{ marginTop: 12 }} disabled={students.length === 0}>
           Create invite link
         </button>
         <p className="small muted" style={{ margin: "10px 0 0" }}>
           Generates a one-time link (no shared password). Share it however you like — email, text, or
-          in person.
+          in person. Don’t see the child? <Link href="/students">Enroll them on the roster first</Link>.
         </p>
       </form>
 

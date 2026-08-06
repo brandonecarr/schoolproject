@@ -13,6 +13,15 @@ import { prisma } from "@/lib/db";
 import { requireRole, logAudit } from "@/lib/auth";
 import { hashPassword } from "@/lib/password";
 import { deleteStudentData } from "@/lib/retention";
+import { autoScoreQuiz, parseItems, parseQuizAnswers } from "@/lib/lms";
+
+// Image/PDF types a student may turn in (bytes stored in the DB, like samples).
+const ALLOWED: Record<string, string> = {
+  "image/jpeg": "jpg",
+  "image/png": "png",
+  "image/webp": "webp",
+  "application/pdf": "pdf",
+};
 
 export async function createStudentAccount(formData: FormData) {
   const { user } = await requireRole("parent");
@@ -42,27 +51,149 @@ export async function createStudentAccount(formData: FormData) {
   });
   await logAudit(user.id, "student_account_created_with_consent", studentId);
   revalidatePath("/parent");
-  redirect("/parent?created=1");
+  revalidatePath("/parent/children");
+  redirect("/parent/children?created=1");
 }
 
+// Type-aware turn-in. Each assignment type has its own completion path:
+//   quiz     → auto-score the self-gradable items; graded outright if nothing
+//              needs a human, else waits in the grading queue with autoScore kept
+//   checkoff → auto-credit full points on completion (+ optional reflection)
+//   upload   → store the photo/PDF as a work sample and link it (feeds evidence)
+//   written  → typed response (rubric also accepts an optional file)
+// Resubmission is allowed from assigned/draft/returned; from graded only when
+// the teacher enabled it.
 export async function submitWork(formData: FormData) {
   const { user } = await requireRole("student");
   const id = String(formData.get("id"));
 
   const sub = await prisma.submission.findUnique({ where: { id } });
   if (!sub || sub.studentId !== user.studentId) redirect("/student"); // not your assignment
+  const asg = await prisma.assignment.findUnique({ where: { id: sub.assignmentId } });
+  if (!asg) redirect("/student");
+
+  // Lock after submission. A student may only write while the work is open to
+  // them: not yet turned in (assigned/draft), or explicitly reopened by the
+  // teacher (returned). Once submitted or graded it is locked — the ONLY way
+  // back in is the teacher's return-for-revision. This is enforced here, not
+  // just in the UI, because server actions are directly POST-reachable.
+  if (!["assigned", "draft", "returned"].includes(sub.status)) redirect("/student/work?locked=1");
+
+  const now = new Date().toISOString();
+  const cleared = { returnedAt: null, revisionNote: "" }; // a fresh turn-in clears any return
+
+  const saveFile = async (label: string): Promise<string | null> => {
+    const file = formData.get("file") as File | null;
+    if (!file || file.size === 0) return null;
+    const ext = ALLOWED[file.type];
+    if (!ext || file.size > 8 * 1024 * 1024) return null;
+    const buf = Buffer.from(await file.arrayBuffer());
+    const rec = await prisma.fileRec.create({
+      data: {
+        schoolId: user.schoolId,
+        studentId: user.studentId!,
+        label,
+        ext,
+        mime: file.type,
+        bytes: buf.length,
+        data: buf,
+        capturedAt: now,
+      },
+    });
+    return rec.id;
+  };
+
+  if (asg.type === "quiz") {
+    const items = parseItems(asg.configJson);
+    const answers = parseQuizAnswers(String(formData.get("answers") || "[]"));
+    const { auto, needsManual } = autoScoreQuiz(items, answers);
+    await prisma.submission.update({
+      where: { id },
+      data: {
+        status: needsManual ? "submitted" : "graded",
+        submittedAt: now,
+        answersJson: JSON.stringify(answers),
+        autoScore: auto,
+        score: needsManual ? null : auto,
+        gradedAt: needsManual ? null : now,
+        feedback: needsManual ? "" : "Auto-graded.",
+        ...cleared,
+      },
+    });
+  } else if (asg.type === "checkoff") {
+    const reflection = String(formData.get("reflection") || "").trim().slice(0, 500);
+    await prisma.submission.update({
+      where: { id },
+      data: {
+        status: "graded",
+        submittedAt: now,
+        gradedAt: now,
+        answersJson: JSON.stringify({ done: true, reflection }),
+        score: asg.points,
+        autoScore: asg.points,
+        feedback: "Completed.",
+        ...cleared,
+      },
+    });
+  } else if (asg.type === "upload") {
+    const fileId = await saveFile(`${asg.title} — turned in`);
+    if (!fileId) redirect("/student/work?err=file");
+    await prisma.submission.update({
+      where: { id },
+      data: {
+        status: "submitted",
+        submittedAt: now,
+        fileId,
+        responseText: String(formData.get("responseText") || "").slice(0, 2000),
+        ...cleared,
+      },
+    });
+  } else {
+    // written or rubric — typed response, rubric may also attach a file
+    const fileId = (await saveFile(`${asg.title} — turned in`)) ?? sub.fileId;
+    await prisma.submission.update({
+      where: { id },
+      data: {
+        status: "submitted",
+        submittedAt: now,
+        responseText: String(formData.get("responseText") || "").slice(0, 5000),
+        fileId,
+        ...cleared,
+      },
+    });
+  }
+
+  await logAudit(user.id, "submitted_work", id);
+  revalidatePath("/student");
+  revalidatePath("/student/work");
+  revalidatePath("/dashboard");
+  revalidatePath("/grading");
+  redirect("/student/work?sent=1");
+}
+
+// Save progress without turning in. Keeps the work in a "draft" state the
+// student can return to. Not available once graded.
+export async function saveDraft(formData: FormData) {
+  const { user } = await requireRole("student");
+  const id = String(formData.get("id"));
+  const sub = await prisma.submission.findUnique({ where: { id } });
+  if (!sub || sub.studentId !== user.studentId) redirect("/student/work");
+  // Same lock as submit: no saving over work that's already turned in or graded.
+  if (!["assigned", "draft", "returned"].includes(sub.status)) redirect("/student/work?locked=1");
 
   await prisma.submission.update({
     where: { id },
     data: {
-      status: "submitted",
-      submittedAt: new Date().toISOString(),
+      status: "draft",
       responseText: String(formData.get("responseText") || "").slice(0, 5000),
+      answersJson: String(formData.get("answers") || sub.answersJson),
+      draftSavedAt: new Date().toISOString(),
     },
   });
-  await logAudit(user.id, "submitted_work", id);
+  await logAudit(user.id, "saved_draft", id);
   revalidatePath("/student");
-  redirect("/student?sent=1");
+  revalidatePath("/student/work");
+  redirect("/student/work?draft=1");
 }
 
 // Parent reports an upcoming/known absence — posts an excused attendance record
@@ -110,5 +241,6 @@ export async function deleteChildData(formData: FormData) {
 
   await deleteStudentData(studentId, user.schoolId, user.id);
   revalidatePath("/parent");
-  redirect("/parent?deleted=1");
+  revalidatePath("/parent/children");
+  redirect("/parent/children?deleted=1");
 }

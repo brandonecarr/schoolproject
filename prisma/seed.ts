@@ -126,11 +126,74 @@ async function main() {
     { courseId: courses[1].id, title: "Revision: add sensory detail", instructions: "Take your draft and add three details that use a sense other than sight.", dueDate: daysAhead(2), points: 20 },
     { courseId: courses[2].id, title: "Desert food web diagram", instructions: "Draw a food web with at least eight organisms from the Sonoran Desert. Label producers and consumers.", dueDate: daysAgo(4), points: 25 },
     { courseId: courses[2].id, title: "Field observation journal", instructions: "Three entries this week. What did you notice outside that changed?", dueDate: daysAhead(4), points: 15 },
+    // New assignment TYPES — show off the expanded LMS.
+    {
+      courseId: courses[0].id,
+      title: "Fractions quick-check",
+      instructions: "A short quiz. Take your time on the last one.",
+      dueDate: daysAhead(1),
+      points: 6,
+      type: "quiz",
+      configJson: JSON.stringify([
+        { id: "q1", kind: "mc", prompt: "What is 3/4 + 1/4?", choices: ["1/2", "1", "4/8", "3/8"], answerIndex: 1, points: 2 },
+        { id: "q2", kind: "tf", prompt: "1/2 is greater than 1/3.", answerIndex: 0, points: 1 },
+        { id: "q3", kind: "short", prompt: "Explain how you know 2/4 and 1/2 are equal.", points: 3 },
+      ]),
+    },
+    {
+      courseId: courses[2].id,
+      title: "Read Chapter 3: Volcanoes",
+      instructions: "Read pages 40–52. Mark it complete when you finish.",
+      dueDate: daysAhead(3),
+      points: 10,
+      type: "checkoff",
+      configJson: JSON.stringify({ reflection: true }),
+    },
+    {
+      courseId: courses[2].id,
+      title: "Photograph your leaf collection",
+      instructions: "Take a clear photo of your pressed leaves with the labels showing, and upload it.",
+      dueDate: daysAhead(5),
+      points: 20,
+      type: "upload",
+      configJson: "",
+    },
+    {
+      courseId: courses[1].id,
+      title: "Persuasive essay — final",
+      instructions: "Turn in your final essay. You’ll be graded on the rubric below.",
+      dueDate: daysAhead(6),
+      points: 15,
+      type: "rubric",
+      configJson: JSON.stringify({
+        criteria: [
+          { id: "c1", label: "Ideas & focus", max: 5 },
+          { id: "c2", label: "Use of evidence", max: 5 },
+          { id: "c3", label: "Mechanics", max: 5 },
+        ],
+      }),
+    },
   ];
   const assignments = [];
   for (const a of assignmentData) {
     assignments.push(await prisma.assignment.create({ data: { schoolId: school.id, ...a } }));
   }
+
+  // A ready-made worksheet in the library, so the teacher sees one immediately.
+  await prisma.worksheet.create({
+    data: {
+      schoolId: school.id,
+      title: "Multiplication facts — 6s and 7s",
+      subject: "Math",
+      instructions: "Show your work. Circle your final answer.",
+      itemsJson: JSON.stringify([
+        { id: "w1", kind: "fill", prompt: "6 × 7 =", answer: "42", points: 1 },
+        { id: "w2", kind: "fill", prompt: "7 × 8 =", answer: "56", points: 1 },
+        { id: "w3", kind: "mc", prompt: "Which is 6 × 9?", choices: ["54", "56", "63", "48"], answerIndex: 0, points: 1 },
+        { id: "w4", kind: "short", prompt: "Explain a trick for remembering the 6s.", points: 2 },
+      ]),
+    },
+  });
 
   // Attendance: 12 school days back (weekdays only), with two realistic absences.
   let logged = 0;
@@ -173,6 +236,12 @@ async function main() {
     { si: 4, ai: 2, status: "assigned" },
     { si: 5, ai: 0, status: "graded", score: 17, feedback: "Good focus today." },
     { si: 5, ai: 4, status: "submitted" },
+    // Give the demo student (Eli, si:0) one of each new type to try.
+    { si: 0, ai: 6, status: "assigned" }, // quiz
+    { si: 0, ai: 7, status: "assigned" }, // check-off
+    { si: 0, ai: 8, status: "assigned" }, // upload
+    { si: 0, ai: 9, status: "assigned" }, // rubric project
+    { si: 1, ai: 6, status: "assigned" }, // quiz for a second student too
   ];
 
   for (const g of grid) {

@@ -1,7 +1,10 @@
+import Link from "next/link";
 import { requireTeacher } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { today, fmt } from "@/lib/dates";
+import { typeMeta } from "@/lib/lms";
 import { addAssignment } from "../actions";
+import { AssignmentBuilder } from "@/components/AssignmentBuilder";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Assignments — Cohort" };
@@ -16,7 +19,10 @@ export default async function AssignmentsPage({
   const sp = await searchParams;
 
   const courses = await prisma.course.findMany({ where: { schoolId }, orderBy: { createdAt: "asc" } });
-  const students = await prisma.student.findMany({ where: { schoolId } });
+  const students = await prisma.student.findMany({
+    where: { schoolId },
+    orderBy: { name: "asc" },
+  });
   const where = sp.course ? { schoolId, courseId: sp.course } : { schoolId };
   const list = await prisma.assignment.findMany({ where, orderBy: { dueDate: "desc" } });
   const subs = await prisma.submission.findMany({ where: { schoolId } });
@@ -25,51 +31,33 @@ export default async function AssignmentsPage({
 
   return (
     <>
-      {sp.created && <div className="notice good">Assignment created and assigned to every student.</div>}
+      {sp.created && (
+        <div className="notice good">
+          Assignment created and assigned to {sp.created} student{sp.created === "1" ? "" : "s"}.
+        </div>
+      )}
       <div className="topbar">
         <div>
           <div className="eyebrow">Work assigned</div>
           <h1>Assignments</h1>
         </div>
+        <Link className="btn sec" href="/worksheets">
+          Worksheet library →
+        </Link>
       </div>
 
-      <form action={addAssignment} className="card">
-        <div className="row" style={{ gap: 12 }}>
-          <div style={{ flex: 2, minWidth: 240 }}>
-            <label htmlFor="t">Title</label>
-            <input id="t" name="title" required placeholder="Fractions on a number line" />
-          </div>
-          <div style={{ flex: 1, minWidth: 180 }}>
-            <label htmlFor="c">Course</label>
-            <select id="c" name="courseId">
-              {courses.map((c) => (
-                <option key={c.id} value={c.id}>
-                  {c.name}
-                </option>
-              ))}
-            </select>
-          </div>
+      {courses.length === 0 ? (
+        <div className="notice warn">
+          Add a course first — <Link href="/courses">create one</Link> — then you can assign work.
         </div>
-        <label htmlFor="i">Instructions for the student</label>
-        <textarea
-          id="i"
-          name="instructions"
-          placeholder="Place each fraction on the number line, then explain in one sentence how you decided."
+      ) : (
+        <AssignmentBuilder
+          action={addAssignment}
+          courses={courses.map((c) => ({ id: c.id, name: c.name }))}
+          students={students.map((s) => ({ id: s.id, name: s.name, grade: s.grade }))}
+          today={today()}
         />
-        <div className="row" style={{ gap: 12 }}>
-          <div style={{ width: 180 }}>
-            <label htmlFor="d">Due</label>
-            <input id="d" type="date" name="dueDate" defaultValue={today()} />
-          </div>
-          <div style={{ width: 120 }}>
-            <label htmlFor="p">Points</label>
-            <input id="p" type="number" name="points" defaultValue={20} min={1} />
-          </div>
-        </div>
-        <button className="btn" style={{ marginTop: 12 }}>
-          Assign to all students
-        </button>
-      </form>
+      )}
 
       <div className="sep" />
       <div className="card" style={{ padding: "16px 10px" }}>
@@ -77,6 +65,7 @@ export default async function AssignmentsPage({
           <thead>
             <tr>
               <th>Assignment</th>
+              <th>Type</th>
               <th>Course</th>
               <th>Due</th>
               <th>Turned in</th>
@@ -86,6 +75,7 @@ export default async function AssignmentsPage({
           <tbody>
             {list.map((a) => {
               const mine = subs.filter((s) => s.assignmentId === a.id);
+              const m = typeMeta(a.type);
               const instr = a.instructions || "";
               return (
                 <tr key={a.id}>
@@ -96,15 +86,28 @@ export default async function AssignmentsPage({
                       {instr.length > 70 ? "…" : ""}
                     </div>
                   </td>
+                  <td className="small">
+                    <span className="typechip">
+                      <span aria-hidden>{m.icon}</span> {m.label}
+                    </span>
+                  </td>
                   <td className="small">{courseName(a.courseId)}</td>
                   <td className="small">{fmt(a.dueDate)}</td>
                   <td className="mono">
-                    {mine.filter((s) => s.status !== "assigned").length}/{students.length}
+                    {mine.filter((s) => s.status !== "assigned" && s.status !== "draft").length}/
+                    {mine.length}
                   </td>
                   <td className="mono">{mine.filter((s) => s.status === "graded").length}</td>
                 </tr>
               );
             })}
+            {list.length === 0 && (
+              <tr>
+                <td colSpan={6} className="muted small" style={{ padding: 16 }}>
+                  No assignments yet. Build your first one above.
+                </td>
+              </tr>
+            )}
           </tbody>
         </table>
       </div>

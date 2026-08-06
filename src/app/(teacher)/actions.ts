@@ -12,6 +12,14 @@ import { requireTeacher, logAudit } from "@/lib/auth";
 import { evidenceFor } from "@/lib/evidence";
 import { purposeNarrative } from "@/lib/ai";
 import { PROGRAMS } from "@/lib/rules";
+import {
+  assignmentMax,
+  rubricConfig,
+  parseItems,
+  parseQuizAnswers,
+  autoScoreQuiz,
+  itemIsAuto,
+} from "@/lib/lms";
 import { deleteStudentData } from "@/lib/retention";
 import { newTokenValue, tokenExpiry } from "@/lib/tokens";
 import { today, periodStart } from "@/lib/dates";
@@ -65,10 +73,40 @@ export async function addCourse(formData: FormData) {
   redirect("/courses");
 }
 
-// --- Assignments (assigns to every student on create) ---
+// --- Assignments ---
+// Type-aware create: the builder posts a `type` + a serialized `config` (quiz
+// items / rubric criteria / check-off opts), optional targeting, an optional
+// attached resource file, and the resubmission flag. Fan-out creates one
+// Submission ("assigned") per targeted student.
 export async function addAssignment(formData: FormData) {
-  const { school } = await requireTeacher();
+  const { user, school } = await requireTeacher();
   const schoolId = school!.id;
+
+  const type = String(formData.get("type") || "written");
+  const configJson = String(formData.get("config") || "");
+  const flatPoints = Number(formData.get("points")) || 20;
+  const points = assignmentMax(type, configJson, flatPoints);
+
+  // Optional teacher-attached resource (image/PDF, stored in the DB, no student).
+  let resourceFileId: string | null = null;
+  const res = formData.get("resource") as File | null;
+  if (res && res.size > 0 && ALLOWED[res.type] && res.size <= 8 * 1024 * 1024) {
+    const buf = Buffer.from(await res.arrayBuffer());
+    const rec = await prisma.fileRec.create({
+      data: {
+        schoolId,
+        studentId: null,
+        label: res.name || "Resource",
+        ext: ALLOWED[res.type],
+        mime: res.type,
+        bytes: buf.length,
+        data: buf,
+        capturedAt: new Date().toISOString(),
+      },
+    });
+    resourceFileId = rec.id;
+  }
+
   const a = await prisma.assignment.create({
     data: {
       schoolId,
@@ -76,21 +114,91 @@ export async function addAssignment(formData: FormData) {
       title: String(formData.get("title") || ""),
       instructions: String(formData.get("instructions") || ""),
       dueDate: String(formData.get("dueDate") || today()),
-      points: Number(formData.get("points")) || 20,
+      assignedAt: String(formData.get("assignedAt") || ""),
+      points,
+      type,
+      configJson,
+      resourceFileId,
     },
   });
-  const students = await prisma.student.findMany({ where: { schoolId } });
+
+  // Targeting: "*" (or empty) = whole class; otherwise a CSV of student ids.
+  const targets = String(formData.get("students") || "*").trim();
+  const students =
+    targets === "*" || targets === ""
+      ? await prisma.student.findMany({ where: { schoolId } })
+      : await prisma.student.findMany({
+          where: { schoolId, id: { in: targets.split(",").filter(Boolean) } },
+        });
   for (const s of students) {
     await prisma.submission.create({
       data: { schoolId, assignmentId: a.id, studentId: s.id, status: "assigned" },
     });
   }
+
+  await logAudit(user.id, "assignment_created", `${type}: ${a.title} → ${students.length}`);
   revalidatePath("/assignments");
-  redirect("/assignments?created=1");
+  redirect(`/assignments?created=${students.length}`);
 }
 
-// --- Grading ---
+// --- Grading (type-aware) ---
+// rubric → sum the per-criterion scores (and record them on the submission);
+// quiz   → keep the auto-graded points and add the teacher's short-answer points;
+// else   → a single score. Feedback is common to all.
+const clamp = (n: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, n));
+
 export async function saveGrade(formData: FormData) {
+  const { user, school } = await requireTeacher();
+  const id = String(formData.get("id"));
+  const sub = await prisma.submission.findFirst({ where: { id, schoolId: school!.id } });
+  if (!sub) redirect("/grading");
+  const asg = await prisma.assignment.findUnique({ where: { id: sub.assignmentId } });
+  if (!asg) redirect("/grading");
+
+  let score = 0;
+  let rubricJson: string | undefined;
+  if (asg.type === "rubric") {
+    const { criteria } = rubricConfig(asg.configJson);
+    const scores = criteria.map((c) => ({
+      critId: c.id,
+      score: clamp(Number(formData.get(`rc_${c.id}`)) || 0, 0, c.max),
+    }));
+    score = scores.reduce((n, s) => n + s.score, 0);
+    rubricJson = JSON.stringify({ rubric: scores });
+  } else if (asg.type === "quiz") {
+    const items = parseItems(asg.configJson);
+    const answers = parseQuizAnswers(sub.answersJson);
+    const { auto } = autoScoreQuiz(items, answers);
+    const manual = items
+      .filter((it) => !itemIsAuto(it))
+      .reduce((n, it) => n + clamp(Number(formData.get(`sq_${it.id}`)) || 0, 0, it.points), 0);
+    score = auto + manual;
+  } else {
+    score = Number(formData.get("score")) || 0;
+  }
+
+  await prisma.submission.update({
+    where: { id },
+    data: {
+      status: "graded",
+      score,
+      feedback: String(formData.get("feedback") || ""),
+      gradedAt: new Date().toISOString(),
+      returnedAt: null,
+      revisionNote: "",
+      ...(rubricJson ? { answersJson: rubricJson } : {}),
+    },
+  });
+  await logAudit(user.id, "graded", id);
+  revalidatePath("/grading");
+  revalidatePath("/dashboard");
+  revalidatePath("/student");
+  redirect("/grading?graded=1");
+}
+
+// Send a submission back for revision with a note. The student sees the note and
+// can turn it in again (their earlier response is preserved as the starting point).
+export async function returnSubmission(formData: FormData) {
   const { user, school } = await requireTeacher();
   const id = String(formData.get("id"));
   const sub = await prisma.submission.findFirst({ where: { id, schoolId: school!.id } });
@@ -98,16 +206,15 @@ export async function saveGrade(formData: FormData) {
   await prisma.submission.update({
     where: { id },
     data: {
-      status: "graded",
-      score: Number(formData.get("score")),
-      feedback: String(formData.get("feedback") || ""),
-      gradedAt: new Date().toISOString(),
+      status: "returned",
+      returnedAt: new Date().toISOString(),
+      revisionNote: String(formData.get("note") || "").slice(0, 500),
     },
   });
-  await logAudit(user.id, "graded", id);
+  await logAudit(user.id, "submission_returned", id);
   revalidatePath("/grading");
-  revalidatePath("/dashboard");
-  redirect("/grading?graded=1");
+  revalidatePath("/student");
+  redirect("/grading?returned=1");
 }
 
 // --- Invoices ---
@@ -329,6 +436,39 @@ export async function recordPayment(formData: FormData) {
   redirect("/billing?paid=1");
 }
 
+// --- Add a single student (roster record, NOT a login) ---
+// This creates the school's educational record for a child. It is deliberately
+// separate from the child's login: the login is created later by the verified
+// parent (createStudentAccount), which is what makes COPPA consent verifiable.
+export async function addStudent(formData: FormData) {
+  const { user, school } = await requireTeacher();
+  const name = String(formData.get("name") || "").trim();
+  if (!name) redirect("/students?added=0");
+
+  const programKey = String(formData.get("esaProgram") || "").toUpperCase();
+  const program = programKey && PROGRAMS[programKey] ? programKey : null;
+
+  const student = await prisma.student.create({
+    data: {
+      schoolId: school!.id,
+      name,
+      grade: String(formData.get("grade") || "").trim(),
+      familyName:
+        String(formData.get("familyName") || "").trim() ||
+        name.split(" ").slice(-1)[0] ||
+        name,
+      esaProgram: program,
+      esaAmount: Number(formData.get("esaAmount")) || 0,
+      tuitionAnnual: Number(formData.get("tuitionAnnual")) || school!.esaAmount || 0,
+    },
+  });
+  await logAudit(user.id, "student_added", `${name} (${student.id})`);
+  revalidatePath("/students");
+  revalidatePath("/dashboard");
+  revalidatePath("/invites");
+  redirect("/students?added=1");
+}
+
 // --- Roster CSV import ---
 // Columns: name, grade, familyName, esaProgram, esaAmount, tuitionAnnual.
 // Only `name` is required; a header row (first cell "name") is skipped.
@@ -445,4 +585,73 @@ export async function deleteSample(formData: FormData) {
   }
   revalidatePath(`/students/${studentId}`);
   redirect(`/students/${studentId}`);
+}
+
+// --- Worksheets (reusable question sets) ---
+// A worksheet is built once, then printed (worksheets/[id]/print) or assigned
+// digitally (spawns a quiz-type Assignment from the same items).
+export async function createWorksheet(formData: FormData) {
+  const { user, school } = await requireTeacher();
+  const ws = await prisma.worksheet.create({
+    data: {
+      schoolId: school!.id,
+      title: String(formData.get("title") || "Untitled worksheet"),
+      subject: String(formData.get("subject") || ""),
+      instructions: String(formData.get("instructions") || ""),
+      itemsJson: String(formData.get("items") || "[]"),
+    },
+  });
+  await logAudit(user.id, "worksheet_created", ws.title);
+  revalidatePath("/worksheets");
+  redirect(`/worksheets/${ws.id}`);
+}
+
+export async function deleteWorksheet(formData: FormData) {
+  const { user, school } = await requireTeacher();
+  const id = String(formData.get("id"));
+  const ws = await prisma.worksheet.findFirst({ where: { id, schoolId: school!.id } });
+  if (ws) {
+    await prisma.worksheet.delete({ where: { id } });
+    await logAudit(user.id, "worksheet_deleted", id);
+  }
+  revalidatePath("/worksheets");
+  redirect("/worksheets");
+}
+
+// Turn a worksheet into a live, digital quiz assignment and fan it out.
+export async function assignWorksheet(formData: FormData) {
+  const { user, school } = await requireTeacher();
+  const schoolId = school!.id;
+  const id = String(formData.get("worksheetId"));
+  const ws = await prisma.worksheet.findFirst({ where: { id, schoolId } });
+  if (!ws) redirect("/worksheets");
+
+  const a = await prisma.assignment.create({
+    data: {
+      schoolId,
+      courseId: String(formData.get("courseId")),
+      title: ws.title,
+      instructions: ws.instructions,
+      dueDate: String(formData.get("dueDate") || today()),
+      assignedAt: String(formData.get("assignedAt") || ""),
+      points: assignmentMax("quiz", ws.itemsJson, 20),
+      type: "quiz",
+      configJson: ws.itemsJson,
+    },
+  });
+
+  // Targeting: checked students, or the whole class when none are checked.
+  const chosen = formData.getAll("stu").map(String).filter(Boolean);
+  const students = chosen.length
+    ? await prisma.student.findMany({ where: { schoolId, id: { in: chosen } } })
+    : await prisma.student.findMany({ where: { schoolId } });
+  for (const s of students) {
+    await prisma.submission.create({
+      data: { schoolId, assignmentId: a.id, studentId: s.id, status: "assigned" },
+    });
+  }
+
+  await logAudit(user.id, "worksheet_assigned", `${ws.title} → ${students.length}`);
+  revalidatePath("/assignments");
+  redirect(`/assignments?created=${students.length}`);
 }

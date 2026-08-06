@@ -4,6 +4,8 @@ import { prisma } from "@/lib/db";
 import { evidenceFor } from "@/lib/evidence";
 import { readiness, PROGRAMS } from "@/lib/rules";
 import { today, fmt } from "@/lib/dates";
+import { dueLabel, daysBetween } from "@/lib/due";
+import { typeMeta } from "@/lib/lms";
 import { EvidenceBar } from "@/components/EvidenceBar";
 import { Pill } from "@/components/ui";
 import { reimbursementMetrics, formatPct } from "@/lib/metrics";
@@ -15,156 +17,184 @@ export default async function Dashboard() {
   const { user, school } = await requireTeacher();
   const schoolId = school!.id;
 
-  const students = await prisma.student.findMany({
-    where: { schoolId },
-    orderBy: { createdAt: "asc" },
-  });
+  const students = await prisma.student.findMany({ where: { schoolId }, orderBy: { createdAt: "asc" } });
   const ev = await Promise.all(students.map(async (s) => ({ s, e: await evidenceFor(s.id) })));
-
-  const ungraded = await prisma.submission.count({
-    where: { schoolId, status: "submitted" },
-  });
+  const ungraded = await prisma.submission.count({ where: { schoolId, status: "submitted" } });
   const attToday = await prisma.attendance.count({ where: { schoolId, date: today() } });
-
-  const esaKids = students.filter((s) => s.esaProgram);
-  const avg = Math.round(ev.reduce((a, x) => a + x.e.score, 0) / (ev.length || 1));
-  const outstandingCash = esaKids.reduce((a, s) => a + Math.round(s.esaAmount / 10), 0);
-
   const invoices = await prisma.invoice.findMany({ where: { schoolId } });
   const m = reimbursementMetrics(invoices);
+
+  const avg = Math.round(ev.reduce((a, x) => a + x.e.score, 0) / (ev.length || 1));
   const hasReimbursementData = m.decided > 0 || m.inFlight > 0;
+  // Triage: least-ready students first — this is a command deck, not a roster.
+  const triage = [...ev].sort((a, b) => a.e.score - b.e.score);
+
+  // Coming due soon: the next assignments due, with turn-in progress.
+  const td = today();
+  const upcoming = await prisma.assignment.findMany({
+    where: { schoolId, dueDate: { gte: td } },
+    orderBy: { dueDate: "asc" },
+    take: 5,
+  });
+  const upSubs = upcoming.length
+    ? await prisma.submission.findMany({
+        where: { schoolId, assignmentId: { in: upcoming.map((a) => a.id) } },
+      })
+    : [];
+  const upcomingRows = upcoming.map((a) => {
+    const mine = upSubs.filter((s) => s.assignmentId === a.id);
+    const inHand = mine.filter((s) => s.status === "submitted" || s.status === "graded").length;
+    return { a, inHand, total: mine.length, daysLeft: daysBetween(td, a.dueDate) };
+  });
 
   return (
     <>
-      <div className="topbar">
-        <div>
-          <div className="eyebrow">{fmt(today())}</div>
-          <h1>Good morning, {user.name.split(" ")[0]}.</h1>
-        </div>
-        <div className="row">
-          <Link className="btn sec" href="/attendance">
-            Take attendance
-          </Link>
-          <Link className="btn" href="/invoices">
-            ESA invoices
-          </Link>
-        </div>
-      </div>
-
-      <div className="grid g3">
-        <div className="stat">
-          <div className="n">{students.length}</div>
-          <div className="l">Students</div>
-        </div>
-        <div className="stat">
-          <div className="n">{ungraded}</div>
-          <div className="l">Waiting to grade</div>
-        </div>
-        <div className="stat">
-          <div className="n">
-            {avg}
-            <span style={{ fontSize: 15, color: "var(--ink-soft)" }}>/100</span>
+      <section className="cmd-hero">
+        <div className="spread">
+          <div>
+            <div className="eyebrow">{fmt(today())}</div>
+            <h1>Good morning, {user.name.split(" ")[0]}.</h1>
           </div>
-          <div className="l">Avg evidence score</div>
+          <div className="row">
+            <Link className="btn sec" href="/attendance">
+              Take attendance
+            </Link>
+            <Link className="btn mark" href="/invoices">
+              ESA invoices
+            </Link>
+          </div>
         </div>
-      </div>
+        <div className="cmd-metrics">
+          <div className="cmd-metric">
+            <div className="n">{students.length}</div>
+            <div className="l">Students</div>
+          </div>
+          <div className={`cmd-metric ${ungraded > 0 ? "accent" : ""}`}>
+            <div className="n">{ungraded}</div>
+            <div className="l">Waiting to grade</div>
+          </div>
+          <div className="cmd-metric">
+            <div className="n">{avg}</div>
+            <div className="l">Avg evidence</div>
+          </div>
+          <div className="cmd-metric">
+            <div className="n">{hasReimbursementData ? formatPct(m.firstPassRate) : "—"}</div>
+            <div className="l">First-pass approval</div>
+          </div>
+        </div>
+      </section>
 
       {attToday === 0 && (
         <div className="notice warn" style={{ marginTop: 16 }}>
-          Attendance isn&apos;t logged for today yet. It&apos;s the single biggest input to every ESA
+          Attendance isn&apos;t logged for today yet — it&apos;s the single biggest input to every ESA
           invoice. <Link href="/attendance">Take it now</Link>.
         </div>
       )}
 
-      <div className="sep" />
-
-      <div className="spread" style={{ marginBottom: 10 }}>
+      <div className="cmd-grid">
         <div>
-          <div className="eyebrow">Evidence board</div>
-          <h2>Who is invoice-ready</h2>
+          <div className="spread" style={{ margin: "6px 2px 12px" }}>
+            <div>
+              <div className="eyebrow">Needs attention</div>
+              <h2>Who isn&apos;t invoice-ready</h2>
+            </div>
+            <Link className="btn ghost sm" href="/evidence">
+              Full board
+            </Link>
+          </div>
+          {triage.map(({ s, e }) => {
+            const r = readiness(e.score);
+            return (
+              <div key={s.id} className={`attn-row ${r.tone}`}>
+                <div className="who">
+                  <Link href={`/students/${s.id}`} style={{ fontWeight: 600, textDecoration: "none" }}>
+                    {s.name}
+                  </Link>
+                  <div className="small muted">
+                    Grade {s.grade} · {s.esaProgram ? PROGRAMS[s.esaProgram].label : "Private pay"}
+                  </div>
+                </div>
+                <div className="bar">
+                  <EvidenceBar parts={e.parts} legend={false} />
+                </div>
+                <Pill tone={r.tone}>{r.label}</Pill>
+                <div className="sc">{e.score}</div>
+              </div>
+            );
+          })}
         </div>
-        <Link className="btn ghost sm" href="/evidence">
-          Open full board
-        </Link>
-      </div>
-      <div className="card" style={{ padding: "16px 10px" }}>
-        <table>
-          <thead>
-            <tr>
-              <th>Student</th>
-              <th>Attendance · Instruction · Work · Assessment · Notes</th>
-              <th>Status</th>
-              <th>Score</th>
-            </tr>
-          </thead>
-          <tbody>
-            {ev.map(({ s, e }) => {
-              const r = readiness(e.score);
-              return (
-                <tr key={s.id}>
-                  <td>
-                    <Link href={`/students/${s.id}`} style={{ fontWeight: 600, textDecoration: "none" }}>
-                      {s.name}
-                    </Link>
-                    <div className="small muted">
-                      Grade {s.grade} · {s.esaProgram ? PROGRAMS[s.esaProgram].label : "Private pay"}
-                    </div>
-                  </td>
-                  <td style={{ width: 300 }}>
-                    <EvidenceBar parts={e.parts} legend={false} />
-                  </td>
-                  <td style={{ width: 150 }}>
-                    <Pill tone={r.tone}>{r.label}</Pill>
-                  </td>
-                  <td style={{ width: 60 }} className="mono">
-                    {e.score}
-                  </td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
-      </div>
 
-      <div className="sep" />
-      <div className="grid g2">
-        <div className="card">
-          <div className="eyebrow">Getting paid</div>
-          {hasReimbursementData ? (
-            <>
-              <h3 style={{ margin: "6px 0 10px" }}>
-                {formatPct(m.firstPassRate)} first-pass approval
-                {m.avgDaysToCash != null ? ` · ${m.avgDaysToCash} days to cash` : ""}
-              </h3>
-              <p className="small muted" style={{ margin: 0 }}>
-                ${m.inFlight.toLocaleString()} in flight, ${m.paidTotal.toLocaleString()} paid this
-                year. <Link href="/invoices">Open ESA invoices</Link>.
+        <div>
+          <div className="card">
+            <div className="eyebrow">Getting paid</div>
+            {hasReimbursementData ? (
+              <>
+                <h3 style={{ margin: "6px 0 8px" }}>
+                  {formatPct(m.firstPassRate)} approved first-pass
+                </h3>
+                <p className="small muted" style={{ margin: 0 }}>
+                  {m.avgDaysToCash != null ? `${m.avgDaysToCash} days to cash · ` : ""}$
+                  {m.inFlight.toLocaleString()} in flight, ${m.paidTotal.toLocaleString()} paid.{" "}
+                  <Link href="/invoices">Open ESA invoices</Link>.
+                </p>
+              </>
+            ) : (
+              <>
+                <h3 style={{ margin: "6px 0 8px" }}>Nothing submitted yet</h3>
+                <p className="small muted" style={{ margin: 0 }}>
+                  Build packets from the teaching you&apos;ve already logged.{" "}
+                  <Link href="/invoices">ESA invoices</Link>.
+                </p>
+              </>
+            )}
+          </div>
+          <div className="card">
+            <div className="eyebrow">Grading queue</div>
+            <h3 style={{ margin: "6px 0 10px" }}>
+              {ungraded} submission{ungraded === 1 ? "" : "s"} waiting
+            </h3>
+            <p className="small muted" style={{ margin: "0 0 12px" }}>
+              Graded work with feedback is the strongest evidence a state accepts.
+            </p>
+            <Link className="btn sm" href="/grading">
+              Open grading queue
+            </Link>
+          </div>
+
+          <div className="card">
+            <div className="spread">
+              <div className="eyebrow">Coming due soon</div>
+              <Link className="small" href="/assignments">
+                Assignments →
+              </Link>
+            </div>
+            {upcomingRows.length === 0 ? (
+              <p className="small muted" style={{ margin: "8px 0 0" }}>
+                No assignments due ahead. <Link href="/assignments">Assign some work</Link>.
               </p>
-            </>
-          ) : (
-            <>
-              <h3 style={{ margin: "6px 0 10px" }}>
-                About ${outstandingCash.toLocaleString()} sits in the next ESA cycle
-              </h3>
-              <p className="small muted" style={{ margin: 0 }}>
-                {esaKids.length} of {students.length} families are on {school!.railLabel}.
-                Reimbursement typically lands well after the month you taught — build the invoices
-                before you need the money, not after.
-              </p>
-            </>
-          )}
-        </div>
-        <div className="card">
-          <div className="eyebrow">Grading queue</div>
-          <h3 style={{ margin: "6px 0 10px" }}>
-            {ungraded} submission{ungraded === 1 ? "" : "s"} waiting
-          </h3>
-          <p className="small muted" style={{ margin: "0 0 12px" }}>
-            Graded work with written feedback is the strongest evidence a state accepts.
-          </p>
-          <Link className="btn sm" href="/grading">
-            Open grading queue
-          </Link>
+            ) : (
+              <div style={{ marginTop: 8 }}>
+                {upcomingRows.map(({ a, inHand, total, daysLeft }) => {
+                  const m = typeMeta(a.type);
+                  const tone = daysLeft <= 1 ? "warn" : "info";
+                  return (
+                    <div key={a.id} className="due-row compact">
+                      <span className="due-ic" aria-hidden>
+                        {m.icon}
+                      </span>
+                      <span className="due-main">
+                        <span className="due-title">{a.title}</span>
+                        <span className="small muted">
+                          {inHand}/{total} turned in · {fmt(a.dueDate)}
+                        </span>
+                      </span>
+                      <span className={`due-when ${tone}`}>{dueLabel(daysLeft)}</span>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
         </div>
       </div>
     </>

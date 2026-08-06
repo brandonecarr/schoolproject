@@ -77,6 +77,13 @@ model Assignment {
   instructions String   @default("")
   dueDate      String // YYYY-MM-DD
   points       Int      @default(20)
+  // How the work is given + completed. Drives the student completion UI and the
+  // grading UI. See src/lib/lms.ts for the type registry and config shapes.
+  type          String  @default("written") // written | quiz | upload | checkoff | rubric
+  configJson    String  @default("") // type-specific: quiz items / rubric criteria / checkoff opts
+  assignedAt    String  @default("") // YYYY-MM-DD availability; "" = available immediately
+  allowResubmit Boolean @default(false)
+  resourceFileId String? // teacher-attached resource (FileRec id), opened alongside instructions
   createdAt    DateTime @default(now())
 }
 
@@ -85,12 +92,32 @@ model Submission {
   schoolId     String
   assignmentId String
   studentId    String
-  status       String // assigned | submitted | graded
+  status       String // assigned | draft | submitted | returned | graded
   submittedAt  String? // ISO timestamp
   responseText String   @default("")
   score        Int?
   feedback     String   @default("")
   gradedAt     String? // ISO timestamp
+  // Type-aware completion + grading.
+  answersJson  String  @default("") // quiz answers / rubric per-criterion scores / checkoff state
+  fileId       String? // upload-type: the FileRec the student turned in (also a work sample)
+  autoScore    Int? // auto-graded portion (quiz MC/TF); manual grading adds to it
+  returnedAt   String? // ISO — when a teacher returned it for revision
+  revisionNote String  @default("") // teacher's note explaining the return
+  draftSavedAt String? // ISO — last draft save
+  createdAt    DateTime @default(now())
+}
+
+// A reusable worksheet the teacher builds once, then either prints/saves as PDF
+// (worksheets/[id]/print) or assigns digitally (spawns a quiz-type Assignment).
+// itemsJson uses the same Item[] shape as a quiz (see src/lib/lms.ts).
+model Worksheet {
+  id           String   @id @default(cuid())
+  schoolId     String
+  title        String
+  subject      String   @default("")
+  instructions String   @default("")
+  itemsJson    String   @default("[]")
   createdAt    DateTime @default(now())
 }
 
@@ -117,7 +144,7 @@ model Observation {
 model FileRec {
   id         String   @id @default(cuid())
   schoolId   String
-  studentId  String
+  studentId  String? // null for teacher-attached assignment resources (no child)
   label      String
   ext        String
   mime       String

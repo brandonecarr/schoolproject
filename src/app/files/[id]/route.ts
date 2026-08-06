@@ -18,14 +18,18 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
   if (!f) return new Response("Not found.", { status: 404 });
 
   const isStaff = ["owner", "teacher"].includes(user.role) && user.schoolId === f.schoolId;
+  // A file with no studentId is a teacher-attached assignment resource — shared
+  // teaching material, readable by anyone signed in at that school.
+  const isSchoolResource = f.studentId == null && user.schoolId === f.schoolId;
   let isFamily = false;
   if (user.role === "parent") {
     const ids: string[] = user.studentIdsJson ? JSON.parse(user.studentIdsJson) : [];
-    isFamily = ids.includes(f.studentId);
+    isFamily = f.studentId != null && ids.includes(f.studentId);
   } else if (user.role === "student") {
-    isFamily = user.studentId === f.studentId;
+    isFamily = f.studentId != null && user.studentId === f.studentId;
   }
-  if (!isStaff && !isFamily) return new Response("Not available for this account.", { status: 403 });
+  if (!isStaff && !isFamily && !isSchoolResource)
+    return new Response("Not available for this account.", { status: 403 });
 
   const safeName = f.label.replace(/[^\w. -]/g, "");
   return new Response(new Uint8Array(f.data), {

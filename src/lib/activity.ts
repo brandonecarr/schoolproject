@@ -80,7 +80,7 @@ export async function buildActivityFeed(
       type: "sample",
       ts: toTs(f.capturedAt),
       date: (f.capturedAt || "").slice(0, 10),
-      studentName: nameOf(f.studentId),
+      studentName: nameOf(f.studentId ?? ""),
       title: f.label,
       detail: "Work sample added",
       fileId: f.id,

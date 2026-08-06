@@ -1,18 +1,24 @@
 import { requireRole } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { buildActivityFeed, type FeedItem } from "@/lib/activity";
-import { fmt, today } from "@/lib/dates";
+import { fmt, today, periodStart } from "@/lib/dates";
 import { Notice } from "@/components/ui";
 import { reportAbsence } from "../../actions";
 
 export const dynamic = "force-dynamic";
-export const metadata = { title: "Feed — Cohort" };
+export const metadata = { title: "Journal — Cohort" };
 
 const ICON: Record<FeedItem["type"], string> = {
-  work: "✅",
-  observation: "📝",
-  sample: "📷",
-  attendance: "🗓️",
+  work: "✓",
+  observation: "✎",
+  sample: "◆",
+  attendance: "◷",
+};
+const KIND: Record<FeedItem["type"], string> = {
+  work: "Graded work",
+  observation: "A note from the teacher",
+  sample: "Work sample",
+  attendance: "Attendance",
 };
 
 export default async function ParentFeedPage({
@@ -27,24 +33,47 @@ export default async function ParentFeedPage({
   const kids = (await prisma.student.findMany({ where: { id: { in: ids } } })).sort(
     (a, b) => ids.indexOf(a.id) - ids.indexOf(b.id)
   );
-  const feed = await buildActivityFeed(kids.map((k) => ({ id: k.id, name: k.name })));
+  const [feed, presentDays] = await Promise.all([
+    buildActivityFeed(kids.map((k) => ({ id: k.id, name: k.name }))),
+    prisma.attendance.count({
+      where: { studentId: { in: ids }, status: "present", date: { gte: periodStart(), lte: today() } },
+    }),
+  ]);
+
   const multi = kids.length > 1;
+  const newGrades = feed.filter((f) => f.type === "work").length;
+  const samples = feed.filter((f) => f.type === "sample").length;
+  const heading = multi ? "Your family journal" : `${kids[0]?.name.split(" ")[0] ?? "Your"}'s journal`;
 
   return (
     <>
       {sp.absence && <Notice tone="good">Absence reported — the teacher has been notified.</Notice>}
-      <div className="topbar">
-        <div>
-          <div className="eyebrow">Your family</div>
-          <h1>Activity</h1>
-        </div>
-      </div>
 
-      <details className="card" style={{ marginBottom: 16 }}>
+      <section className="journal-hero">
+        <div className="kicker">The last 30 days</div>
+        <h1 style={{ margin: "6px 0 0" }}>{heading}</h1>
+        <p className="muted" style={{ margin: "8px 0 0", maxWidth: "52ch" }}>
+          A running story of {multi ? "your children's" : "your child's"} days — the work, the wins, and
+          the notes from the room.
+        </p>
+        <div className="glance">
+          <div className="g">
+            <strong>{presentDays}</strong> days present
+          </div>
+          <div className="g">
+            <strong>{newGrades}</strong> graded {newGrades === 1 ? "piece" : "pieces"}
+          </div>
+          <div className="g">
+            <strong>{samples}</strong> work {samples === 1 ? "sample" : "samples"}
+          </div>
+        </div>
+      </section>
+
+      <details className="card" style={{ margin: "16px 0" }}>
         <summary style={{ cursor: "pointer", fontWeight: 600 }}>Report an absence</summary>
         <form action={reportAbsence} style={{ marginTop: 12 }}>
           <div className="row" style={{ gap: 12, alignItems: "flex-end" }}>
-            <div style={{ minWidth: 160 }}>
+            <div style={{ flex: 1, minWidth: 150 }}>
               <label htmlFor="studentId">Child</label>
               <select id="studentId" name="studentId">
                 {kids.map((k) => (
@@ -54,11 +83,11 @@ export default async function ParentFeedPage({
                 ))}
               </select>
             </div>
-            <div style={{ width: 170 }}>
+            <div style={{ flex: 1, minWidth: 150 }}>
               <label htmlFor="date">Date</label>
               <input id="date" type="date" name="date" defaultValue={today()} required />
             </div>
-            <div style={{ flex: 1, minWidth: 200 }}>
+            <div style={{ flex: 1, minWidth: 150 }}>
               <label htmlFor="note">Reason (optional)</label>
               <input id="note" name="note" placeholder="Doctor's appointment" />
             </div>
@@ -68,39 +97,33 @@ export default async function ParentFeedPage({
       </details>
 
       {feed.length ? (
-        <div className="feed">
+        <div className="timeline">
           {feed.map((it) => (
-            <div key={it.id} className="feed-item">
-              <div className={`feed-icon ${it.type}`} aria-hidden>
+            <div key={it.id} className="tl-item">
+              <div className={`tl-dot ${it.type}`} aria-hidden>
                 {ICON[it.type]}
               </div>
-              <div style={{ flex: 1, minWidth: 0 }}>
+              <div className="tl-card">
                 <div className="spread" style={{ gap: 8 }}>
-                  <strong>{it.title}</strong>
-                  <span className="small muted">{fmt(it.date)}</span>
+                  <h3>{it.title}</h3>
+                  <span className="when">{fmt(it.date)}</span>
                 </div>
-                <div className="small muted" style={{ marginBottom: 2 }}>
+                <div className="small muted" style={{ margin: "1px 0 0" }}>
                   {multi ? `${it.studentName} · ` : ""}
-                  {it.type === "work"
-                    ? "Graded work"
-                    : it.type === "observation"
-                      ? "Teacher note"
-                      : it.type === "sample"
-                        ? "Work sample"
-                        : "Attendance"}
+                  {KIND[it.type]}
                 </div>
-                {it.detail && <div style={{ marginTop: 2 }}>{it.detail}</div>}
+                {it.detail && <div style={{ marginTop: 6 }}>{it.detail}</div>}
                 {it.fileId && it.mime !== "application/pdf" && (
                   /* eslint-disable-next-line @next/next/no-img-element */
                   <img
                     src={`/files/${it.fileId}`}
                     alt={it.title}
                     style={{
-                      marginTop: 8,
-                      maxWidth: 220,
+                      marginTop: 10,
+                      maxWidth: 260,
                       width: "100%",
                       border: "1px solid var(--rule)",
-                      borderRadius: 8,
+                      borderRadius: 10,
                       display: "block",
                     }}
                   />
@@ -112,8 +135,8 @@ export default async function ParentFeedPage({
       ) : (
         <div className="card">
           <p className="muted" style={{ margin: 0 }}>
-            Nothing here yet. As your {kids.length > 1 ? "children turn" : "child turns"} in work and
-            the teacher adds notes, it&apos;ll show up here.
+            The story starts soon. As {multi ? "your children turn" : "your child turns"} in work and
+            the teacher adds notes, it&apos;ll appear here.
           </p>
         </div>
       )}

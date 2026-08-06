@@ -6,15 +6,17 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 
 const PARENT_LINKS = [
+  { href: "/parent", label: "Home" },
   { href: "/parent/feed", label: "Feed" },
-  { href: "/parent", label: "Children" },
+  { href: "/parent/children", label: "Children" },
   { href: "/parent/reports", label: "Reports" },
   { href: "/parent/tuition", label: "Tuition" },
   { href: "/parent/messages", label: "Messages" },
 ];
 
 const STUDENT_LINKS = [
-  { href: "/student", label: "My work" },
+  { href: "/student", label: "Home" },
+  { href: "/student/work", label: "My work" },
   { href: "/student/portfolio", label: "Portfolio" },
   { href: "/student/messages", label: "Messages" },
 ];
