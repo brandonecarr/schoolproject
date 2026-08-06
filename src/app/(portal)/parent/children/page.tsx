@@ -63,9 +63,20 @@ export default async function ParentChildrenPage({
               <div className="eyebrow">Grade {k.grade}</div>
               <h2>{k.name}</h2>
             </div>
-            <Pill tone="info">
-              {e.presentDays} of {e.attendance.length} days present
-            </Pill>
+            <div className="row" style={{ gap: 10, alignItems: "center" }}>
+              <Pill tone="info">
+                {e.presentDays} of {e.attendance.length} days present
+              </Pill>
+              <a
+                className="btn ghost sm"
+                href={`/records/${k.id}/print`}
+                target="_blank"
+                rel="noreferrer"
+                title="A printable record of everything the school has logged"
+              >
+                Download record
+              </a>
+            </div>
           </div>
 
           <div className="sep" style={{ margin: "16px 0" }} />

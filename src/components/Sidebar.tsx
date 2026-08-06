@@ -32,6 +32,7 @@ const NAV: { group: string; items: { href: string; label: string; icon: string }
     group: "People",
     items: [
       { href: "/students", label: "Students", icon: "students" },
+      { href: "/reports", label: "Records & exports", icon: "evidence" },
       { href: "/invites", label: "Invite families", icon: "invites" },
     ],
   },
