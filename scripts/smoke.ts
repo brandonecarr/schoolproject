@@ -7,12 +7,12 @@
 
 import "dotenv/config";
 import { PrismaClient } from "../src/generated/prisma/client";
-import { PrismaLibSql } from "@prisma/adapter-libsql";
+import { PrismaPg } from "@prisma/adapter-pg";
 import { scoreEvidence } from "../src/lib/rules";
 
-const url = process.env.DATABASE_URL ?? "file:./dev.db";
-const authToken = process.env.DATABASE_AUTH_TOKEN;
-const adapter = new PrismaLibSql(authToken ? { url, authToken } : { url });
+const connectionString = process.env.DIRECT_URL ?? process.env.DATABASE_URL;
+if (!connectionString) throw new Error("Set DATABASE_URL (or DIRECT_URL) before running smoke.");
+const adapter = new PrismaPg({ connectionString });
 const prisma = new PrismaClient({ adapter });
 
 function periodStart(): string {
