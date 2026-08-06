@@ -2,7 +2,7 @@ import Link from "next/link";
 import { requireTeacher } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { today, fmt } from "@/lib/dates";
-import { typeMeta } from "@/lib/lms";
+import { typeMeta, parseItems } from "@/lib/lms";
 import { stripMarkdown } from "@/lib/markdown";
 import { addAssignment, setAssignmentOutcomes } from "../actions";
 import { AssignmentBuilder } from "@/components/AssignmentBuilder";
@@ -32,6 +32,13 @@ export default async function AssignmentsPage({
     orderBy: [{ subject: "asc" }, { code: "asc" }],
   });
   const alignments = await prisma.outcomeAlignment.findMany({ where: { schoolId } });
+  const bankRows = await prisma.itemBank.findMany({ where: { schoolId }, orderBy: { name: "asc" } });
+  const banks = bankRows.map((b) => ({
+    id: b.id,
+    name: b.name,
+    subject: b.subject,
+    items: parseItems(b.itemsJson),
+  }));
 
   const courseName = (id: string) => courses.find((c) => c.id === id)?.name || "—";
   const alignedTo = (assignmentId: string) =>
@@ -73,6 +80,7 @@ export default async function AssignmentsPage({
             title: o.title,
             subject: o.subject,
           }))}
+          banks={banks}
           today={today()}
         />
       )}

@@ -26,6 +26,7 @@ const NAV: { group: string; items: { href: string; label: string; icon: string }
       { href: "/syllabus", label: "Syllabus", icon: "courses" },
       { href: "/assignments", label: "Assignments", icon: "assignments" },
       { href: "/worksheets", label: "Worksheets", icon: "assignments" },
+      { href: "/banks", label: "Question banks", icon: "assignments" },
       { href: "/grading", label: "Grading queue", icon: "grading" },
       { href: "/gradebook", label: "Gradebook", icon: "grading" },
       { href: "/outcomes", label: "Standards", icon: "evidence" },

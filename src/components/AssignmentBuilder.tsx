@@ -17,6 +17,7 @@ import {
 } from "@/lib/lms";
 import { ItemsEditor, blankItem, uid } from "@/components/ItemsEditor";
 import { MarkdownField } from "@/components/MarkdownField";
+import { BankPicker, type BankSummary } from "@/components/BankPicker";
 
 type CourseOpt = { id: string; name: string };
 type StudentOpt = { id: string; name: string; grade: string };
@@ -29,12 +30,14 @@ export function AssignmentBuilder({
   courses,
   students,
   outcomes = [],
+  banks = [],
   today,
 }: {
   action: (fd: FormData) => void;
   courses: CourseOpt[];
   students: StudentOpt[];
   outcomes?: OutcomeOpt[];
+  banks?: BankSummary[];
   today: string;
 }) {
   const [type, setType] = useState<AssignmentType>("written");
@@ -126,7 +129,12 @@ export function AssignmentBuilder({
       />
 
       {/* type-specific builder */}
-      {type === "quiz" && <ItemsEditor items={items} setItems={setItems} />}
+      {type === "quiz" && (
+        <>
+          <ItemsEditor items={items} setItems={setItems} />
+          <BankPicker banks={banks} onInsert={(added) => setItems((xs) => [...xs, ...added])} />
+        </>
+      )}
 
       {type === "rubric" && (
         <RubricBuilder criteria={criteria} setCriteria={setCriteria} />

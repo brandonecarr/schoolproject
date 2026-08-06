@@ -5,7 +5,7 @@
 import { NextResponse } from "next/server";
 import { getSession, logAudit } from "@/lib/auth";
 import { prisma } from "@/lib/db";
-import { parseItems, quizMax } from "@/lib/lms";
+import { parseItems, quizMax, seededOrder } from "@/lib/lms";
 import { renderText } from "@/lib/markdown";
 
 export const dynamic = "force-dynamic";
@@ -51,6 +51,44 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
         body = `<div class="fill">${
           showKey && it.answer ? `<span class="keytag">${esc(it.answer)}</span>` : "____________________"
         }</div>`;
+      } else if (it.kind === "multi") {
+        const correct = new Set(it.answerIndices ?? []);
+        body = `<ol class="choices" type="A">${(it.choices ?? [])
+          .map(
+            (c, ci) =>
+              `<li class="${showKey && correct.has(ci) ? "key" : ""}"><span class="box"></span>${esc(c)}</li>`
+          )
+          .join("")}</ol><div class="hint">Tick every correct answer.</div>`;
+      } else if (it.kind === "numeric") {
+        body = `<div class="fill">${
+          showKey && typeof it.numAnswer === "number"
+            ? `<span class="keytag">${it.numAnswer}${it.tolerance ? ` ± ${it.tolerance}` : ""}</span>`
+            : "____________________"
+        }</div>`;
+      } else if (it.kind === "matching") {
+        // On paper the right column is listed A, B, C… and the student writes
+        // the letter next to each prompt.
+        const pairs = it.pairs ?? [];
+        const order = seededOrder(it.id, pairs.length);
+        const letterFor = (origIdx: number) =>
+          String.fromCharCode(65 + order.findIndex((o) => o === origIdx));
+        body = `<table class="match"><tbody>${pairs
+          .map(
+            (p, i) =>
+              `<tr><td class="mline">${showKey ? `<span class="keytag">${esc(letterFor(i))}</span>` : "____"}</td><td>${esc(p.left)}</td><td class="mright">${esc(
+                String.fromCharCode(65 + i)
+              )}. ${esc(pairs[order[i]].right)}</td></tr>`
+          )
+          .join("")}</tbody></table>`;
+      } else if (it.kind === "ordering") {
+        const steps = it.ordering ?? [];
+        const order = seededOrder(it.id, steps.length);
+        body = `<table class="match"><tbody>${order
+          .map(
+            (origIdx) =>
+              `<tr><td class="mline">${showKey ? `<span class="keytag">${origIdx + 1}</span>` : "____"}</td><td>${esc(steps[origIdx])}</td></tr>`
+          )
+          .join("")}</tbody></table><div class="hint">Number them in order.</div>`;
       } else {
         body = blank + blank;
       }
@@ -73,6 +111,12 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
   ol.choices li{margin:4px 0;display:flex;align-items:center;gap:8px}
   ol.choices li.key{font-weight:700}
   .bubble{display:inline-block;width:13px;height:13px;border:1.5px solid #141C26;border-radius:50%;flex:0 0 auto}
+  .box{display:inline-block;width:13px;height:13px;border:1.5px solid #141C26;flex:0 0 auto}
+  .hint{font-family:-apple-system,sans-serif;font-size:9pt;color:#5C6672;margin-top:4px}
+  table.match{width:100%;border-collapse:collapse;margin-top:6px}
+  table.match td{padding:4px 6px;vertical-align:top;font-size:11pt}
+  td.mline{width:46px;border-bottom:1px solid #C7CBC0;text-align:center}
+  td.mright{color:#5C6672}
   .tf{display:flex;align-items:center;gap:6px;font-family:-apple-system,sans-serif}
   .fill{margin-top:8px;font-family:-apple-system,sans-serif}
   .lines span{display:block;border-bottom:1px solid #C7CBC0;height:26px}

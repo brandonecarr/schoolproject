@@ -671,6 +671,54 @@ export async function deleteSample(formData: FormData) {
   redirect(`/students/${studentId}`);
 }
 
+// --- Item banks (reusable questions) ---
+export async function createItemBank(formData: FormData) {
+  const { user, school } = await requireTeacher();
+  const name = String(formData.get("name") || "").trim();
+  if (!name) redirect("/banks?err=name");
+  const bank = await prisma.itemBank.create({
+    data: {
+      schoolId: school!.id,
+      name,
+      subject: String(formData.get("subject") || ""),
+      itemsJson: String(formData.get("items") || "[]"),
+    },
+  });
+  await logAudit(user.id, "item_bank_created", name);
+  revalidatePath("/banks");
+  redirect(`/banks?created=${bank.id}`);
+}
+
+export async function updateItemBank(formData: FormData) {
+  const { user, school } = await requireTeacher();
+  const id = String(formData.get("id"));
+  const bank = await prisma.itemBank.findFirst({ where: { id, schoolId: school!.id } });
+  if (!bank) redirect("/banks");
+  await prisma.itemBank.update({
+    where: { id },
+    data: {
+      name: String(formData.get("name") || bank.name),
+      subject: String(formData.get("subject") || ""),
+      itemsJson: String(formData.get("items") || bank.itemsJson),
+    },
+  });
+  await logAudit(user.id, "item_bank_updated", id);
+  revalidatePath("/banks");
+  redirect("/banks?saved=1");
+}
+
+export async function deleteItemBank(formData: FormData) {
+  const { user, school } = await requireTeacher();
+  const id = String(formData.get("id"));
+  const bank = await prisma.itemBank.findFirst({ where: { id, schoolId: school!.id } });
+  if (bank) {
+    await prisma.itemBank.delete({ where: { id } });
+    await logAudit(user.id, "item_bank_deleted", bank.name);
+  }
+  revalidatePath("/banks");
+  redirect("/banks?deleted=1");
+}
+
 // --- Pages (teaching content) ---
 export async function createPage(formData: FormData) {
   const { user, school } = await requireTeacher();

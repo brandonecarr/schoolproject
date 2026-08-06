@@ -11,10 +11,16 @@ export const metadata = { title: "Worksheets — Cohort" };
 
 export default async function WorksheetsPage() {
   const { school } = await requireTeacher();
-  const list = await prisma.worksheet.findMany({
-    where: { schoolId: school!.id },
-    orderBy: { createdAt: "desc" },
-  });
+  const [list, bankRows] = await Promise.all([
+    prisma.worksheet.findMany({ where: { schoolId: school!.id }, orderBy: { createdAt: "desc" } }),
+    prisma.itemBank.findMany({ where: { schoolId: school!.id }, orderBy: { name: "asc" } }),
+  ]);
+  const banks = bankRows.map((b) => ({
+    id: b.id,
+    name: b.name,
+    subject: b.subject,
+    items: parseItems(b.itemsJson),
+  }));
 
   return (
     <>
@@ -33,7 +39,7 @@ export default async function WorksheetsPage() {
         <strong>assign it digitally</strong> as an auto-graded quiz. Same questions, either way.
       </p>
 
-      <WorksheetBuilder action={createWorksheet} />
+      <WorksheetBuilder action={createWorksheet} banks={banks} />
 
       <div className="sep" />
       <div className="eyebrow">Your library</div>

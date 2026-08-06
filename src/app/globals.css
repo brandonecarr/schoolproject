@@ -1487,6 +1487,43 @@ input[type="date"]::-webkit-calendar-picker-indicator {
   width: calc(100% - 30px);
 }
 
+/* matching + ordering answer grids */
+.matchgrid,
+.ordergrid {
+  display: grid;
+  gap: 8px;
+  margin-top: 8px;
+  margin-left: 30px;
+}
+.matchrow {
+  display: grid;
+  grid-template-columns: 1fr 220px;
+  gap: 10px;
+  align-items: center;
+}
+.matchleft {
+  font-weight: 600;
+}
+.matchrow select,
+.orderrow select {
+  margin: 0;
+}
+.orderrow {
+  display: grid;
+  grid-template-columns: 84px 1fr;
+  gap: 10px;
+  align-items: center;
+}
+.orderstep {
+  font-weight: 600;
+}
+@media (max-width: 640px) {
+  .matchrow {
+    grid-template-columns: 1fr;
+    gap: 4px;
+  }
+}
+
 /* grading */
 .gradecard .response,
 .response {

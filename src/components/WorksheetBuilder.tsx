@@ -8,8 +8,15 @@ import { useMemo, useState } from "react";
 import { quizMax, type Item } from "@/lib/lms";
 import { ItemsEditor, blankItem } from "@/components/ItemsEditor";
 import { MarkdownField } from "@/components/MarkdownField";
+import { BankPicker, type BankSummary } from "@/components/BankPicker";
 
-export function WorksheetBuilder({ action }: { action: (fd: FormData) => void }) {
+export function WorksheetBuilder({
+  action,
+  banks = [],
+}: {
+  action: (fd: FormData) => void;
+  banks?: BankSummary[];
+}) {
   // Fixed ids for initial rows to keep SSR and client hydration identical.
   const [items, setItems] = useState<Item[]>(() => [blankItem("mc", "w0"), blankItem("short", "w1")]);
   const itemsJson = useMemo(() => JSON.stringify(items), [items]);
@@ -38,6 +45,7 @@ export function WorksheetBuilder({ action }: { action: (fd: FormData) => void })
       />
 
       <ItemsEditor items={items} setItems={setItems} />
+      <BankPicker banks={banks} onInsert={(added) => setItems((xs) => [...xs, ...added])} />
 
       <div className="spread" style={{ marginTop: 16, alignItems: "center" }}>
         <span className="small muted">

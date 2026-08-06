@@ -9,7 +9,7 @@ import {
   autoScoreQuiz,
   itemIsAuto,
   rubricConfig,
-  normalize,
+  scoreItem,
   type Item,
 } from "@/lib/lms";
 import { saveGrade, returnSubmission } from "../actions";
@@ -160,18 +160,39 @@ function QuizGrade({
   const { auto, autoMax, needsManual } = autoScoreQuiz(items, answers);
   const answerOf = (id: string) => answers.find((x) => x.itemId === id)?.value;
 
+  // Partial-credit kinds report their earned points rather than a tick or cross.
   const isCorrect = (it: Item): boolean | null => {
     const v = answerOf(it.id);
     if (v == null) return null;
-    if (it.kind === "mc" || it.kind === "tf") return Number(v) === it.answerIndex;
-    if (it.kind === "fill" && it.answer) return normalize(String(v)) === normalize(it.answer);
-    return null;
+    if (!itemIsAuto(it)) return null;
+    if (it.kind === "matching" || it.kind === "ordering") return null;
+    return scoreItem(it, v) === (Number(it.points) || 0);
+  };
+  const partial = (it: Item): string | null => {
+    if (it.kind !== "matching" && it.kind !== "ordering") return null;
+    const v = answerOf(it.id);
+    if (v == null) return null;
+    return `${scoreItem(it, v)} of ${it.points} pts`;
   };
   const shownAnswer = (it: Item): string => {
     const v = answerOf(it.id);
-    if (v == null) return "—";
+    if (v == null || v === "" || (Array.isArray(v) && v.length === 0)) return "—";
     if (it.kind === "mc") return it.choices?.[Number(v)] ?? String(v);
     if (it.kind === "tf") return Number(v) === 0 ? "True" : "False";
+    if (it.kind === "multi") {
+      const picked = Array.isArray(v) ? v : [];
+      return picked.map((i) => it.choices?.[i] ?? `#${i}`).join(", ") || "—";
+    }
+    if (it.kind === "matching") {
+      const picked = Array.isArray(v) ? v : [];
+      return (it.pairs ?? [])
+        .map((p, i) => `${p.left} → ${it.pairs?.[picked[i]]?.right ?? "—"}`)
+        .join("; ");
+    }
+    if (it.kind === "ordering") {
+      const picked = Array.isArray(v) ? v : [];
+      return picked.map((orig, pos) => `${pos + 1}. ${it.ordering?.[orig] ?? "—"}`).join("  ");
+    }
     return String(v);
   };
 
@@ -194,6 +215,7 @@ function QuizGrade({
                 <span className="muted">Answer:</span> {shownAnswer(it)}{" "}
                 {correct === true && <span className="ok">✓</span>}
                 {correct === false && <span className="no">✗</span>}
+                {partial(it) && <span className="muted"> · {partial(it)}</span>}
               </div>
               {!isAuto && (
                 <div className="row" style={{ gap: 8, alignItems: "center", marginTop: 6 }}>

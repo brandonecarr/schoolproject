@@ -128,6 +128,19 @@ model Worksheet {
   createdAt    DateTime @default(now())
 }
 
+// A reusable pool of questions. Write a question once, drop it into any quiz or
+// worksheet later. itemsJson uses the same Item[] shape as everything else.
+model ItemBank {
+  id        String   @id @default(cuid())
+  schoolId  String
+  name      String
+  subject   String   @default("")
+  itemsJson String   @default("[]")
+  createdAt DateTime @default(now())
+
+  @@index([schoolId])
+}
+
 // --- Curriculum structure ------------------------------------------------
 // Pages are teaching content (a lesson, a reading, a reference sheet). Modules
 // sequence pages and assignments into a path a student works through in order.
