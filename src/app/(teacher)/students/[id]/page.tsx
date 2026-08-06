@@ -37,6 +37,11 @@ export default async function StudentPage({
 
   const e = await evidenceFor(s.id);
   const mastery = await masteryForStudent(s.id, school!.id);
+  const gradeChanges = await prisma.gradeChange.findMany({
+    where: { schoolId: school!.id, studentId: s.id },
+    orderBy: { at: "desc" },
+    take: 8,
+  });
   const r = readiness(e.score);
   const missing = e.parts.filter((p) => !p.ok);
   const msg = upload ? UPLOAD_MSG[upload] : null;
@@ -128,6 +133,29 @@ export default async function StudentPage({
           <p className="small" style={{ marginTop: 8 }}>
             {e.presentDays} present of {e.attendance.length} logged days
           </p>
+
+          {gradeChanges.length > 0 && (
+            <>
+              <div className="sep" style={{ margin: "16px 0" }} />
+              <div className="eyebrow">Grade history</div>
+              <div style={{ marginTop: 8 }}>
+                {gradeChanges.map((c) => (
+                  <div key={c.id} className="small" style={{ padding: "6px 0" }}>
+                    <span className="mono">
+                      {c.oldScore ?? "—"} → <strong>{c.newScore ?? "—"}</strong>
+                    </span>{" "}
+                    on{" "}
+                    {e.submissions.find((x) => x.assignmentId === c.assignmentId)?.assignmentTitle ??
+                      "an assignment"}
+                    <div className="muted">
+                      {c.changedByName} · {fmt(c.at.slice(0, 10))}
+                      {c.reason ? ` · ${c.reason}` : ""}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </>
+          )}
         </div>
       </div>
 

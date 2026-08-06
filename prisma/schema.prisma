@@ -124,6 +124,28 @@ model Worksheet {
   createdAt    DateTime @default(now())
 }
 
+// Every change to a score, with who made it and what it was before. Grades are
+// the part of the record a state reviewer or a parent is most likely to
+// challenge, so they need a defensible history — not just a current value.
+model GradeChange {
+  id            String   @id @default(cuid())
+  schoolId      String
+  submissionId  String
+  studentId     String
+  assignmentId  String
+  oldScore      Int? // null = was ungraded
+  newScore      Int?
+  changedById   String
+  changedByName String
+  reason        String   @default("")
+  at            String // ISO timestamp
+  createdAt     DateTime @default(now())
+
+  @@index([schoolId])
+  @@index([studentId])
+  @@index([submissionId])
+}
+
 // --- Standards / learning outcomes -------------------------------------
 // The strongest ESA evidence a microschool can produce is documented progress
 // against named standards. An Outcome is a standard the school teaches to;

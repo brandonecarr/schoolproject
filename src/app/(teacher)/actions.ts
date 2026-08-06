@@ -203,6 +203,24 @@ export async function saveGrade(formData: FormData) {
     },
   });
 
+  // Every score write is auditable, wherever it came from.
+  if (sub.score !== score) {
+    await prisma.gradeChange.create({
+      data: {
+        schoolId: school!.id,
+        submissionId: id,
+        studentId: sub.studentId,
+        assignmentId: sub.assignmentId,
+        oldScore: sub.score,
+        newScore: score,
+        changedById: user.id,
+        changedByName: user.name,
+        reason: "Graded in the grading queue",
+        at: new Date().toISOString(),
+      },
+    });
+  }
+
   // Standards mastery accrues automatically from graded work.
   await recordOutcomesForSubmission({
     schoolId: school!.id,
@@ -218,6 +236,7 @@ export async function saveGrade(formData: FormData) {
   revalidatePath("/dashboard");
   revalidatePath("/student");
   revalidatePath("/mastery");
+  revalidatePath("/gradebook");
   redirect("/grading?graded=1");
 }
 
@@ -612,6 +631,91 @@ export async function deleteSample(formData: FormData) {
   }
   revalidatePath(`/students/${studentId}`);
   redirect(`/students/${studentId}`);
+}
+
+// --- Gradebook ---
+// One bulk save for the whole grid. Only cells whose value actually changed are
+// written, and every one of those writes a GradeChange row: grades are the part
+// of the record most likely to be questioned later, so they get a defensible
+// history (who, when, from what, to what, why).
+//
+// A blank cell means "leave this alone", never "erase the grade" — a bulk form
+// must not be able to wipe a term's marks by accident.
+export async function saveGradebook(formData: FormData) {
+  const { user, school } = await requireTeacher();
+  const schoolId = school!.id;
+  const reason = String(formData.get("reason") || "").trim().slice(0, 200);
+  const now = new Date().toISOString();
+
+  // Collect submitted cells: score_<submissionId>
+  const edits: { submissionId: string; raw: string }[] = [];
+  for (const [key, value] of formData.entries()) {
+    if (key.startsWith("score_")) {
+      edits.push({ submissionId: key.slice(6), raw: String(value).trim() });
+    }
+  }
+  if (edits.length === 0) redirect("/gradebook");
+
+  const subs = await prisma.submission.findMany({
+    where: { schoolId, id: { in: edits.map((e) => e.submissionId) } },
+  });
+  const asgIds = [...new Set(subs.map((s) => s.assignmentId))];
+  const assignments = await prisma.assignment.findMany({ where: { id: { in: asgIds } } });
+
+  let changed = 0;
+  for (const e of edits) {
+    if (e.raw === "") continue; // blank = unchanged
+    const sub = subs.find((s) => s.id === e.submissionId);
+    if (!sub) continue;
+    const asg = assignments.find((a) => a.id === sub.assignmentId);
+    if (!asg) continue;
+
+    const next = clamp(Math.round(Number(e.raw)), 0, asg.points);
+    if (Number.isNaN(next)) continue;
+    if (sub.score === next && sub.status === "graded") continue; // no-op
+
+    await prisma.submission.update({
+      where: { id: sub.id },
+      data: {
+        score: next,
+        status: "graded",
+        gradedAt: now,
+        returnedAt: null,
+        revisionNote: "",
+      },
+    });
+    await prisma.gradeChange.create({
+      data: {
+        schoolId,
+        submissionId: sub.id,
+        studentId: sub.studentId,
+        assignmentId: sub.assignmentId,
+        oldScore: sub.score,
+        newScore: next,
+        changedById: user.id,
+        changedByName: user.name,
+        reason,
+        at: now,
+      },
+    });
+    // Keep standards mastery in step with the corrected grade.
+    await recordOutcomesForSubmission({
+      schoolId,
+      studentId: sub.studentId,
+      assignmentId: sub.assignmentId,
+      submissionId: sub.id,
+      score: next,
+      possible: asg.points,
+    });
+    changed++;
+  }
+
+  await logAudit(user.id, "gradebook_saved", `${changed} grade${changed === 1 ? "" : "s"} changed`);
+  revalidatePath("/gradebook");
+  revalidatePath("/dashboard");
+  revalidatePath("/grading");
+  revalidatePath("/mastery");
+  redirect(`/gradebook?saved=${changed}`);
 }
 
 // --- Standards / learning outcomes ---
