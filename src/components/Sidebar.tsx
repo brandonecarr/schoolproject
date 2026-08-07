@@ -136,15 +136,16 @@ export function Sidebar({
         </div>
       </div>
 
-      {pinned.length > 0 && (
+      <div className="navscroll">
+        {pinned.length > 0 && (
         <div className="pinned">
           {pinned.map((item) => (
             <Row key={item.href} item={item} />
           ))}
         </div>
-      )}
+        )}
 
-      {grouped ? (
+        {grouped ? (
         nav.map((section) => {
           const isOpen = open === section.group;
           const holdsActive = section.group === activeGroup;
@@ -179,6 +180,7 @@ export function Sidebar({
           ))}
         </div>
       )}
+      </div>
 
       <div className="foot">
         {pinnable && (

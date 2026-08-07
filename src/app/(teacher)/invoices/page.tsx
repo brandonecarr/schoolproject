@@ -2,7 +2,7 @@ import Link from "next/link";
 import { requireTeacher } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { fmt } from "@/lib/dates";
-import { Pill, Notice } from "@/components/ui";
+import { Pill, Notice, StatCard } from "@/components/ui";
 import { VerificationNote } from "@/components/VerificationNote";
 import { verificationCounts, railVerification } from "@/lib/observe";
 import type { Tone } from "@/components/ui";
@@ -71,40 +71,38 @@ export default async function InvoicesPage({
         </div>
       )}
 
-      <div className="grid g3" style={{ marginTop: 16 }}>
-        <div className="stat">
-          <div className="n">{formatPct(m.firstPassRate)}</div>
-          <div className="l">First-pass approval</div>
-          {m.decided > 0 && (
-            <div className="small muted" style={{ marginTop: 4 }}>
-              {m.firstPassPaid} of {m.decided} decided
-            </div>
-          )}
-        </div>
-        <div className="stat">
-          <div className="n">
-            {m.avgDaysToCash == null ? "—" : m.avgDaysToCash}
-            {m.avgDaysToCash != null && (
-              <span style={{ fontSize: 15, color: "var(--ink-soft)" }}> days</span>
-            )}
-          </div>
-          <div className="l">Avg days to cash</div>
-          {m.paidCount > 0 && (
-            <div className="small muted" style={{ marginTop: 4 }}>
-              over {m.paidCount} paid
-            </div>
-          )}
-        </div>
-        <div className="stat">
-          <div className="n">${m.inFlight.toLocaleString()}</div>
-          <div className="l">In flight</div>
-          <div className="small muted" style={{ marginTop: 4 }}>
-            ${m.paidTotal.toLocaleString()} paid · ${m.draftTotal.toLocaleString()} in draft
-          </div>
-        </div>
+      {/* The handoff groups these rows into quarterly packets. Our invoices are
+          per student per period — that is the data model, and reshaping it to
+          match a mockup would be a functional change, not a restyle. The stat
+          row above maps cleanly either way. */}
+      <div className="statrow" style={{ marginTop: 16 }}>
+        <StatCard
+          label="Reimbursed this year"
+          value={`$${m.paidTotal.toLocaleString()}`}
+          delta={m.paidCount > 0 ? `${m.paidCount} packet${m.paidCount === 1 ? "" : "s"} paid` : "Nothing paid yet"}
+          tone="good"
+        />
+        <StatCard
+          label="In flight"
+          value={`$${m.inFlight.toLocaleString()}`}
+          delta={m.counts.submitted ? `${m.counts.submitted} submitted` : "Nothing submitted"}
+          tone="info"
+        />
+        <StatCard
+          label="Not yet built"
+          value={`$${m.draftTotal.toLocaleString()}`}
+          delta={m.counts.draft ? `${m.counts.draft} in draft` : "No drafts"}
+          tone="info"
+        />
+        <StatCard
+          label="Avg days to cash"
+          value={m.avgDaysToCash == null ? "—" : m.avgDaysToCash}
+          delta={m.paidCount > 0 ? `Across ${m.paidCount} paid` : "No paid packets yet"}
+          tone="info"
+        />
       </div>
 
-      <div className="card" style={{ padding: "16px 10px", marginTop: 12 }}>
+      <div className="card2 nopad" style={{ marginTop: 12 }}>
         <table>
           <thead>
             <tr>
