@@ -9,6 +9,7 @@ import { prisma } from "@/lib/db";
 import { scoreEvidence, type ScoredEvidence } from "@/lib/rules";
 import { rollup } from "@/lib/outcomes";
 import { periodStart, today } from "@/lib/dates";
+import { instructionalDays, parseSchoolDays, hasCalendar } from "@/lib/calendar";
 
 export type EvidenceSubmission = {
   id: string;
@@ -57,6 +58,10 @@ export type Evidence = ScoredEvidence & {
   // Standards demonstrated in this window (empty when the school tracks none).
   standards: EvidenceStandard[];
   standardsMastered: number;
+  // Instructional days the school's published calendar puts in this window, or
+  // null when no calendar is published. Null and 0 mean very different things:
+  // null is "we can't say", 0 is "the calendar says none".
+  instructionalDays: number | null;
 };
 
 export async function evidenceFor(
@@ -157,6 +162,22 @@ export async function evidenceFor(
   }
   const standardsMastered = standards.filter((s) => s.mastered).length;
 
+  // Instructional days from the school's published calendar. A student row
+  // doesn't carry its school, so reach it through the attendance/assignment
+  // rows we already have; when neither exists there is nothing to bill anyway.
+  const schoolId =
+    attendanceAll[0]?.schoolId ?? assignmentRows[0]?.schoolId ?? filesAll[0]?.schoolId ?? null;
+  let instrDays: number | null = null;
+  if (schoolId) {
+    const [school, calEvents] = await Promise.all([
+      prisma.school.findUnique({ where: { id: schoolId } }),
+      prisma.calendarEvent.findMany({ where: { schoolId } }),
+    ]);
+    if (school && hasCalendar(calEvents)) {
+      instrDays = instructionalDays(start, end, calEvents, parseSchoolDays(school.schoolDays)).length;
+    }
+  }
+
   const scored = scoreEvidence({
     attendance,
     submissions,
@@ -164,6 +185,7 @@ export async function evidenceFor(
     assignments,
     samples,
     standards: standards.length > 0 ? { assessed: standards.length, mastered: standardsMastered } : null,
+    instructionalDays: instrDays,
   });
 
   return {
@@ -174,6 +196,7 @@ export async function evidenceFor(
     samples,
     standards,
     standardsMastered,
+    instructionalDays: instrDays,
     ...scored,
   };
 }

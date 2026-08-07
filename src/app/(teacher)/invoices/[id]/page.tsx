@@ -225,10 +225,30 @@ export default async function InvoicePacketPage({
       <div className="grid g2">
         <div className="card">
           <div className="eyebrow">Attendance summary</div>
-          <p style={{ margin: "8px 0 0" }}>
-            <strong>{e.presentDays}</strong> present of <strong>{e.attendance.length}</strong> logged
-            instructional days
-          </p>
+          {/* With a published calendar the denominator is the school's own
+              stated instructional days, which a reviewer can check against it.
+              Without one, all we can honestly say is how many days we logged. */}
+          {e.instructionalDays != null ? (
+            <>
+              <p style={{ margin: "8px 0 0" }}>
+                <strong>{e.presentDays}</strong> present of{" "}
+                <strong>{e.instructionalDays}</strong> instructional days in the period
+              </p>
+              {e.attendance.length < e.instructionalDays && (
+                <p className="small muted" style={{ margin: "6px 0 0" }}>
+                  {e.instructionalDays - e.attendance.length} day
+                  {e.instructionalDays - e.attendance.length === 1 ? "" : "s"} with no attendance
+                  record — <a href="/attendance">log them</a> before submitting.
+                </p>
+              )}
+            </>
+          ) : (
+            <p style={{ margin: "8px 0 0" }}>
+              <strong>{e.presentDays}</strong> present of <strong>{e.attendance.length}</strong> logged
+              days. <a href="/calendar">Publish term dates</a> to state this against your own
+              calendar.
+            </p>
+          )}
         </div>
         <div className="card">
           <div className="eyebrow">Amount</div>

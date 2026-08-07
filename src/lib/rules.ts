@@ -249,6 +249,10 @@ type ScoreInput = {
   observations: unknown[];
   assignments: unknown[];
   samples?: unknown[];
+  // Instructional days the school's published calendar says fell in this period.
+  // Omit (or pass null) and scoring is unchanged — a school with no published
+  // calendar is measured exactly as before.
+  instructionalDays?: number | null;
   // Standards mastery, when the school tracks standards. Omit (or pass null) and
   // scoring is unchanged — schools that don't use standards aren't penalised.
   standards?: { assessed: number; mastered: number } | null;
@@ -261,6 +265,7 @@ export function scoreEvidence({
   assignments,
   samples = [],
   standards = null,
+  instructionalDays = null,
 }: ScoreInput): ScoredEvidence {
   const present = attendance.filter((a) => a.status === "present").length;
   const graded = submissions.filter((s) => s.status === "graded").length;
@@ -269,14 +274,28 @@ export function scoreEvidence({
   ).length;
 
   const parts: EvidencePart[] = [
-    {
-      key: "attendance",
-      label: "Attendance days logged",
-      count: attendance.length,
-      ok: attendance.length >= 8,
-      need: "At least 8 attendance days in the period",
-      weight: 30,
-    },
+    // "At least 8 days" is a number we invented. Once a school publishes term
+    // dates, the honest test is whether attendance was logged for every
+    // instructional day its own calendar claims — which is what a reviewer
+    // comparing the two documents will check. Without a calendar we keep the
+    // old flat threshold, so nothing changes for a school that hasn't set one.
+    instructionalDays && instructionalDays > 0
+      ? {
+          key: "attendance",
+          label: `Attendance logged (${attendance.length} of ${instructionalDays} instructional days)`,
+          count: attendance.length,
+          ok: attendance.length >= instructionalDays,
+          need: `An attendance record for each of the ${instructionalDays} instructional days your calendar lists`,
+          weight: 30,
+        }
+      : {
+          key: "attendance",
+          label: "Attendance days logged",
+          count: attendance.length,
+          ok: attendance.length >= 8,
+          need: "At least 8 attendance days in the period",
+          weight: 30,
+        },
     {
       key: "instruction",
       label: "Assignments delivered",

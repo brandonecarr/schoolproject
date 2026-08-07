@@ -1508,3 +1508,80 @@ export async function decideProposal(formData: FormData) {
   revalidatePath("/proposals");
   redirect("/proposals");
 }
+
+// --- School calendar ---
+// Terms and closures set the instructional-day count that every ESA invoice
+// claims, so these are billing edits, not scheduling ones. Audited accordingly.
+const CAL_KINDS = new Set(["term", "closure", "event"]);
+
+export async function addCalendarEvent(formData: FormData) {
+  const { user, school } = await requireTeacher();
+  const kind = String(formData.get("kind") || "event");
+  const title = String(formData.get("title") || "").trim();
+  const startDate = String(formData.get("startDate") || "").trim();
+  // A single-day entry may leave the end blank; treat it as the same day rather
+  // than as an open-ended range.
+  const endRaw = String(formData.get("endDate") || "").trim();
+  const endDate = endRaw || startDate;
+
+  const valid = /^\d{4}-\d{2}-\d{2}$/;
+  if (!CAL_KINDS.has(kind) || !title || !valid.test(startDate) || !valid.test(endDate)) {
+    redirect("/calendar?error=invalid");
+  }
+  if (endDate < startDate) redirect("/calendar?error=backwards");
+
+  await prisma.calendarEvent.create({
+    data: {
+      schoolId: school!.id,
+      kind,
+      title,
+      startDate,
+      endDate,
+      note: String(formData.get("note") || "").trim(),
+      staffOnly: formData.get("staffOnly") === "on",
+    },
+  });
+  await logAudit(user.id, "calendar_event_added", `${kind}: ${title} ${startDate}–${endDate}`);
+  revalidatePath("/calendar");
+  redirect("/calendar?added=1");
+}
+
+export async function deleteCalendarEvent(formData: FormData) {
+  const { user, school } = await requireTeacher();
+  const id = String(formData.get("id"));
+  const e = await prisma.calendarEvent.findFirst({ where: { id, schoolId: school!.id } });
+  if (!e) redirect("/calendar");
+  await prisma.calendarEvent.delete({ where: { id } });
+  await logAudit(user.id, "calendar_event_deleted", `${e.kind}: ${e.title} ${e.startDate}–${e.endDate}`);
+  revalidatePath("/calendar");
+  redirect("/calendar?deleted=1");
+}
+
+// Which weekdays this school teaches. Changing it moves the denominator on
+// every invoice, which is exactly why it lives here and not in a hidden default.
+export async function saveSchoolDays(formData: FormData) {
+  const { user, school } = await requireTeacher();
+  const picked = [1, 2, 3, 4, 5, 6, 7].filter((d) => formData.get(`d${d}`) === "on");
+  if (picked.length === 0) redirect("/calendar?error=nodays");
+  await prisma.school.update({
+    where: { id: school!.id },
+    data: { schoolDays: picked.join(",") },
+  });
+  await logAudit(user.id, "school_days_saved", picked.join(","));
+  revalidatePath("/calendar");
+  revalidatePath("/evidence");
+  redirect("/calendar?saved=1");
+}
+
+// Rotate the secret in a user's iCal subscription URL. The old URL stops working
+// immediately — this is the revoke button for a credential that lives in a URL.
+export async function regenerateCalendarToken() {
+  const { user } = await requireTeacher();
+  await prisma.user.update({
+    where: { id: user.id },
+    data: { calendarToken: newTokenValue() },
+  });
+  await logAudit(user.id, "calendar_token_rotated", user.id);
+  revalidatePath("/calendar");
+  redirect("/calendar?rotated=1");
+}

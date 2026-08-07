@@ -144,3 +144,65 @@ describe("addDays", () => {
     expect(addDays("2026-01-01", 45)).toBe("2026-02-15");
   });
 });
+
+describe("scoreEvidence — calendar-aware attendance", () => {
+  const base = {
+    submissions: [] as { status: string }[],
+    observations: [] as unknown[],
+    assignments: [] as unknown[],
+  };
+  const att = (n: number) => Array.from({ length: n }, () => ({ status: "present" }));
+
+  it("is unchanged for a school with no published calendar", () => {
+    // The whole point of the null case: adding this feature must not silently
+    // move any existing school's score.
+    const before = scoreEvidence({ ...base, attendance: att(8) });
+    const after = scoreEvidence({ ...base, attendance: att(8), instructionalDays: null });
+    expect(after.score).toBe(before.score);
+    expect(after.parts.find((p) => p.key === "attendance")!.ok).toBe(true);
+  });
+
+  it("passes only when every instructional day is logged", () => {
+    const short = scoreEvidence({ ...base, attendance: att(12), instructionalDays: 14 });
+    const full = scoreEvidence({ ...base, attendance: att(14), instructionalDays: 14 });
+    expect(short.parts.find((p) => p.key === "attendance")!.ok).toBe(false);
+    expect(full.parts.find((p) => p.key === "attendance")!.ok).toBe(true);
+  });
+
+  it("is stricter than the flat threshold when the calendar demands more", () => {
+    // 10 days would have passed the old ">= 8" rule; against a 14-day calendar
+    // it is a gap a reviewer would find.
+    expect(scoreEvidence({ ...base, attendance: att(10) }).parts.find((p) => p.key === "attendance")!.ok).toBe(true);
+    expect(
+      scoreEvidence({ ...base, attendance: att(10), instructionalDays: 14 }).parts.find(
+        (p) => p.key === "attendance"
+      )!.ok
+    ).toBe(false);
+  });
+
+  it("is kinder than the flat threshold for a short billing period", () => {
+    // A 4-day week over a fortnight is 8 days; a period containing only 5
+    // instructional days should not be marked short for having 5.
+    const p = scoreEvidence({ ...base, attendance: att(5), instructionalDays: 5 }).parts.find(
+      (x) => x.key === "attendance"
+    )!;
+    expect(p.ok).toBe(true);
+    expect(p.label).toContain("5 of 5");
+  });
+
+  it("names the denominator so the invoice can quote it", () => {
+    const p = scoreEvidence({ ...base, attendance: att(12), instructionalDays: 14 }).parts.find(
+      (x) => x.key === "attendance"
+    )!;
+    expect(p.label).toBe("Attendance logged (12 of 14 instructional days)");
+    expect(p.need).toContain("14 instructional days");
+  });
+
+  it("falls back rather than dividing by a zero-day calendar", () => {
+    const p = scoreEvidence({ ...base, attendance: att(8), instructionalDays: 0 }).parts.find(
+      (x) => x.key === "attendance"
+    )!;
+    expect(p.ok).toBe(true);
+    expect(p.label).toBe("Attendance days logged");
+  });
+});

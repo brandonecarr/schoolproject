@@ -83,7 +83,11 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
   <p class="narrative">${esc(inv.narrative)}</p>
 
   <h2>Attendance summary</h2>
-  <p style="margin:0">Present <strong>${e.presentDays}</strong> of <strong>${e.attendance.length}</strong> logged instructional days during the service period.</p>
+  <p style="margin:0">${
+    e.instructionalDays != null
+      ? `Present <strong>${e.presentDays}</strong> of <strong>${e.instructionalDays}</strong> instructional days in the service period, per the school's published calendar.`
+      : `Present <strong>${e.presentDays}</strong> of <strong>${e.attendance.length}</strong> logged days during the service period.`
+  }</p>
 
   ${
     e.standards.length

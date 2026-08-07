@@ -34,11 +34,19 @@ model School {
   // Standards mastery: fraction of an aligned assignment's points a student must
   // earn for that attempt to count as "mastered" (0.8 = 80%).
   masteryThreshold Float @default(0.8)
+  // Which weekdays are instructional, as ISO numbers (1=Mon … 7=Sun). Not
+  // cosmetic: it sets the denominator of "present N of M instructional days" on
+  // every ESA invoice, and plenty of microschools deliberately run four days.
+  schoolDays String @default("1,2,3,4,5")
   createdAt DateTime @default(now())
 }
 
 model User {
   id              String   @id @default(cuid())
+  // Secret in the iCal subscription URL. Calendar clients cannot send an
+  // Authorization header, so the URL itself is the credential — long-lived,
+  // revocable by regenerating, and scoped to calendar data only.
+  calendarToken   String?  @unique
   schoolId        String
   role            String // owner | teacher | parent | student
   name            String
@@ -586,4 +594,32 @@ model RuleProposal {
 
   @@index([status, createdAt])
   @@index([sourceId])
+}
+
+
+// The school's published calendar. Three kinds, doing quite different jobs:
+//   term     the range instruction is in session — the OUTER bound on what can
+//            be billed as an instructional day
+//   closure  a day inside a term that is not instructional (holiday, in-service,
+//            snow day). Subtracted from the term.
+//   event    everything else — field trips, picture day, parent evenings. Shown
+//            to families and exported, but never affects the instructional count.
+//
+// Both dates are inclusive "YYYY-MM-DD". Note that iCal's DTEND for an all-day
+// event is EXCLUSIVE, so the serializer adds a day; see src/lib/calendar.ts.
+model CalendarEvent {
+  id        String  @id @default(cuid())
+  schoolId  String
+  kind      String // term | closure | event
+  title     String
+  startDate String // YYYY-MM-DD, inclusive
+  endDate   String // YYYY-MM-DD, inclusive
+  note      String  @default("")
+  /** Hide from the family-facing calendar and the iCal feed. Staff in-service
+   *  days are a closure families should see; some planning notes are not. */
+  staffOnly Boolean @default(false)
+
+  createdAt DateTime @default(now())
+
+  @@index([schoolId, startDate])
 }
