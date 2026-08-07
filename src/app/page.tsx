@@ -461,7 +461,7 @@ export default async function Home({
           <section className="lp-wrap lp-section" id="pricing">
             <div className="lp-centerhead">
               <div className="lp-eyebrow">Pricing</div>
-              <h2 className="lp-h2">Early adopters pay one flat rate</h2>
+              <h2 className="lp-h2">The first cohort pays one flat rate</h2>
               <p>
                 At launch, Cohort will be priced per child — because that&apos;s how you&apos;re
                 funded. While it&apos;s early, it&apos;s simpler than that: everything, every
@@ -486,8 +486,8 @@ export default async function Home({
 
               <article className="lp-tier featured">
                 <div className="lp-tierhead">
-                  <h3>Early adopter</h3>
-                  <span className="lp-expect">Early access</span>
+                  <h3>The first cohort</h3>
+                  <span className="lp-expect">First 25 schools</span>
                 </div>
                 <p className="lp-tiersub">Everything, for every enrolled student.</p>
                 <div className="lp-price">$149</div>
@@ -501,10 +501,14 @@ export default async function Home({
                   <li>Family portal and portfolios</li>
                   <li>Your own school address</li>
                   <li>Rate locked for your first 12 months</li>
+                  <li>A direct line to the founder while it&apos;s early</li>
                 </ul>
                 <Link className="lp-pill lp-pill-full" href="/signup">
                   Start your school
                 </Link>
+                <div className="lp-pricenote" style={{ textAlign: "center", marginTop: 10 }}>
+                  Limited to the first 25 schools.
+                </div>
               </article>
 
               <article className="lp-tier">
@@ -526,8 +530,8 @@ export default async function Home({
             </div>
 
             <p className="lp-placeholder">
-              [ per-child launch pricing not set — early adopters keep $149/mo for their first
-              year regardless ]
+              [ per-child launch pricing not set — the first cohort keeps $149/mo for their
+              first year regardless ]
             </p>
           </section>
         )}
