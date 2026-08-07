@@ -28,12 +28,11 @@ export const metadata = {
 };
 
 /**
- * Pricing is designed and built but the number is not set.
- *
- * The handoff put this behind a flag on purpose. `[ $ / child ]` on a live
- * marketing domain tells a prospect the company has not decided what it costs;
- * flip this to true once the price is real and delete the placeholder note in
- * the markup at the same time.
+ * The early-adopter rate is real: $149/mo flat, locked twelve months. What is
+ * still unset is the per-child price that replaces it at launch — the
+ * placeholder note under the tiers says so, and the network tier still reads
+ * [ talk to us ]. Nothing on this page charges anyone; there is no billing
+ * system yet, so early-adopter invoices are a manual affair by design.
  */
 const SHOW_PRICING = true;
 
@@ -462,10 +461,12 @@ export default async function Home({
           <section className="lp-wrap lp-section" id="pricing">
             <div className="lp-centerhead">
               <div className="lp-eyebrow">Pricing</div>
-              <h2 className="lp-h2">Per child, because that&apos;s how you&apos;re funded</h2>
+              <h2 className="lp-h2">Early adopters pay one flat rate</h2>
               <p>
-                Free to set up, and free while you&apos;re getting your first roster in. You only
-                pay once children are enrolled.
+                At launch, Cohort will be priced per child — because that&apos;s how you&apos;re
+                funded. While it&apos;s early, it&apos;s simpler than that: everything, every
+                student, one rate, locked for your first twelve months. Free until your first
+                children are enrolled.
               </p>
             </div>
 
@@ -485,21 +486,21 @@ export default async function Home({
 
               <article className="lp-tier featured">
                 <div className="lp-tierhead">
-                  <h3>Per child</h3>
-                  <span className="lp-expect">Expected</span>
+                  <h3>Early adopter</h3>
+                  <span className="lp-expect">Early access</span>
                 </div>
                 <p className="lp-tiersub">Everything, for every enrolled student.</p>
-                <div className="lp-slot">
-                  <span className="lp-slotbox">[ $ / child ]</span>
-                  <span className="lp-pricenote">per month</span>
+                <div className="lp-price">$149</div>
+                <div className="lp-pricenote">
+                  per month, flat — any number of students. Billed monthly, cancel anytime.
                 </div>
-                <div className="lp-pricenote">Billed monthly, cancel anytime</div>
                 <div className="lp-hair" />
                 <ul>
                   <li>ESA packets in your state&apos;s format</li>
                   <li>Evidence board and rejection tracking</li>
                   <li>Family portal and portfolios</li>
                   <li>Your own school address</li>
+                  <li>Rate locked for your first 12 months</li>
                 </ul>
                 <Link className="lp-pill lp-pill-full" href="/signup">
                   Start your school
@@ -525,7 +526,8 @@ export default async function Home({
             </div>
 
             <p className="lp-placeholder">
-              [ pricing not final — swap the placeholders when the number is set ]
+              [ per-child launch pricing not set — early adopters keep $149/mo for their first
+              year regardless ]
             </p>
           </section>
         )}
