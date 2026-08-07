@@ -18,6 +18,10 @@ import type { UserModel as User, SchoolModel as School } from "@/generated/prism
 
 export const SESSION_COOKIE = "cohort_sid";
 
+/** Owner or teacher. Defined here because getSession needs it before the
+ *  messages module is reachable. */
+export const isStaffRole = (role: string) => role === "owner" || role === "teacher";
+
 // Password + session-id helpers live in the Next-free lib/password.ts so the
 // seed script can reuse them; re-exported here for server code convenience.
 export { hashPassword, verifyPassword, newSessionId } from "@/lib/password";
@@ -36,9 +40,16 @@ export async function logAudit(
 export type SchoolWithRail = School & { railLabel: string };
 
 export type Session = {
+  /** Whose view this is. While impersonating, this is the FAMILY member — so
+   *  every existing role check, page gate and query scopes to them without a
+   *  single call site changing. */
   user: User;
   school: SchoolWithRail | null;
   rail: Rail | null;
+  /** The staff member actually driving, when impersonating. Null normally.
+   *  Audit entries are attributed to this person, never the person being
+   *  viewed — otherwise the log would record a parent doing things they didn't. */
+  actor: User | null;
 };
 
 // Read the current session from the cookie. Returns null if not signed in.
@@ -50,8 +61,33 @@ export async function getSession(): Promise<Session | null> {
   const session = await prisma.session.findUnique({ where: { id: sid } });
   if (!session) return null;
 
-  const user = await prisma.user.findUnique({ where: { id: session.userId } });
-  if (!user) return null;
+  const signedIn = await prisma.user.findUnique({ where: { id: session.userId } });
+  if (!signedIn) return null;
+
+  // Impersonation. The swap happens HERE, once, so that every downstream role
+  // check, page gate and scoped query sees the family member and needs no
+  // knowledge of this feature. Re-validated on every request rather than
+  // trusted from when it started: if the staff member's role changed, or the
+  // target moved school, the view ends immediately.
+  let user = signedIn;
+  let actor: User | null = null;
+  if (session.viewingAsUserId) {
+    const target = await prisma.user.findUnique({ where: { id: session.viewingAsUserId } });
+    if (
+      target &&
+      isStaffRole(signedIn.role) &&
+      target.schoolId === signedIn.schoolId &&
+      !isStaffRole(target.role)
+    ) {
+      user = target;
+      actor = signedIn;
+    } else {
+      // Anything unexpected — target deleted, promoted to staff, moved school —
+      // drops the view rather than guessing. Failing open into someone else's
+      // account is the one outcome that must never happen.
+      await prisma.session.update({ where: { id: sid }, data: { viewingAsUserId: null } });
+    }
+  }
 
   let school: SchoolWithRail | null = null;
   let rail: Rail | null = null;
@@ -62,7 +98,7 @@ export async function getSession(): Promise<Session | null> {
       school = { ...s, railLabel: rail ? rail.label : "No ESA program" };
     }
   }
-  return { user, school, rail };
+  return { user, school, rail, actor };
 }
 
 // Gate a page/action to any signed-in user. Redirects to /login otherwise.
@@ -77,6 +113,23 @@ export async function requireRole(...roles: string[]): Promise<Session> {
   const session = await requireUser();
   if (!roles.includes(session.user.role)) redirect("/");
   return session;
+}
+
+/**
+ * Refuse a write while someone is being viewed.
+ *
+ * "View as" is for answering "what does this parent actually see?", not for
+ * doing things on their behalf. A support tool that can act as a user is an
+ * impersonation tool, and every action it takes lands in that person's record
+ * under their name.
+ *
+ * Teacher-console actions need no call here: impersonation swaps in a
+ * parent/student, so requireTeacher() already refuses. This is for the portal
+ * actions, which the viewed user legitimately can call. Every one of them must
+ * call it, and tests/view-as.test.ts fails the build if one doesn't.
+ */
+export async function requireNotViewing(session: Session, back = "/"): Promise<void> {
+  if (session.actor) redirect(`${back}?viewonly=1`);
 }
 
 // The teacher gate used everywhere in the console (owner or teacher).

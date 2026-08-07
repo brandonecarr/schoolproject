@@ -5,15 +5,17 @@ import { requireUser } from "@/lib/auth";
 import { TopNav } from "@/components/TopNav";
 import { threadStudentIds, unreadForFamily } from "@/lib/messages";
 import { unreadCountFor } from "@/lib/notify";
+import { ViewAsBanner } from "@/components/ViewAsBanner";
 
 export default async function PortalLayout({ children }: { children: React.ReactNode }) {
-  const { user } = await requireUser();
+  const { user, actor: user_actor } = await requireUser();
   const [messagesUnread, notificationsUnread] = await Promise.all([
     unreadForFamily(await threadStudentIds(user)),
     unreadCountFor(user.id),
   ]);
   return (
     <>
+      {user_actor && <ViewAsBanner name={user.name} role={user.role} />}
       <a className="skip" href="#content">
         Skip to content
       </a>

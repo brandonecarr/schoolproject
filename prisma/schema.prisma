@@ -435,6 +435,13 @@ model Invoice {
 model Session {
   id        String   @id
   userId    String
+  // Set while a staff member is viewing the app as a family member, to answer
+  // "what does Dana actually see?". READ-ONLY by construction: getSession swaps
+  // in this user, so requireTeacher() sees a parent/student role and every
+  // teacher page and action refuses; the twelve portal actions refuse
+  // explicitly. Stored on the session rather than in a cookie so it cannot be
+  // forged, and so it ends when the session does.
+  viewingAsUserId String?
   createdAt DateTime @default(now())
 }
 

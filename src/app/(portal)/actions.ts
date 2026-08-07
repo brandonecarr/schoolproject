@@ -10,7 +10,7 @@
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/db";
-import { requireRole, requireUser, logAudit } from "@/lib/auth";
+import { requireRole, requireUser, requireNotViewing, logAudit } from "@/lib/auth";
 import { canSee } from "@/lib/announcements";
 import { move, nextPosition } from "@/lib/portfolio";
 import { hashPassword } from "@/lib/password";
@@ -29,7 +29,9 @@ const ALLOWED: Record<string, string> = {
 };
 
 export async function createStudentAccount(formData: FormData) {
-  const { user } = await requireRole("parent");
+  const s = await requireRole("parent");
+  await requireNotViewing(s, "/parent");
+  const { user } = s;
   const studentId = String(formData.get("studentId"));
 
   const ownStudentIds: string[] = user.studentIdsJson ? JSON.parse(user.studentIdsJson) : [];
@@ -69,7 +71,9 @@ export async function createStudentAccount(formData: FormData) {
 // Resubmission is allowed from assigned/draft/returned; from graded only when
 // the teacher enabled it.
 export async function submitWork(formData: FormData) {
-  const { user } = await requireRole("student");
+  const s = await requireRole("student");
+  await requireNotViewing(s, "/student");
+  const { user } = s;
   const id = String(formData.get("id"));
 
   const sub = await prisma.submission.findUnique({ where: { id } });
@@ -226,7 +230,9 @@ export async function submitWork(formData: FormData) {
 // Mark a module page as read. Pages are the only item kind with no other record
 // of being done — assignment completion is derived from the submission itself.
 export async function markPageRead(formData: FormData) {
-  const { user } = await requireRole("student");
+  const s = await requireRole("student");
+  await requireNotViewing(s, "/student");
+  const { user } = s;
   const moduleItemId = String(formData.get("moduleItemId"));
 
   const item = await prisma.moduleItem.findFirst({
@@ -252,7 +258,9 @@ export async function markPageRead(formData: FormData) {
 // Save progress without turning in. Keeps the work in a "draft" state the
 // student can return to. Not available once graded.
 export async function saveDraft(formData: FormData) {
-  const { user } = await requireRole("student");
+  const s = await requireRole("student");
+  await requireNotViewing(s, "/student");
+  const { user } = s;
   const id = String(formData.get("id"));
   const sub = await prisma.submission.findUnique({ where: { id } });
   if (!sub || sub.studentId !== user.studentId) redirect("/student/work");
@@ -277,7 +285,9 @@ export async function saveDraft(formData: FormData) {
 // Parent reports an upcoming/known absence — posts an excused attendance record
 // with a note the teacher sees (and which feeds the evidence they rely on).
 export async function reportAbsence(formData: FormData) {
-  const { user } = await requireRole("parent");
+  const s = await requireRole("parent");
+  await requireNotViewing(s, "/parent");
+  const { user } = s;
   const studentId = String(formData.get("studentId"));
   const date = String(formData.get("date") || "");
   const note = String(formData.get("note") || "").trim().slice(0, 300);
@@ -321,7 +331,9 @@ export async function reportAbsence(formData: FormData) {
 // COPPA right to deletion, exercised by the verified parent: permanently delete
 // their child and every record tied to them.
 export async function deleteChildData(formData: FormData) {
-  const { user } = await requireRole("parent");
+  const s = await requireRole("parent");
+  await requireNotViewing(s, "/parent");
+  const { user } = s;
   const studentId = String(formData.get("studentId"));
   const ownStudentIds: string[] = user.studentIdsJson ? JSON.parse(user.studentIdsJson) : [];
   if (!ownStudentIds.includes(studentId)) redirect("/parent"); // not your child
@@ -338,7 +350,9 @@ export async function deleteChildData(formData: FormData) {
 // user input, and acknowledging a draft or another audience's notice would both
 // create a false record and reveal that it exists.
 export async function acknowledgeAnnouncement(formData: FormData) {
-  const { user } = await requireUser();
+  const s = await requireUser();
+  await requireNotViewing(s, s.user.role === "student" ? "/student" : "/parent");
+  const { user } = s;
   const id = String(formData.get("id"));
   const back = user.role === "student" ? "/student/announcements" : "/parent/announcements";
 
@@ -365,7 +379,9 @@ export async function acknowledgeAnnouncement(formData: FormData) {
 // studentId would let one child write into another's portfolio.
 
 async function ownPortfolio(): Promise<{ userId: string; studentId: string; schoolId: string; name: string }> {
-  const { user } = await requireRole("student");
+  const s = await requireRole("student");
+  await requireNotViewing(s, "/student");
+  const { user } = s;
   if (!user.studentId) redirect("/student");
   return { userId: user.id, studentId: user.studentId, schoolId: user.schoolId, name: user.name };
 }
@@ -462,7 +478,9 @@ export async function removePortfolioEntry(formData: FormData) {
 // the thing it configures, and the honest choice a parent wants to make is
 // "email me" or "don't".
 export async function setEmailAlerts(formData: FormData) {
-  const { user } = await requireUser();
+  const s = await requireUser();
+  await requireNotViewing(s, s.user.role === "student" ? "/student" : "/parent");
+  const { user } = s;
   const on = String(formData.get("on")) === "1";
   await prisma.user.update({ where: { id: user.id }, data: { emailAlerts: on } });
   const back = String(formData.get("back") || "/");

@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { requireTeacher } from "@/lib/auth";
+import { startViewAs } from "@/app/view-as/actions";
 import { prisma } from "@/lib/db";
 import { evidenceFor } from "@/lib/evidence";
 import { readiness, PROGRAMS } from "@/lib/rules";
@@ -33,6 +34,23 @@ export default async function StudentPage({
   const { upload } = await searchParams;
 
   const s = await prisma.student.findFirst({ where: { id, schoolId: school!.id } });
+  // Family logins attached to this child, so a teacher can see exactly what
+  // they see. Parent links are stored as a JSON array of student ids.
+  const familyUsers = s
+    ? (
+        await prisma.user.findMany({
+          where: { schoolId: school!.id, role: { in: ["parent", "student"] } },
+          select: { id: true, name: true, role: true, studentId: true, studentIdsJson: true },
+        })
+      ).filter((u) => {
+        if (u.role === "student") return u.studentId === s.id;
+        try {
+          return (u.studentIdsJson ? (JSON.parse(u.studentIdsJson) as string[]) : []).includes(s.id);
+        } catch {
+          return false;
+        }
+      })
+    : [];
   if (!s) notFound();
 
   const e = await evidenceFor(s.id);
@@ -70,6 +88,24 @@ export default async function StudentPage({
           </Link>
         </div>
       </div>
+
+      {familyUsers.length > 0 && (
+        <div className="card" style={{ padding: "12px 18px" }}>
+          <div className="row" style={{ gap: 10, alignItems: "center", flexWrap: "wrap" }}>
+            <span className="small muted">See what this family sees:</span>
+            {familyUsers.map((u) => (
+              <form key={u.id} action={startViewAs}>
+                <input type="hidden" name="userId" value={u.id} />
+                <input type="hidden" name="back" value={`/students/${s.id}`} />
+                <button className="btn ghost sm">
+                  View as {u.name} ({u.role})
+                </button>
+              </form>
+            ))}
+            <span className="small muted">Read-only, and recorded in the audit log.</span>
+          </div>
+        </div>
+      )}
 
       <div className="card">
         <div className="spread">

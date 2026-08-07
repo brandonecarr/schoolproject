@@ -2725,3 +2725,39 @@ a:focus-visible {
 .workcard h2 {
   font-size: 17px;
 }
+
+/* "View as" banner. Sticky and loud on purpose: the failure it prevents is a
+   teacher forgetting whose account they're looking at. */
+.viewasbar {
+  position: sticky;
+  top: 0;
+  z-index: 90;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  flex-wrap: wrap;
+  background: var(--mark);
+  color: var(--ink);
+  padding: 9px 16px;
+  font-size: 13.5px;
+  font-family: var(--sans);
+  border-bottom: 2px solid var(--mark-deep);
+}
+.viewasbtn {
+  background: var(--ink);
+  color: #fff;
+  border: 0;
+  border-radius: 999px;
+  padding: 5px 14px;
+  font: inherit;
+  font-size: 12.5px;
+  cursor: pointer;
+}
+.viewasbtn:hover {
+  background: var(--blue);
+}
+.viewasbtn:focus-visible {
+  outline: 2px solid var(--ink);
+  outline-offset: 2px;
+}
