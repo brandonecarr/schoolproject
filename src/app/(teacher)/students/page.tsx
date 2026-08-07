@@ -2,7 +2,8 @@ import Link from "next/link";
 import { requireTeacher } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { evidenceFor } from "@/lib/evidence";
-import { readiness, PROGRAMS } from "@/lib/rules";
+import { readiness, PROGRAMS, RAILS, programOptions } from "@/lib/rules";
+import { FundingSelect } from "@/components/FundingSelect";
 import { Pill, Notice } from "@/components/ui";
 import { addStudent } from "../actions";
 
@@ -21,7 +22,14 @@ export default async function StudentsPage({
     orderBy: { createdAt: "asc" },
   });
   const rows = await Promise.all(students.map(async (s) => ({ s, e: await evidenceFor(s.id) })));
-  const programs = Object.entries(PROGRAMS) as [string, { label: string }][];
+  // Grouped by how the money actually arrives — that, not the state, is what
+  // changes the paperwork. Within a group, alphabetical by state.
+  const opts = programOptions().map((p) => ({ ...p, railLabel: RAILS[p.rail]?.label ?? p.rail }));
+  const programGroups = [
+    { label: "Education savings accounts", items: opts.filter((p) => p.kind === "esa") },
+    { label: "Tax-credit scholarships", items: opts.filter((p) => p.kind === "taxcredit") },
+    { label: "Other state funding", items: opts.filter((p) => p.kind !== "esa" && p.kind !== "taxcredit") },
+  ].filter((g) => g.items.length > 0);
 
   return (
     <>
@@ -73,21 +81,7 @@ export default async function StudentsPage({
             </div>
           </div>
           <div className="row" style={{ gap: 12 }}>
-            <div style={{ flex: 1, minWidth: 180 }}>
-              <label htmlFor="esaProgram">Funding</label>
-              <select id="esaProgram" name="esaProgram" defaultValue="">
-                <option value="">Private pay (no ESA)</option>
-                {programs.map(([key, p]) => (
-                  <option key={key} value={key}>
-                    {p.label}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div style={{ flex: 1, minWidth: 140 }}>
-              <label htmlFor="esaAmount">ESA amount / yr</label>
-              <input id="esaAmount" name="esaAmount" type="number" min={0} placeholder="0" />
-            </div>
+            <FundingSelect groups={programGroups} />
             <div style={{ flex: 1, minWidth: 140 }}>
               <label htmlFor="tuitionAnnual">Tuition / yr</label>
               <input

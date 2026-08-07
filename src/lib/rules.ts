@@ -19,11 +19,13 @@ export type Rail = {
   rejectionReasons: string[];
 };
 
-export const RAILS: Record<string, Rail> = {
+// Rails are declared WITHOUT their state list — it is derived from PROGRAMS at
+// the bottom of this section so the two can never drift apart. Adding a state is
+// therefore a one-line change to PROGRAMS, never an edit in two places.
+const RAIL_DEFS: Record<string, Omit<Rail, "states">> = {
   classwallet: {
     id: "classwallet",
     label: "ClassWallet",
-    states: ["AZ", "UT", "AR"],
     vendorFeePct: 2.5,
     verify: true,
     // What the invoice packet must contain
@@ -45,7 +47,6 @@ export const RAILS: Record<string, Rail> = {
   stepup: {
     id: "stepup",
     label: "Step Up For Students",
-    states: ["FL"],
     vendorFeePct: 0,
     verify: true,
     requires: [
@@ -64,7 +65,6 @@ export const RAILS: Record<string, Rail> = {
   odyssey: {
     id: "odyssey",
     label: "Odyssey",
-    states: ["IA"],
     vendorFeePct: 0,
     verify: true,
     requires: [
@@ -77,17 +77,139 @@ export const RAILS: Record<string, Rail> = {
       "Documentation submitted after the reporting deadline",
     ],
   },
+  studentfirst: {
+    id: "studentfirst",
+    label: "Student First Technologies",
+    vendorFeePct: 0,
+    verify: true,
+    requires: [
+      { key: "attendance_summary", label: "Attendance summary for the billing period" },
+      { key: "purpose_statement", label: "Educational purpose statement" },
+      { key: "itemized_amount", label: "Itemized amount with service dates" },
+    ],
+    rejectionReasons: [
+      "Provider not approved for the category billed",
+      "Documentation submitted after the reporting deadline",
+    ],
+  },
+  ace: {
+    id: "ace",
+    label: "ACE Scholarships",
+    vendorFeePct: 0,
+    verify: true,
+    requires: [
+      { key: "attendance_summary", label: "Attendance summary for the billing period" },
+      { key: "purpose_statement", label: "Educational purpose statement" },
+      { key: "curriculum_reference", label: "Curriculum or course of study reference" },
+      { key: "itemized_amount", label: "Itemized amount with service dates" },
+    ],
+    rejectionReasons: [
+      "Expense category not on the approved-use list",
+      "Amount exceeds the family's remaining balance",
+    ],
+  },
+  // No marketplace in between: the family (or the school) files with the state
+  // agency directly. Fewer intermediaries, but usually stricter paperwork,
+  // because nobody is pre-screening the packet before it reaches a reviewer.
+  statedirect: {
+    id: "statedirect",
+    label: "State agency (direct)",
+    vendorFeePct: 0,
+    verify: true,
+    requires: [
+      { key: "attendance_summary", label: "Attendance summary for the billing period" },
+      { key: "purpose_statement", label: "Educational purpose statement" },
+      { key: "curriculum_reference", label: "Curriculum or course of study reference" },
+      { key: "work_samples", label: "Evidence of student work" },
+      { key: "itemized_amount", label: "Itemized amount with service dates" },
+    ],
+    rejectionReasons: [
+      "Provider not on the state's approved-provider list",
+      "Missing documentation of instruction delivered",
+      "Service dates outside the approved billing period",
+    ],
+  },
 };
 
-export type Program = { rail: string; program: string; label: string };
+export const RAILS: Record<string, Rail> = Object.fromEntries(
+  Object.entries(RAIL_DEFS).map(([id, r]) => [id, { ...r, states: [] as string[] }])
+);
 
+// How the money reaches the school. This changes the paperwork more than the
+// state does, so it's worth showing the teacher which one she's on.
+//  - "esa"       family-controlled account, school invoices against a balance
+//  - "taxcredit" credit or scholarship routed through an approving organisation
+//  - "voucher"   state pays an approved school directly per enrolled student
+//  - "allotment" per-pupil allotment for enrolled home/correspondence students
+export type ProgramKind = "esa" | "taxcredit" | "voucher" | "allotment";
+
+export type Program = {
+  rail: string;
+  program: string;
+  label: string;
+  kind: ProgramKind;
+  /** Approximate annual award per student. A starting figure for the invoice
+   *  form, NOT an entitlement — every one of these is set annually and several
+   *  are prorated or tiered. Always confirm against the family's award letter. */
+  amount: number;
+  /** True once the program is actually disbursing. False means enacted but not
+   *  yet paying, so a school can select it and plan without invoicing yet. */
+  live: boolean;
+  /** Eligibility is narrower than "any student in the state". */
+  limited?: string;
+  /** Other programs the same state runs that a microschool might also bill.
+   *  PROGRAMS is keyed by state, so only the primary one is selectable today. */
+  alsoRuns?: string[];
+};
+
+// ⚑ EVERY entry below is unverified — see the file header. The rail assignments
+// in particular are the shakiest part: states re-bid these contracts, and the
+// vendors' own marketing pages contradict each other about who administers what.
+// Confirm the administrator with the family's award letter before the first
+// invoice, and treat a wrong rail as a guaranteed rejection.
+//
+// Keyed by state code because Student.esaProgram stores a state code and
+// railForState() resolves a school's rail from School.state. A state that runs
+// more than one billable program lists the others in `alsoRuns` rather than
+// getting a second entry; splitting those out needs a data migration first.
 export const PROGRAMS: Record<string, Program> = {
-  AZ: { rail: "classwallet", program: "Empowerment Scholarship Account", label: "Arizona ESA" },
-  FL: { rail: "stepup", program: "PEP / FES", label: "Florida PEP" },
-  IA: { rail: "odyssey", program: "Students First ESA", label: "Iowa ESA" },
-  UT: { rail: "classwallet", program: "Utah Fits All", label: "Utah Fits All" },
-  AR: { rail: "classwallet", program: "Education Freedom Account", label: "Arkansas EFA" },
+  AL: { rail: "classwallet", program: "CHOOSE Act", label: "Alabama CHOOSE Act", kind: "esa", amount: 7000, live: true, alsoRuns: ["CHOOSE Act home education award (~$2,000)"] },
+  AK: { rail: "statedirect", program: "Correspondence school allotment", label: "Alaska correspondence allotment", kind: "allotment", amount: 2700, live: true, limited: "Students enrolled in a district correspondence program" },
+  AZ: { rail: "classwallet", program: "Empowerment Scholarship Account", label: "Arizona ESA", kind: "esa", amount: 7400, live: true },
+  AR: { rail: "classwallet", program: "Education Freedom Account", label: "Arkansas EFA", kind: "esa", amount: 7600, live: true },
+  FL: { rail: "stepup", program: "Personalized Education Program", label: "Florida PEP", kind: "esa", amount: 8000, live: true, alsoRuns: ["Family Empowerment Scholarship (FES-EO / FES-UA)"] },
+  GA: { rail: "odyssey", program: "Georgia Promise Scholarship", label: "Georgia Promise Scholarship", kind: "esa", amount: 6500, live: true, limited: "Students zoned to a low-performing public school" },
+  ID: { rail: "statedirect", program: "Parental Choice Tax Credit", label: "Idaho Parental Choice Tax Credit", kind: "taxcredit", amount: 5000, live: true },
+  IN: { rail: "classwallet", program: "Education Scholarship Account", label: "Indiana ESA", kind: "esa", amount: 7500, live: true, limited: "Students with a disability or service plan" },
+  IA: { rail: "odyssey", program: "Students First ESA", label: "Iowa ESA", kind: "esa", amount: 7800, live: true },
+  LA: { rail: "odyssey", program: "LA GATOR Scholarship", label: "Louisiana LA GATOR", kind: "esa", amount: 7500, live: true },
+  MS: { rail: "statedirect", program: "Education Scholarship Account", label: "Mississippi ESA", kind: "esa", amount: 7000, live: true, limited: "Students with an IEP" },
+  MO: { rail: "statedirect", program: "MOScholars", label: "Missouri MOScholars", kind: "taxcredit", amount: 6400, live: true },
+  MT: { rail: "statedirect", program: "Education Savings Account", label: "Montana ESA", kind: "esa", amount: 8000, live: true, limited: "Students with a disability" },
+  NH: { rail: "statedirect", program: "Education Freedom Account", label: "New Hampshire EFA", kind: "esa", amount: 5200, live: true },
+  NC: { rail: "classwallet", program: "ESA+", label: "North Carolina ESA+", kind: "esa", amount: 9000, live: true, limited: "Students with a disability", alsoRuns: ["Opportunity Scholarship (private school tuition)"] },
+  OH: { rail: "classwallet", program: "Afterschool Child Enrichment (ACE)", label: "Ohio ACE", kind: "esa", amount: 1000, live: true, alsoRuns: ["EdChoice Scholarship (private school tuition)"] },
+  OK: { rail: "statedirect", program: "Parental Choice Tax Credit", label: "Oklahoma Parental Choice Tax Credit", kind: "taxcredit", amount: 7500, live: true },
+  SC: { rail: "classwallet", program: "Education Scholarship Trust Fund", label: "South Carolina ESTF", kind: "esa", amount: 7500, live: true },
+  TN: { rail: "studentfirst", program: "Education Freedom Scholarship", label: "Tennessee EFS", kind: "esa", amount: 7300, live: true, alsoRuns: ["Individualized Education Account (IEA)"] },
+  TX: { rail: "odyssey", program: "Education Savings Account", label: "Texas ESA", kind: "esa", amount: 10500, live: false, alsoRuns: ["Special-needs award (~$30,000)"] },
+  UT: { rail: "ace", program: "Utah Fits All Scholarship", label: "Utah Fits All", kind: "esa", amount: 8000, live: true },
+  WV: { rail: "studentfirst", program: "Hope Scholarship", label: "West Virginia Hope Scholarship", kind: "esa", amount: 5200, live: true },
+  WY: { rail: "odyssey", program: "Steamboat Legacy Scholarship", label: "Wyoming ESA", kind: "esa", amount: 7000, live: true },
 };
+
+// Backfill each rail's state list from PROGRAMS so the two can't drift.
+for (const [state, p] of Object.entries(PROGRAMS)) {
+  RAILS[p.rail]?.states.push(state);
+}
+
+/** Programs in the order a human scans them: alphabetical by label, which is
+ *  also alphabetical by state, because every label leads with the state name. */
+export function programOptions(): (Program & { code: string })[] {
+  return Object.entries(PROGRAMS)
+    .map(([code, p]) => ({ code, ...p }))
+    .sort((a, b) => a.label.localeCompare(b.label));
+}
 
 export function railForState(state: string): Rail | null {
   const p = PROGRAMS[state];
