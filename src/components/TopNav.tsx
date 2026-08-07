@@ -59,9 +59,12 @@ export function TopNav({
       ))}
       <span className="sp" />
       <span style={{ fontSize: 13, color: "#d5deee" }}>{userName}</span>
-      <Link href="/logout" style={{ color: "#d5deee" }}>
-        Sign out
-      </Link>
+      {/* A form, not a link — see the note in src/app/logout/route.ts. */}
+      <form method="post" action="/logout">
+        <button type="submit" className="signout">
+          Sign out
+        </button>
+      </form>
     </div>
   );
 }

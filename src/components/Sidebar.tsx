@@ -114,9 +114,13 @@ export function Sidebar({
       <div className="foot">
         {userName}
         <br />
-        <Link href="/logout" style={{ padding: "6px 0", display: "inline-block" }}>
-          Sign out
-        </Link>
+        {/* A form, not a link: signing out is destructive, so it must not be
+            reachable by a prefetch, a preload, or a stray GET. */}
+        <form method="post" action="/logout">
+          <button type="submit" className="signout">
+            Sign out
+          </button>
+        </form>
       </div>
     </nav>
   );

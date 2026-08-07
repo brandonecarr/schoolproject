@@ -184,6 +184,23 @@ h3 {
   opacity: 1;
   color: var(--mark);
 }
+/* Sign out is a form button, styled to read as the link it replaced. */
+.signout {
+  background: none;
+  border: 0;
+  padding: 6px 0;
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+  text-decoration: none;
+}
+.signout:hover {
+  text-decoration: underline;
+}
+.tnav .signout {
+  color: #d5deee;
+  font-size: 14px;
+}
 .side .foot {
   margin-top: 20px;
   padding: 16px 12px 0;
