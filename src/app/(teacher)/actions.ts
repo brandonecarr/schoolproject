@@ -26,6 +26,7 @@ import { recordOutcomesForSubmission, masteryForStudent } from "@/lib/mastery";
 import { notifyUsers, parentUserIdsFor, studentUserIdFor, familyUserIdsByRole } from "@/lib/notify";
 import { excerpt } from "@/lib/announcements";
 import { clamp01, isAnnotatable } from "@/lib/annotate";
+import { parsePins, togglePin } from "@/lib/nav";
 import { runMasteryPaths } from "@/lib/paths-run";
 import { bandFor, describeBand, isSelfReferential } from "@/lib/paths";
 import { deleteStudentData } from "@/lib/retention";
@@ -1750,4 +1751,22 @@ export async function deleteAnnotation(formData: FormData) {
   await logAudit(user.id, "annotation_deleted", id);
   revalidatePath("/grading");
   redirect("/grading");
+}
+
+// Pin or unpin a nav item for the signed-in teacher.
+//
+// Not audited: rearranging your own shortcuts is not an event anyone needs a
+// record of, and filling the audit log with it would bury the entries that
+// matter.
+export async function toggleNavPin(formData: FormData) {
+  const { user } = await requireTeacher();
+  const href = String(formData.get("href") || "");
+  const next = togglePin(parsePins(user.pinnedNav), href);
+  await prisma.user.update({
+    where: { id: user.id },
+    data: { pinnedNav: JSON.stringify(next) },
+  });
+  // Every page shows the sidebar, so the layout has to re-render everywhere.
+  revalidatePath("/", "layout");
+  redirect(String(formData.get("back") || "/dashboard"));
 }

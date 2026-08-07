@@ -47,6 +47,10 @@ model User {
   // Authorization header, so the URL itself is the credential — long-lived,
   // revocable by regenerating, and scoped to calendar data only.
   calendarToken   String?  @unique
+  // Nav shortcuts, as a JSON array of hrefs. Pins only — teachers cannot rename
+  // or reorder the groups, so a new feature always lands in its proper group
+  // whether or not anything is pinned. See the note in src/lib/nav.ts.
+  pinnedNav       String?
   schoolId        String
   role            String // owner | teacher | parent | student
   name            String

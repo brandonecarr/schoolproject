@@ -6,6 +6,7 @@ import { requireTeacher } from "@/lib/auth";
 import { Sidebar } from "@/components/Sidebar";
 import { unreadForStaff } from "@/lib/messages";
 import { unreadCountFor } from "@/lib/notify";
+import { parsePins } from "@/lib/nav";
 
 export default async function TeacherLayout({ children }: { children: React.ReactNode }) {
   const { user, school } = await requireTeacher();
@@ -20,6 +21,7 @@ export default async function TeacherLayout({ children }: { children: React.Reac
         schoolState={school?.state ?? ""}
         railLabel={school?.railLabel ?? ""}
         userName={user.name}
+        pins={parsePins(user.pinnedNav)}
         messagesUnread={messagesUnread}
         notificationsUnread={notificationsUnread}
       />
