@@ -23,6 +23,8 @@ import {
 import { packByKey } from "@/lib/outcomes";
 import { recordOutcomesForSubmission, masteryForStudent } from "@/lib/mastery";
 import { notifyUsers, parentUserIdsFor, studentUserIdFor } from "@/lib/notify";
+import { runMasteryPaths } from "@/lib/paths-run";
+import { bandFor, describeBand, isSelfReferential } from "@/lib/paths";
 import { deleteStudentData } from "@/lib/retention";
 import { newTokenValue, tokenExpiry } from "@/lib/tokens";
 import { today, periodStart } from "@/lib/dates";
@@ -228,6 +230,15 @@ export async function saveGrade(formData: FormData) {
     studentId: sub.studentId,
     assignmentId: asg.id,
     submissionId: id,
+    score,
+    possible: asg.points,
+  });
+
+  // A mastery path may now have work to hand this student.
+  await runMasteryPaths({
+    schoolId: school!.id,
+    studentId: sub.studentId,
+    assignmentId: asg.id,
     score,
     possible: asg.points,
   });
@@ -669,6 +680,46 @@ export async function deleteSample(formData: FormData) {
   }
   revalidatePath(`/students/${studentId}`);
   redirect(`/students/${studentId}`);
+}
+
+// --- Mastery paths ---
+export async function addPathRule(formData: FormData) {
+  const { user, school } = await requireTeacher();
+  const assignmentId = String(formData.get("assignmentId"));
+  const thenAssignmentId = String(formData.get("thenAssignmentId"));
+  if (!assignmentId || !thenAssignmentId) redirect("/paths?err=missing");
+  if (isSelfReferential(assignmentId, thenAssignmentId)) redirect("/paths?err=self");
+
+  const preset = String(formData.get("preset") || "below") as "below" | "atOrAbove" | "between";
+  const a = Number(formData.get("a")) || 0;
+  const b = Number(formData.get("b")) || 0;
+  const { minPct, maxPct } = bandFor(preset, a, b);
+
+  await prisma.pathRule.create({
+    data: {
+      schoolId: school!.id,
+      assignmentId,
+      minPct,
+      maxPct,
+      thenAssignmentId,
+      note: String(formData.get("note") || "").slice(0, 300),
+    },
+  });
+  await logAudit(user.id, "path_rule_added", `${assignmentId} ${minPct}-${maxPct} → ${thenAssignmentId}`);
+  revalidatePath("/paths");
+  redirect("/paths?added=1");
+}
+
+export async function deletePathRule(formData: FormData) {
+  const { user, school } = await requireTeacher();
+  const id = String(formData.get("id"));
+  const r = await prisma.pathRule.findFirst({ where: { id, schoolId: school!.id } });
+  if (r) {
+    await prisma.pathRule.delete({ where: { id } });
+    await logAudit(user.id, "path_rule_deleted", id);
+  }
+  revalidatePath("/paths");
+  redirect("/paths?deleted=1");
 }
 
 // --- Item banks (reusable questions) ---
@@ -1161,6 +1212,13 @@ export async function saveGradebook(formData: FormData) {
       studentId: sub.studentId,
       assignmentId: sub.assignmentId,
       submissionId: sub.id,
+      score: next,
+      possible: asg.points,
+    });
+    await runMasteryPaths({
+      schoolId,
+      studentId: sub.studentId,
+      assignmentId: sub.assignmentId,
       score: next,
       possible: asg.points,
     });

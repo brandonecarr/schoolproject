@@ -21,6 +21,7 @@ import { renderText } from "@/lib/markdown";
 export type SubData = {
   id: string;
   status: string;
+  assignedReason?: string;
   responseText: string;
   answersJson: string;
   revisionNote: string;
@@ -97,6 +98,12 @@ export function WorkCard({
         <a className="reslink small" href={`/files/${asg.resourceFileId}`} target="_blank" rel="noreferrer">
           ▤ Open the attached resource
         </a>
+      )}
+
+      {sub.assignedReason && (
+        <div className="notice info" style={{ margin: "10px 0 0" }}>
+          <strong>Why you have this:</strong> {sub.assignedReason}
+        </div>
       )}
 
       {returned && sub.revisionNote && (

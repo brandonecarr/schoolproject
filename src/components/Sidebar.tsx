@@ -29,6 +29,7 @@ const NAV: { group: string; items: { href: string; label: string; icon: string }
       { href: "/banks", label: "Question banks", icon: "assignments" },
       { href: "/grading", label: "Grading queue", icon: "grading" },
       { href: "/gradebook", label: "Gradebook", icon: "grading" },
+      { href: "/paths", label: "Mastery paths", icon: "evidence" },
       { href: "/outcomes", label: "Standards", icon: "evidence" },
       { href: "/mastery", label: "Mastery board", icon: "evidence" },
     ],

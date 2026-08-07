@@ -61,6 +61,7 @@ export default async function StudentWorkPage({
   const toSub = (s: (typeof subsRaw)[number]): SubData => ({
     id: s.id,
     status: s.status,
+    assignedReason: s.assignedReason,
     responseText: s.responseText,
     answersJson: s.answersJson,
     revisionNote: s.revisionNote,

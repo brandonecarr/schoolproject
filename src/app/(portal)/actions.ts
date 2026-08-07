@@ -16,6 +16,7 @@ import { deleteStudentData } from "@/lib/retention";
 import { autoScoreQuiz, parseItems, parseQuizAnswers } from "@/lib/lms";
 import { recordOutcomesForSubmission } from "@/lib/mastery";
 import { notifyUsers, staffUserIdsFor } from "@/lib/notify";
+import { runMasteryPaths } from "@/lib/paths-run";
 
 // Image/PDF types a student may turn in (bytes stored in the DB, like samples).
 const ALLOWED: Record<string, string> = {
@@ -132,6 +133,13 @@ export async function submitWork(formData: FormData) {
         score: auto,
         possible: asg.points,
       });
+      await runMasteryPaths({
+        schoolId: user.schoolId,
+        studentId: user.studentId!,
+        assignmentId: asg.id,
+        score: auto,
+        possible: asg.points,
+      });
     }
   } else if (asg.type === "checkoff") {
     const reflection = String(formData.get("reflection") || "").trim().slice(0, 500);
@@ -153,6 +161,13 @@ export async function submitWork(formData: FormData) {
       studentId: user.studentId!,
       assignmentId: asg.id,
       submissionId: id,
+      score: asg.points,
+      possible: asg.points,
+    });
+    await runMasteryPaths({
+      schoolId: user.schoolId,
+      studentId: user.studentId!,
+      assignmentId: asg.id,
       score: asg.points,
       possible: asg.points,
     });

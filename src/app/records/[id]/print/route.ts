@@ -51,7 +51,7 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
   const start = url.searchParams.get("start") || periodStart();
   const end = url.searchParams.get("end") || today();
 
-  const [e, mastery, courses, report] = await Promise.all([
+  const [e, mastery, courses, report, targeted] = await Promise.all([
     evidenceFor(id, start, end),
     masteryForStudent(id, student.schoolId, { start, end }),
     prisma.course.findMany({ where: { schoolId: student.schoolId } }),
@@ -59,6 +59,12 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
     prisma.progressReport.findFirst({
       where: { studentId: id, status: "approved" },
       orderBy: { periodEnd: "desc" },
+    }),
+    // Work a mastery path handed this student in response to their results —
+    // documented, individualised instruction.
+    prisma.submission.findMany({
+      where: { studentId: id, NOT: { assignedReason: "" } },
+      orderBy: { createdAt: "desc" },
     }),
   ]);
   const schoolRow = school ?? (await prisma.school.findUnique({ where: { id: student.schoolId } }));
@@ -208,6 +214,19 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
   <p style="margin:0 0 6px">Mastered <strong>${masteredCount}</strong> of <strong>${assessed.length}</strong> standards assessed this period.</p>
   <table><thead><tr><th style="width:90px">Subject</th><th style="width:92px">Standard</th><th>Skill</th><th style="width:60px" class="num">Level</th><th style="width:110px">Status</th></tr></thead>
   <tbody>${masteryRows}</tbody></table>`
+      : ""
+  }
+
+  ${
+    targeted.length
+      ? `<h2>Individualised instruction</h2>
+  <p style="margin:0 0 4px">${targeted.length} assignment${targeted.length === 1 ? " was" : "s were"} given to this student specifically, in response to assessed performance.</p>
+  <table><tbody>${targeted
+    .map((t) => {
+      const a = e.submissions.find((x) => x.assignmentId === t.assignmentId);
+      return `<tr><td style="width:220px">${esc(a?.assignmentTitle ?? "Assignment")}</td><td>${esc(t.assignedReason)}</td></tr>`;
+    })
+    .join("")}</tbody></table>`
       : ""
   }
 

@@ -111,6 +111,9 @@ model Submission {
   returnedAt   String? // ISO — when a teacher returned it for revision
   revisionNote String  @default("") // teacher's note explaining the return
   draftSavedAt String? // ISO — last draft save
+  // Set when a mastery path assigned this work automatically, so the student
+  // can see why it appeared and the record shows the instruction was targeted.
+  assignedReason String @default("")
   createdAt    DateTime @default(now())
 }
 
@@ -126,6 +129,27 @@ model Worksheet {
   instructionsFormat String @default("markdown")
   itemsJson    String   @default("[]")
   createdAt    DateTime @default(now())
+}
+
+// Mastery path: "when a student scores in THIS range on THIS assignment, give
+// them THAT one next." Support for the student who struggled, extension for the
+// one who raced ahead — and both are documented automatically, which is exactly
+// the individualised-instruction evidence an ESA reviewer wants to see.
+//
+// The range is an inclusive percentage band, so one code path covers "below
+// 70", "70 and above", and "between 50 and 79".
+model PathRule {
+  id               String   @id @default(cuid())
+  schoolId         String
+  assignmentId     String // the trigger
+  minPct           Int      @default(0)
+  maxPct           Int      @default(100)
+  thenAssignmentId String // what to assign next
+  note             String   @default("") // shown to the student, in the teacher's words
+  createdAt        DateTime @default(now())
+
+  @@index([schoolId])
+  @@index([assignmentId])
 }
 
 // A reusable pool of questions. Write a question once, drop it into any quiz or
