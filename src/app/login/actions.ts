@@ -3,6 +3,7 @@
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/db";
+import { asSystem, enterTenant } from "@/lib/tenant-context";
 import { verifyPassword, newSessionId, logAudit, SESSION_COOKIE, SESSION_COOKIE_OPTIONS } from "@/lib/auth";
 import { currentSlug } from "@/lib/tenant-server";
 
@@ -18,29 +19,38 @@ export async function login(formData: FormData) {
   // parent's credentials working on another school's subdomain — the lookup
   // never leaves this school.
   const slug = await currentSlug();
+  // System: this IS authentication — no tenant exists until a credential
+  // matches. The slug lookup and the candidate search are what decide it.
   let candidates;
   if (slug) {
-    const school = await prisma.school.findUnique({ where: { slug }, select: { id: true } });
-    candidates = school ? await prisma.user.findMany({ where: { schoolId: school.id, email } }) : [];
+    const school = await asSystem(() =>
+      prisma.school.findUnique({ where: { slug }, select: { id: true } })
+    );
+    candidates = school
+      ? await asSystem(() => prisma.user.findMany({ where: { schoolId: school.id, email } }))
+      : [];
   } else {
     // Untenanted: localhost, a preview URL, or tenancy not switched on. No
     // address to scope by, so match on the credentials and only proceed when
     // exactly one account is satisfied — signing someone into an arbitrary one
     // of several schools would be worse than asking.
-    candidates = await prisma.user.findMany({ where: { email } });
+    candidates = await asSystem(() => prisma.user.findMany({ where: { email } }));
   }
   const matches = candidates.filter((u) => verifyPassword(password, u.password));
 
   if (matches.length === 0) {
-    await logAudit(null, "login_failed", email);
+    await asSystem(() => logAudit(null, "login_failed", email));
     redirect("/login?e=bad");
   }
   if (matches.length > 1) {
     // Only reachable untenanted: the same address and password at two schools.
-    await logAudit(null, "login_ambiguous", email);
+    await asSystem(() => logAudit(null, "login_ambiguous", email));
     redirect("/login?e=ambiguous");
   }
   const user = matches[0];
+  // Authenticated. The session write and the audit entry belong to this
+  // school, so bind it — same mechanism getSession uses.
+  enterTenant(user.schoolId);
 
   const sid = newSessionId();
   await prisma.session.create({ data: { id: sid, userId: user.id } });

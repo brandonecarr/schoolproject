@@ -20,6 +20,7 @@
 
 import { NextResponse, type NextRequest } from "next/server";
 import { prisma } from "@/lib/db";
+import { asSystem, enterTenant } from "@/lib/tenant-context";
 import { tokenUsable } from "@/lib/tokens";
 import { newSessionId, SESSION_COOKIE, SESSION_COOKIE_OPTIONS, logAudit } from "@/lib/auth";
 import { currentHostKind, currentOrigin } from "@/lib/tenant-server";
@@ -37,10 +38,13 @@ export async function GET(request: NextRequest) {
   const value = request.nextUrl.searchParams.get("t") || "";
   if (!value) return refuse();
 
-  const token = await prisma.token.findUnique({ where: { token: value } });
+  // System: the handoff token IS the authentication. The moment it resolves,
+  // its school is the tenant for every check and write below.
+  const token = await asSystem(() => prisma.token.findUnique({ where: { token: value } }));
   if (!token || token.type !== "signin_handoff" || !token.userId || !tokenUsable(token)) {
     return refuse();
   }
+  enterTenant(token.schoolId);
 
   const user = await prisma.user.findUnique({ where: { id: token.userId } });
   if (!user || user.schoolId !== token.schoolId) return refuse();

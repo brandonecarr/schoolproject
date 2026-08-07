@@ -19,6 +19,7 @@
 // their own. Nobody sees another family's.
 
 import { prisma } from "@/lib/db";
+import { asSystem, enterTenant } from "@/lib/tenant-context";
 import { buildIcal, type IcalEntry, type CalEvent } from "@/lib/calendar";
 import { threadStudentIds, isStaff as isStaffRole } from "@/lib/messages";
 import { icalLocalStamp } from "@/lib/conferences";
@@ -38,14 +39,18 @@ export async function GET(_request: Request, { params }: { params: Promise<{ tok
   // expect to see in the URL.
   const token = raw.replace(/\.ics$/i, "");
 
+  // System: the token in the URL is the credential, and it is looked up
+  // across schools by design — that is what a calendar token is for.
   const user = token
-    ? await prisma.user.findUnique({ where: { calendarToken: token } })
+    ? await asSystem(() => prisma.user.findUnique({ where: { calendarToken: token } }))
     : null;
   // 404 rather than 401: an unauthenticated probe should not be able to tell a
   // wrong token from a revoked one.
   if (!user || !user.schoolId) {
     return new Response("Not found", { status: 404 });
   }
+  // The subscriber is real; every read below is their school's data only.
+  enterTenant(user.schoolId);
 
   const school = await prisma.school.findUnique({ where: { id: user.schoolId } });
   if (!school) return new Response("Not found", { status: 404 });

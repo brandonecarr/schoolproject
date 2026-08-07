@@ -2,6 +2,7 @@
 // src/lib/observations.ts the same way lib/mastery.ts pairs with lib/outcomes.ts.
 
 import { prisma } from "@/lib/db";
+import { asSystem } from "@/lib/tenant-context";
 import {
   verificationFromCounts,
   NO_EVIDENCE,
@@ -108,10 +109,19 @@ function bump(m: Map<string, EvidenceCounts>, key: string | null, outcome: strin
 
 export async function verificationCounts(schoolId: string): Promise<VerificationIndex> {
   const [platform, school] = await Promise.all([
-    prisma.railObservation.groupBy({
-      by: ["railId", "programCode", "outcome"],
-      _count: { _all: true },
-    }),
+    // System, and the ONLY tenant-crossing read in the product: the platform
+    // rollup that answers "has anyone, anywhere, watched this rail survive a
+    // real cycle?". groupBy returns counts alone — no reason text, no school
+    // ids — which is exactly the boundary the privacy note above draws.
+    // Under row-level security a tenant-scoped run of this query would not
+    // fail; it would silently count only this school and quietly claim the
+    // platform has seen less than it has. asSystem keeps it honest.
+    asSystem(() =>
+      prisma.railObservation.groupBy({
+        by: ["railId", "programCode", "outcome"],
+        _count: { _all: true },
+      })
+    ),
     prisma.railObservation.groupBy({
       by: ["railId", "programCode", "outcome"],
       where: { schoolId },

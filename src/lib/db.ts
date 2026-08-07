@@ -31,8 +31,60 @@
 
 import { PrismaClient } from "@/generated/prisma/client";
 import { PrismaPg } from "@prisma/adapter-pg";
+import { currentTenantContext } from "@/lib/tenant-context";
 
 const globalForPrisma = globalThis as unknown as { prisma?: PrismaClient };
+
+/**
+ * ROW-LEVEL SECURITY, the application half.
+ *
+ * Every model operation is wrapped in a two-statement transaction: first a
+ * set_config() that tells Postgres which tenant this work is for (or that it
+ * is a sanctioned system operation), then the query itself. The RLS policies
+ * key on those settings. set_config's third argument is `true` — transaction-
+ * local — which is what makes this safe through Supabase's transaction-mode
+ * pooler: the setting dies with the transaction and can never leak onto
+ * whatever connection the pooler hands out next.
+ *
+ * When there is NO context, no setting is issued and the query runs bare. The
+ * policies then see NULL and return nothing. That asymmetry is the design:
+ * the missing-context case must not pay a transaction round-trip on every
+ * public page, and it must fail CLOSED at the database rather than being
+ * patched open here.
+ *
+ * ENFORCEMENT DEPENDS ON THE ROLE. The `postgres` role on Supabase holds
+ * BYPASSRLS, so while DATABASE_URL points at it, the policies are dormant and
+ * this wrapper is inert bookkeeping. Enforcement begins when DATABASE_URL
+ * switches to the `cohort_app` role (no BYPASSRLS) created by
+ * scripts/create-app-role.mjs. That two-step is deliberate: ship the wiring,
+ * prove it, then turn the key — never both at once.
+ *
+ * Known limit, accepted: client-level $transaction and $queryRaw are not
+ * intercepted. The codebase has no raw queries and no $transaction call sites
+ * (retention.ts was refactored off them for exactly this reason), and
+ * tests/rls.test.ts fails the build if either reappears.
+ */
+function withRls(base: PrismaClient): PrismaClient {
+  const extended = base.$extends({
+    query: {
+      $allModels: {
+        async $allOperations({ args, query }) {
+          const ctx = currentTenantContext();
+          if (!ctx) return query(args);
+          const guc =
+            ctx.kind === "system"
+              ? base.$executeRaw`SELECT set_config('app.bypass_rls', 'on', true)`
+              : base.$executeRaw`SELECT set_config('app.tenant_id', ${ctx.tenantId}, true)`;
+          const [, result] = await base.$transaction([guc, query(args) as never]);
+          return result;
+        },
+      },
+    },
+  });
+  // The extension changes the static type but not the model API surface the
+  // app uses. The facade stays PrismaClient so ~200 call sites don't churn.
+  return extended as unknown as PrismaClient;
+}
 
 function makeClient(): PrismaClient {
   const connectionString = process.env.DATABASE_URL;
@@ -40,10 +92,12 @@ function makeClient(): PrismaClient {
     throw new Error("DATABASE_URL is not set — point it at your Supabase Postgres database.");
   }
   const adapter = new PrismaPg({ connectionString });
-  return new PrismaClient({
-    adapter,
-    log: process.env.NODE_ENV === "development" ? ["error", "warn"] : ["error"],
-  });
+  return withRls(
+    new PrismaClient({
+      adapter,
+      log: process.env.NODE_ENV === "development" ? ["error", "warn"] : ["error"],
+    })
+  );
 }
 
 let cached: PrismaClient | undefined;

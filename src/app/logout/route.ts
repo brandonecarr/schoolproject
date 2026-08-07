@@ -13,6 +13,7 @@
 import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { prisma } from "@/lib/db";
+import { asSystem } from "@/lib/tenant-context";
 import { SESSION_COOKIE } from "@/lib/auth";
 import { currentOrigin } from "@/lib/tenant-server";
 
@@ -20,7 +21,9 @@ export async function POST() {
   const jar = await cookies();
   const sid = jar.get(SESSION_COOKIE)?.value;
   if (sid) {
-    await prisma.session.deleteMany({ where: { id: sid } });
+    // System: sign-out happens before any tenant is bound, and it touches
+    // exactly one row, keyed by the cookie's own session id.
+    await asSystem(() => prisma.session.deleteMany({ where: { id: sid } }));
     jar.delete(SESSION_COOKIE);
   }
   // 303 so the browser follows with a GET rather than re-posting. Built from

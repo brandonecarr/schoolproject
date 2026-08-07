@@ -18,6 +18,7 @@ import "server-only";
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/db";
+import { asSystem } from "@/lib/tenant-context";
 import { classifyHost, type HostKind } from "@/lib/tenant";
 import { originFor, rootDomain } from "@/lib/tenant-config";
 
@@ -99,10 +100,11 @@ export { originFor } from "@/lib/tenant-config";
 export async function redirectTokenToTenant(schoolId: string, path: string): Promise<void> {
   const kind = await currentHostKind();
   if (kind.kind !== "apex") return;
-  const school = await prisma.school.findUnique({
-    where: { id: schoolId },
-    select: { slug: true },
-  });
+  // System: runs while following a tokenised link, before any session exists.
+  // Reads one slug, nothing more.
+  const school = await asSystem(() =>
+    prisma.school.findUnique({ where: { id: schoolId }, select: { slug: true } })
+  );
   const origin = school ? originFor(school.slug) : null;
   redirect(origin ? `${origin}${path}` : "/");
 }

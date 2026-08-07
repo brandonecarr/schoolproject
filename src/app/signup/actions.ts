@@ -8,6 +8,7 @@
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/db";
+import { asSystem, enterTenant } from "@/lib/tenant-context";
 import { availableSlug, isUsableSlug, slugify } from "@/lib/tenant";
 import { originFor } from "@/lib/tenant-server";
 import { newTokenValue, tokenExpiryMinutes } from "@/lib/tokens";
@@ -37,7 +38,11 @@ export async function signup(formData: FormData) {
   const asked = slugify(String(formData.get("slug") || ""));
   if (formData.get("slug") && !asked) redirect("/signup?error=slugbad");
 
-  const taken = (await prisma.school.findMany({ select: { slug: true } })).map((s) => s.slug);
+  // System: slug uniqueness is global by definition, and creating the school
+  // cannot be scoped to a tenant that does not exist yet.
+  const taken = (
+    await asSystem(() => prisma.school.findMany({ select: { slug: true } }))
+  ).map((s) => s.slug);
   let slug: string | null;
   if (asked) {
     // Someone typed this one, so it is not ours to quietly renumber into
@@ -49,9 +54,13 @@ export async function signup(formData: FormData) {
     if (!slug) redirect("/signup?error=slugbad");
   }
 
-  const school = await prisma.school.create({
-    data: { name: schoolName, slug, state, esaAmount, address: "" },
-  });
+  const school = await asSystem(() =>
+    prisma.school.create({
+      data: { name: schoolName, slug, state, esaAmount, address: "" },
+    })
+  );
+  // The tenant exists now; everything else in this signup belongs to it.
+  enterTenant(school.id);
   const owner = await prisma.user.create({
     data: { schoolId: school.id, role: "owner", name, email, password: hashPassword(password) },
   });

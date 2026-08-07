@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { prisma } from "@/lib/db";
+import { asSystem, enterTenant } from "@/lib/tenant-context";
 import { tokenUsable } from "@/lib/tokens";
 import { redirectTokenToTenant } from "@/lib/tenant-server";
 import { acceptReset } from "../actions";
@@ -31,7 +32,9 @@ export default async function ResetPage({
   const { token } = await params;
   const { error } = await searchParams;
 
-  const t = await prisma.token.findUnique({ where: { token } });
+  // System: a tokenised link is followed before any session exists.
+  const t = await asSystem(() => prisma.token.findUnique({ where: { token } }));
+  if (t) enterTenant(t.schoolId);
   // Sent before this school had its own address, or opened from an
   // inbox that rewrote the link. The token knows where it belongs.
   if (t) await redirectTokenToTenant(t.schoolId, `/reset/${token}`);

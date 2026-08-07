@@ -14,6 +14,7 @@ import { redirect } from "next/navigation";
 import { prisma } from "@/lib/db";
 import { railForState, type Rail } from "@/lib/rules";
 import { currentHostKind } from "@/lib/tenant-server";
+import { asSystem, enterTenant } from "@/lib/tenant-context";
 // Prisma 7's generator names row types `<Model>Model`; alias to the plain names.
 import type { UserModel as User, SchoolModel as School } from "@/generated/prisma/models";
 
@@ -78,11 +79,26 @@ export type Session = {
 };
 
 // Read the current session from the cookie. Returns null if not signed in.
+//
+// TENANT BINDING happens here, once. The lookups inside run asSystem — they
+// are what DETERMINE the tenant, so they cannot yet be scoped by it — and the
+// last thing this function does on success is enterTenant(user.schoolId),
+// which binds every later query in the calling page or action to that school.
+// See tenant-context.ts for why enterWith reaches the caller's continuation.
 export async function getSession(): Promise<Session | null> {
   const jar = await cookies();
   const sid = jar.get(SESSION_COOKIE)?.value;
   if (!sid) return null;
 
+  const resolved = await asSystem(() => resolveSession(sid));
+  if (!resolved) return null;
+  if (resolved.user.schoolId) enterTenant(resolved.user.schoolId);
+  return resolved;
+}
+
+// System context: this IS the authentication step — nothing is scoped until it
+// answers who is asking.
+async function resolveSession(sid: string): Promise<Session | null> {
   const session = await prisma.session.findUnique({ where: { id: sid } });
   if (!session) return null;
 

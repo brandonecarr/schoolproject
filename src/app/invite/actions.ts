@@ -7,6 +7,7 @@
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/db";
+import { asSystem, enterTenant } from "@/lib/tenant-context";
 import { hashPassword, newSessionId } from "@/lib/password";
 import { SESSION_COOKIE, SESSION_COOKIE_OPTIONS, logAudit } from "@/lib/auth";
 import { tokenUsable } from "@/lib/tokens";
@@ -16,10 +17,13 @@ export async function acceptInvite(formData: FormData) {
   const password = String(formData.get("password") || "");
   const name = String(formData.get("name") || "").trim();
 
-  const t = await prisma.token.findUnique({ where: { token } });
+  // System: the invite token authenticates this request. Once it names its
+  // school, every write below is bound to that school.
+  const t = await asSystem(() => prisma.token.findUnique({ where: { token } }));
   if (!t || t.type !== "parent_invite" || !tokenUsable(t)) {
     redirect(`/invite/${token}?error=1`);
   }
+  enterTenant(t.schoolId);
   const email = (t.email || "").toLowerCase();
   // Scoped to the school that issued the invite. An address already in use at
   // another school is a different person's account there, or the same person

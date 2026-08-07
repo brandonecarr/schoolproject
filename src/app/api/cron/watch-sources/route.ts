@@ -12,6 +12,7 @@
 // sweep can be triggered by hand without pretending to be the scheduler.
 
 import { NextResponse } from "next/server";
+import { asSystem } from "@/lib/tenant-context";
 import { runSweep } from "@/lib/watch-run";
 
 // Node runtime: the sweep uses node:crypto and needs a longer budget than the
@@ -47,7 +48,9 @@ async function handle(request: Request) {
   // ?only=az-esa,ia-esa — check a subset, for debugging a single source.
   const only = url.searchParams.get("only")?.split(",").map((s) => s.trim()).filter(Boolean);
 
-  const report = await runSweep(only);
+  // System: the sweep reads and writes the platform's source-watch tables,
+  // which belong to no school.
+  const report = await asSystem(() => runSweep(only));
 
   // Summary only. The full text lives in SourceSnapshot; echoing it here would
   // put whole government pages into log storage every day for no benefit.

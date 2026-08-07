@@ -10,6 +10,7 @@
 // DOES remove them, because they contain the child's PII.
 
 import { prisma } from "@/lib/db";
+import { asSystem, withTenant } from "@/lib/tenant-context";
 import { logAudit } from "@/lib/auth";
 
 export type PurgeResult = {
@@ -28,10 +29,20 @@ export async function purgeSchool(school: { id: string; retentionDays: number })
   const cutoffDate = cutoff.toISOString().slice(0, 10); // YYYY-MM-DD (date-string fields)
   const cutoffIso = cutoff.toISOString(); // ISO string / DateTime fields
 
-  const [attendance, observations, submissions, files] = await prisma.$transaction([
-    prisma.attendance.deleteMany({ where: { schoolId: school.id, date: { lt: cutoffDate } } }),
-    prisma.observation.deleteMany({ where: { schoolId: school.id, date: { lt: cutoffDate } } }),
-    prisma.submission.deleteMany({ where: { schoolId: school.id, createdAt: { lt: cutoff } } }),
+  // Sequential rather than $transaction, deliberately. The RLS extension in
+  // db.ts wraps every operation in its own set_config transaction, which does
+  // not compose with a client-level batch. Atomicity buys nothing here anyway:
+  // every delete is idempotent against the same cutoff, so a crash midway
+  // leaves work the next nightly run finishes.
+  const attendance = await prisma.attendance.deleteMany({
+    where: { schoolId: school.id, date: { lt: cutoffDate } },
+  });
+  const observations = await prisma.observation.deleteMany({
+    where: { schoolId: school.id, date: { lt: cutoffDate } },
+  });
+  const submissions = await prisma.submission.deleteMany({
+    where: { schoolId: school.id, createdAt: { lt: cutoff } },
+  });
     // studentId is required here, not incidental. A FileRec with a null
     // studentId is explicitly NOT child data — it's a teacher-attached
     // assignment resource, or the school's own logo. Purging those on the
@@ -39,10 +50,9 @@ export async function purgeSchool(school: { id: string; retentionDays: number })
     // takes assignment resources with it, neither of which this window governs.
     // Child files are exactly the ones carrying a studentId, and a family's
     // right-to-deletion request removes them by that same key below.
-    prisma.fileRec.deleteMany({
-      where: { schoolId: school.id, studentId: { not: null }, capturedAt: { lt: cutoffIso } },
-    }),
-  ]);
+  const files = await prisma.fileRec.deleteMany({
+    where: { schoolId: school.id, studentId: { not: null }, capturedAt: { lt: cutoffIso } },
+  });
 
   const result: PurgeResult = {
     schoolId: school.id,
@@ -61,9 +71,15 @@ export async function purgeSchool(school: { id: string; retentionDays: number })
 
 // Run the retention purge across every school (the nightly job).
 export async function purgeAllSchools(): Promise<PurgeResult[]> {
-  const schools = await prisma.school.findMany({ select: { id: true, retentionDays: true } });
+  // System: the nightly job is the one caller that legitimately spans schools.
+  const schools = await asSystem(() =>
+    prisma.school.findMany({ select: { id: true, retentionDays: true } })
+  );
   const results: PurgeResult[] = [];
-  for (const s of schools) results.push(await purgeSchool(s));
+  // Each school's purge runs AS that school. Under row-level security this
+  // means a bug in purgeSchool cannot reach past the school being processed —
+  // the strongest possible containment for the most destructive code we have.
+  for (const s of schools) results.push(await withTenant(s.id, () => purgeSchool(s)));
   return results;
 }
 
@@ -88,16 +104,17 @@ export async function deleteStudentData(
   const student = await prisma.student.findFirst({ where: { id: studentId, schoolId } });
   if (!student) return null;
 
-  const [attendance, observations, submissions, files, invoices, payments, logins] =
-    await prisma.$transaction([
-      prisma.attendance.deleteMany({ where: { studentId, schoolId } }),
-      prisma.observation.deleteMany({ where: { studentId, schoolId } }),
-      prisma.submission.deleteMany({ where: { studentId, schoolId } }),
-      prisma.fileRec.deleteMany({ where: { studentId, schoolId } }),
-      prisma.invoice.deleteMany({ where: { studentId, schoolId } }),
-      prisma.payment.deleteMany({ where: { studentId, schoolId } }),
-      prisma.user.deleteMany({ where: { studentId, schoolId, role: "student" } }),
-    ]);
+  // Sequential for the same reason as purgeSchool above. Right-to-deletion is
+  // rerunnable by construction — every delete targets the same studentId — so
+  // a crash midway is an incomplete deletion the retry completes, not a
+  // corrupt state.
+  const attendance = await prisma.attendance.deleteMany({ where: { studentId, schoolId } });
+  const observations = await prisma.observation.deleteMany({ where: { studentId, schoolId } });
+  const submissions = await prisma.submission.deleteMany({ where: { studentId, schoolId } });
+  const files = await prisma.fileRec.deleteMany({ where: { studentId, schoolId } });
+  const invoices = await prisma.invoice.deleteMany({ where: { studentId, schoolId } });
+  const payments = await prisma.payment.deleteMany({ where: { studentId, schoolId } });
+  const logins = await prisma.user.deleteMany({ where: { studentId, schoolId, role: "student" } });
 
   // Detach the child from any parent's studentIdsJson.
   const parents = await prisma.user.findMany({ where: { schoolId, role: "parent" } });

@@ -8,6 +8,7 @@
 // /api/cron/watch-sources about why a GET may write here.
 
 import { NextResponse } from "next/server";
+import { asSystem } from "@/lib/tenant-context";
 import { runInterpretation } from "@/lib/interpret-run";
 
 export const runtime = "nodejs";
@@ -37,7 +38,8 @@ async function handle(request: Request) {
   // opt-in per run AND requires GITHUB_TOKEN. Without ?pr=1 the job only stores
   // proposals for review in /proposals.
   const openPr = new URL(request.url).searchParams.get("pr") === "1";
-  const report = await runInterpretation({ openPr });
+  // System: rule interpretation is platform work — it belongs to no school.
+  const report = await asSystem(() => runInterpretation({ openPr }));
   return NextResponse.json(report);
 }
 
