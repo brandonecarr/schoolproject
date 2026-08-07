@@ -72,8 +72,7 @@ export function SlugField({ root }: { root: string }) {
         <span className="su-root">.{root || "your-domain"}</span>
       </div>
       <p className="small muted" id="slughelp" style={{ margin: "6px 0 0" }}>
-        This is where you and your families will sign in, and it stays the same even if you rename
-        the school later. Short is better.
+        Where you and your families sign in. Permanent — keep it short.
       </p>
     </div>
   );

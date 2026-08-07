@@ -2,8 +2,9 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { signup } from "./actions";
 import { SlugField } from "./SlugField";
+import { StateNote } from "./StateNote";
 import { rootDomain } from "@/lib/tenant-config";
-import { configuredStates } from "@/lib/rules";
+import { PROGRAMS } from "@/lib/rules";
 
 export const metadata: Metadata = { title: "Create your school — Cohort" };
 export const dynamic = "force-dynamic";
@@ -23,7 +24,9 @@ export default async function SignupPage({
   const { error } = await searchParams;
   const message = error ? ERRORS[error] : undefined;
   const root = rootDomain();
-  const states = configuredStates();
+  // Code -> programme label, e.g. AZ -> "Arizona ESA". Only what the note
+  // needs; the client component gets no more of the rules table than that.
+  const programs = Object.fromEntries(Object.entries(PROGRAMS).map(([c, p]) => [c, p.label]));
 
   return (
     <div className="authplain">
@@ -37,9 +40,6 @@ export default async function SignupPage({
         </div>
 
         <h1>Start your school</h1>
-        <p className="authsub">
-          Your school and your owner account. Students, families and staff come next.
-        </p>
 
         {message && <div className="notice bad">{message}</div>}
 
@@ -69,15 +69,13 @@ export default async function SignupPage({
               <input id="esaAmount" name="esaAmount" type="number" min={0} defaultValue={7400} />
             </div>
           </div>
-          {/* Derived from PROGRAMS, never written out. The hand-written version
-              of this sentence named five states long after twenty-three were
-              configured, which is eighteen states of founders told, on the
-              signup form, that we had nothing for them. */}
-          <p className="small muted" style={{ margin: "6px 0 0" }}>
-            Reimbursement rules are configured for {states.length} states —{" "}
-            <span className="mono">{states.join(" ")}</span>. Any other state works too; you just
-            won&apos;t get program-specific checks on your invoices.
-          </p>
+          {/* Was a paragraph listing all 23 configured state codes. A founder
+              cannot change their state, so the coverage list answered a
+              question nobody was asking while pushing the form off the screen.
+              StateNote answers the real one — "what about mine?" — in one line,
+              and only once there is a state to answer about. Still derived
+              from PROGRAMS, so it cannot go stale. */}
+          <StateNote programs={programs} />
 
           <div className="sep" style={{ margin: "18px 0" }} />
           <label htmlFor="name">Your name</label>
@@ -100,8 +98,7 @@ export default async function SignupPage({
         </form>
 
         <p className="small muted" style={{ marginTop: 14, textAlign: "center" }}>
-          Already have a school? Sign in at your school&apos;s own address.{" "}
-          <Link href="/">Back to the home page</Link>.
+          Already have a school? Sign in at its own address. <Link href="/">Home</Link>
         </p>
       </main>
     </div>
