@@ -61,9 +61,14 @@ export default async function StudentPage({
           </div>
           <h1>{s.name}</h1>
         </div>
-        <Link className="btn" href="/invoices">
-          Build invoice
-        </Link>
+        <div className="row" style={{ gap: 8 }}>
+          <Link className="btn sec" href={`/students/${s.id}/portfolio`}>
+            Portfolio
+          </Link>
+          <Link className="btn" href="/invoices">
+            Build invoice
+          </Link>
+        </div>
       </div>
 
       <div className="card">

@@ -12,6 +12,7 @@ import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/db";
 import { requireRole, requireUser, logAudit } from "@/lib/auth";
 import { canSee } from "@/lib/announcements";
+import { move, nextPosition } from "@/lib/portfolio";
 import { hashPassword } from "@/lib/password";
 import { deleteStudentData } from "@/lib/retention";
 import { autoScoreQuiz, parseItems, parseQuizAnswers } from "@/lib/lms";
@@ -356,4 +357,100 @@ export async function acknowledgeAnnouncement(formData: FormData) {
   }
   revalidatePath(back);
   redirect(back);
+}
+
+// --- Portfolio curation ---
+// The student chooses what represents them and says why. Every action here
+// re-derives the student id from the SESSION, never from the form: a posted
+// studentId would let one child write into another's portfolio.
+
+async function ownPortfolio(): Promise<{ userId: string; studentId: string; schoolId: string; name: string }> {
+  const { user } = await requireRole("student");
+  if (!user.studentId) redirect("/student");
+  return { userId: user.id, studentId: user.studentId, schoolId: user.schoolId, name: user.name };
+}
+
+export async function addPortfolioEntry(formData: FormData) {
+  const me = await ownPortfolio();
+  const submissionId = String(formData.get("submissionId") || "") || null;
+  const fileId = String(formData.get("fileId") || "") || null;
+  if (!submissionId && !fileId) redirect("/student/portfolio");
+
+  // Verify the piece is actually theirs before it can be referenced.
+  if (submissionId) {
+    const sub = await prisma.submission.findUnique({ where: { id: submissionId } });
+    if (!sub || sub.studentId !== me.studentId) redirect("/student/portfolio");
+  }
+  if (fileId) {
+    const f = await prisma.fileRec.findUnique({ where: { id: fileId } });
+    if (!f || f.studentId !== me.studentId) redirect("/student/portfolio");
+  }
+
+  const existing = await prisma.portfolioEntry.findMany({ where: { studentId: me.studentId } });
+  // Adding the same piece twice is always a mis-click, never an intention.
+  if (existing.some((e) => (submissionId && e.submissionId === submissionId) || (fileId && e.fileId === fileId))) {
+    redirect("/student/portfolio?already=1");
+  }
+
+  await prisma.portfolioEntry.create({
+    data: {
+      schoolId: me.schoolId,
+      studentId: me.studentId,
+      submissionId,
+      fileId,
+      title: String(formData.get("title") || "Untitled piece").trim().slice(0, 160),
+      position: nextPosition(existing),
+      addedByRole: "student",
+      addedByName: me.name,
+    },
+  });
+  await logAudit(me.userId, "portfolio_entry_added", submissionId ?? fileId ?? "");
+  revalidatePath("/student/portfolio");
+  redirect("/student/portfolio?added=1");
+}
+
+export async function savePortfolioEntry(formData: FormData) {
+  const me = await ownPortfolio();
+  const id = String(formData.get("id"));
+  const entry = await prisma.portfolioEntry.findFirst({ where: { id, studentId: me.studentId } });
+  if (!entry) redirect("/student/portfolio");
+
+  await prisma.portfolioEntry.update({
+    where: { id },
+    data: {
+      title: String(formData.get("title") || entry.title).trim().slice(0, 160) || entry.title,
+      reflection: String(formData.get("reflection") || "").trim().slice(0, 4000),
+    },
+  });
+  revalidatePath("/student/portfolio");
+  redirect("/student/portfolio?saved=1");
+}
+
+export async function movePortfolioEntry(formData: FormData) {
+  const me = await ownPortfolio();
+  const id = String(formData.get("id"));
+  const dir = String(formData.get("dir")) === "up" ? "up" : "down";
+
+  const entries = await prisma.portfolioEntry.findMany({ where: { studentId: me.studentId } });
+  // move() renumbers the whole sequence, so a list that drifted after deletes
+  // gets repaired here rather than degrading further.
+  const next = move(entries, id, dir);
+  await Promise.all(
+    next.map((e) => prisma.portfolioEntry.update({ where: { id: e.id }, data: { position: e.position } }))
+  );
+  revalidatePath("/student/portfolio");
+  redirect("/student/portfolio");
+}
+
+export async function removePortfolioEntry(formData: FormData) {
+  const me = await ownPortfolio();
+  const id = String(formData.get("id"));
+  const entry = await prisma.portfolioEntry.findFirst({ where: { id, studentId: me.studentId } });
+  if (!entry) redirect("/student/portfolio");
+  // Removing from the portfolio never deletes the work itself — the submission
+  // and the file are the school's record and stay exactly where they were.
+  await prisma.portfolioEntry.delete({ where: { id } });
+  await logAudit(me.userId, "portfolio_entry_removed", id);
+  revalidatePath("/student/portfolio");
+  redirect("/student/portfolio?removed=1");
 }

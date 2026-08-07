@@ -705,3 +705,44 @@ model Annotation {
   @@index([submissionId])
   @@index([fileId])
 }
+
+// A piece the student has CHOSEN for their portfolio, with their reflection on
+// it.
+//
+// The distinction from the automatic gallery it replaces is the whole point. A
+// list of everything a child produced is a filing cabinet; a short set they
+// picked, each with a sentence on why it matters, is a portfolio. The choosing
+// and the explaining are the educational part — and a child articulating what
+// they learned is stronger evidence of instruction than any teacher assertion
+// about the same work.
+//
+// PRIVATE BY CONSTRUCTION. There is no share token, no public route, and no
+// "publish" action anywhere in this feature, deliberately: this is a named
+// child's work and their own words about it. Family and school only.
+model PortfolioEntry {
+  id       String @id @default(cuid())
+  schoolId String
+  studentId String
+
+  // Exactly one of these is set — a graded submission, or a work-sample file.
+  submissionId String?
+  fileId       String?
+
+  /** The student's own title for the piece, which may not be the assignment's. */
+  title            String
+  reflection       String @default("")
+  reflectionFormat String @default("markdown")
+
+  /** Display order, lowest first. Normalised on every move — see lib/portfolio.ts. */
+  position Int @default(0)
+
+  /** A teacher may add a piece too ("this belongs in your portfolio"), and the
+   *  portfolio should say which of them chose it. */
+  addedByRole String @default("student") // student | teacher
+  addedByName String  @default("")
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([studentId, position])
+}

@@ -67,6 +67,9 @@ export default async function ParentChildrenPage({
               <Pill tone="info">
                 {e.presentDays} of {e.attendance.length} days present
               </Pill>
+              <Link className="btn ghost sm" href={`/parent/portfolio/${k.id}`}>
+                Portfolio
+              </Link>
               <a
                 className="btn ghost sm"
                 href={`/records/${k.id}/print`}
