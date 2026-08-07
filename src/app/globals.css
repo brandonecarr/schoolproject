@@ -279,8 +279,10 @@ h3 {
   display: flex;
   align-items: flex-start;
   min-height: 100vh;
-  /* Gutter on the right only — the rail sits flush against the left edge. */
-  padding: 0 14px 0 0;
+  /* No gutter on either side. The rail is flush left and the content panel is
+     flush right, so the shell fills the viewport edge to edge and the page
+     background no longer shows through anywhere. */
+  padding: 0;
   gap: 0;
   background: var(--bg);
 }
@@ -292,8 +294,12 @@ h3 {
   flex: 1;
   min-width: 0;
   background: var(--surface);
+  /* Square, and no right border: both would sit against the viewport edge,
+     where a rounded corner shows the page background through the curve and a
+     border reads as a stray hairline rather than an edge. */
   border: 1px solid var(--line);
-  border-radius: 0 calc(var(--radius) + 4px) calc(var(--radius) + 4px) 0;
+  border-right: 0;
+  border-radius: 0;
   min-height: 100vh;
   margin-left: -20px;
   padding-left: 20px;
