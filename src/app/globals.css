@@ -2916,6 +2916,9 @@ a.mod-item:hover {
 
 .foot {
   margin-top: auto;
+  /* Never squeezed: the rail is overflow:hidden, so without this the footer is
+     the thing that gets clipped on a short viewport. */
+  flex: 0 0 auto;
   padding-top: 14px;
   border-top: 1px solid var(--side-line);
   color: var(--side-dim);
@@ -3544,6 +3547,161 @@ a:hover {
   .setgrid {
     grid-template-columns: 1fr;
   }
+}
+
+
+/* --- Parent: the tuition call to action -----------------------------------
+   The one solid-accent card in the whole design. It is the parent's single
+   financial action, and it earns the emphasis by being the only thing that
+   gets it — a second filled card would spend the same attention twice. */
+
+.accentcard {
+  background: var(--accent);
+  color: #fff;
+  border: 1px solid var(--accent);
+  border-radius: var(--radius);
+  padding: var(--card-pad);
+  box-shadow: var(--shadow);
+}
+.accentcard .eyebrow {
+  color: rgba(255, 255, 255, 0.75);
+}
+.accentcard h3 {
+  font-family: var(--num);
+  font-size: 26px;
+  margin: 6px 0 8px;
+  letter-spacing: -0.02em;
+}
+.accentcard p {
+  font-size: 13.5px;
+  line-height: 1.55;
+  margin: 0;
+  color: rgba(255, 255, 255, 0.92);
+}
+.accentcard .btn {
+  background: #fff;
+  color: var(--accent-dark);
+  border-color: #fff;
+  margin-top: 14px;
+  font-weight: 700;
+}
+.accentcard .btn:hover {
+  background: #fff;
+  color: var(--accent-dark);
+}
+
+/* Inset stat blocks — the tuition ledger's three figures. */
+.insetstats {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+  margin-top: 14px;
+}
+.insetstat {
+  background: var(--surface2);
+  border-radius: var(--radius-sm);
+  padding: 16px;
+}
+.insetstat .n {
+  font-family: var(--num);
+  font-size: 24px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+.insetstat .l {
+  font-size: 12px;
+  color: var(--ink3);
+  margin-top: 2px;
+}
+.insetstat.warn .n {
+  color: var(--warn);
+}
+.insetstat.good .n {
+  color: var(--good);
+}
+.insetstat.muted .n {
+  color: var(--ink3);
+}
+
+/* A ledger list: label left, figure right, one rule per line. */
+.ledgerlist {
+  margin-top: 16px;
+}
+.ledgerline {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 12px 0;
+  border-bottom: 1px solid var(--line);
+  font-size: 13.5px;
+}
+.ledgerline:last-child {
+  border-bottom: 0;
+}
+.ledgerline .v {
+  font-family: var(--num);
+  font-weight: 600;
+}
+
+/* --- Parent: attendance day tiles ------------------------------------------ */
+
+.daytiles {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 10px;
+}
+.daytile {
+  width: 34px;
+  height: 38px;
+  border-radius: 9px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1px;
+  background: var(--good-s);
+  color: var(--good);
+}
+.daytile.absent {
+  background: var(--bad-s);
+  color: var(--bad);
+}
+.daytile.excused {
+  background: var(--warn-s);
+  color: var(--warn);
+}
+.daytile .m {
+  font-size: 13px;
+  font-weight: 700;
+  font-family: var(--num);
+}
+.daytile .d {
+  font-size: 9.5px;
+  opacity: 0.75;
+}
+
+/* --- Standards bars (parent home) ------------------------------------------ */
+
+.stdbars {
+  display: flex;
+  gap: 4px;
+  margin-top: 10px;
+  align-items: flex-end;
+  height: 24px;
+}
+.stdbars i {
+  flex: 1;
+  height: 100%;
+  border-radius: 3px;
+  background: var(--line);
+  display: block;
+}
+.stdbars i.mastered {
+  background: var(--good-f);
+}
+.stdbars i.developing {
+  background: var(--accent-mid);
 }
 
 /* --- Accessibility (8.1) -------------------------------------------------- */

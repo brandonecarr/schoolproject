@@ -38,7 +38,7 @@ export default async function ParentTuitionPage() {
       </p>
 
       {rows.map(({ k, l }) => (
-        <div key={k.id} className="card" style={{ marginTop: 16 }}>
+        <div key={k.id} className="card2" style={{ marginTop: 16, maxWidth: 840 }}>
           <div className="spread">
             <h2>{k.name}</h2>
             <span className="small muted">
@@ -46,38 +46,38 @@ export default async function ParentTuitionPage() {
             </span>
           </div>
 
-          <div className="grid g3" style={{ marginTop: 14 }}>
-            <div className="stat">
+          <div className="insetstats">
+            <div className="insetstat muted">
               <div className="n">${l.esa.toLocaleString()}</div>
               <div className="l">ESA covers</div>
             </div>
-            <div className="stat">
+            <div className="insetstat">
               <div className="n">${l.family.toLocaleString()}</div>
               <div className="l">Your portion</div>
             </div>
-            <div className="stat">
+            <div className={`insetstat ${l.familyBalance > 0 ? "warn" : "good"}`}>
               <div className="n">${l.familyBalance.toLocaleString()}</div>
-              <div className="l">You still owe</div>
+              <div className="l">{l.familyBalance > 0 ? "You still owe" : "Paid in full"}</div>
             </div>
           </div>
 
-          <div className="rollbook" style={{ marginTop: 14 }}>
-            <div className="line">
+          <div className="ledgerlist">
+            <div className="ledgerline">
               <span style={{ flex: 1 }}>You&apos;ve paid</span>
-              <span className="mono">
+              <span className="v">
                 ${l.familyPaid.toLocaleString()} of ${l.family.toLocaleString()}
               </span>
             </div>
-            <div className="line">
+            <div className="ledgerline">
               <span style={{ flex: 1 }}>ESA reimbursed to the school</span>
-              <span className="mono">
+              <span className="v">
                 ${l.esaPaid.toLocaleString()} of ${l.esa.toLocaleString()}
               </span>
             </div>
             {l.esaPending > 0 && (
-              <div className="line">
+              <div className="ledgerline">
                 <span style={{ flex: 1 }}>ESA in progress</span>
-                <span className="mono">${l.esaPending.toLocaleString()}</span>
+                <span className="v">${l.esaPending.toLocaleString()}</span>
               </div>
             )}
           </div>
