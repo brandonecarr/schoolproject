@@ -2,7 +2,7 @@ import Link from "next/link";
 import { requireRole } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { fmt, today } from "@/lib/dates";
-import { Pill, Notice } from "@/components/ui";
+import { Pill, Notice, PageHead } from "@/components/ui";
 import { WorkCard, type SubData, type AsgData } from "@/components/WorkCard";
 import { submitWork, saveDraft } from "../../actions";
 
@@ -41,6 +41,7 @@ export default async function StudentWorkPage({
         (STATUS_ORDER[p.x.status] ?? 3) - (STATUS_ORDER[q.x.status] ?? 3) ||
         (p.a && q.a ? (p.a.dueDate < q.a.dueDate ? -1 : 1) : 0)
     );
+  const lateCount = actionable.filter(({ a }) => a && a.dueDate < today()).length;
   const waiting = subs.filter((s) => s.x.status === "submitted");
 
   const toAsg = (a: NonNullable<ReturnType<typeof assignmentOf>>): AsgData => ({
@@ -84,15 +85,24 @@ export default async function StudentWorkPage({
         </Notice>
       )}
 
-      <div className="spread" style={{ alignItems: "flex-end" }}>
-        <div>
-          <div className="eyebrow">Your quests</div>
-          <h1 style={{ margin: "2px 0 0" }}>My work</h1>
-        </div>
-        <Link className="small" href="/student">
-          ← Home
-        </Link>
-      </div>
+      {/* The handoff draws each row with a "Start" button that navigates away.
+          Ours is WorkCard: an inline form where a quiz, an upload or a
+          check-off is completed in place. Swapping to navigation would be a
+          behaviour change, not a restyle, so the header is what changes here
+          and the card keeps its interaction. */}
+      <PageHead
+        title="My work"
+        sub={
+          actionable.length === 0
+            ? "Nothing to do right now."
+            : `${actionable.length} to go.${lateCount > 0 ? ` ${lateCount} late.` : " Nothing is late."}`
+        }
+        actions={
+          <Link className="btn sec sm" href="/student">
+            ← Home
+          </Link>
+        }
+      />
 
       {actionable.length === 0 ? (
         <div className="card" style={{ marginTop: 14 }}>

@@ -131,6 +131,7 @@ export const STUDENT_NAV: NavGroup[] = [
       { href: "/student", label: "Home", icon: "dashboard" },
       { href: "/student/work", label: "My work", icon: "assignments" },
       { href: "/student/path", label: "My path", icon: "courses" },
+      { href: "/student/trophies", label: "Trophy case", icon: "invites" },
       { href: "/student/portfolio", label: "Portfolio", icon: "evidence" },
       { href: "/student/calendar", label: "Calendar", icon: "attendance" },
       { href: "/student/announcements", label: "News", icon: "messages" },

@@ -7,6 +7,7 @@ import { dueSoonForStudents, dueLabel } from "@/lib/due";
 import { typeMeta } from "@/lib/lms";
 import { masteryForStudent } from "@/lib/mastery";
 import { StandardsSummary } from "@/components/StandardsSummary";
+import { Pill } from "@/components/ui";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Home — Cohort" };
@@ -135,11 +136,9 @@ export default async function StudentHomePage() {
       )}
 
       {/* coming due soon */}
-      <div className="spread" style={{ margin: "22px 2px 10px" }}>
-        <div className="eyebrow" style={{ margin: 0 }}>
-          Coming due soon
-        </div>
-        <Link className="small" href="/student/work">
+      <div className="spread" style={{ margin: "26px 2px 12px" }}>
+        <h2 style={{ fontSize: 20 }}>What&apos;s next</h2>
+        <Link className="cardlink" href="/student/work">
           All my work →
         </Link>
       </div>
@@ -150,23 +149,25 @@ export default async function StudentHomePage() {
           </p>
         </div>
       ) : (
-        <div className="due-list">
+        <div className="worklist">
           {due.slice(0, 5).map((d) => {
             const m = typeMeta(d.type);
             const tone = d.daysLeft < 0 ? "bad" : d.daysLeft <= 1 ? "warn" : "info";
             return (
-              <Link key={d.submissionId} href="/student/work" className={`due-row ${tone}`}>
-                <span className="due-ic" aria-hidden>
+              <Link key={d.submissionId} href="/student/work" className="workrow">
+                <span className="worktile" aria-hidden>
                   {m.icon}
                 </span>
-                <span className="due-main">
-                  <span className="due-title">{d.title}</span>
-                  <span className="small muted">
+                <span className="grow">
+                  <span className="worktitle" style={{ display: "block" }}>
+                    {d.title}
+                  </span>
+                  <span className="workmeta" style={{ display: "block" }}>
                     {d.courseName} · {m.label}
                     {d.status === "returned" ? " · needs changes" : ""}
                   </span>
                 </span>
-                <span className={`due-when ${tone}`}>{dueLabel(d.daysLeft)}</span>
+                <Pill tone={tone}>{dueLabel(d.daysLeft)}</Pill>
               </Link>
             );
           })}
@@ -213,18 +214,20 @@ export default async function StudentHomePage() {
       )}
 
       {/* trophies */}
-      <div className="spread" style={{ marginTop: 22 }}>
-        <div className="eyebrow">Trophy case</div>
-        <Link className="small" href="/student/portfolio">
-          My portfolio →
+      <div className="spread" style={{ margin: "26px 2px 12px" }}>
+        <h2 style={{ fontSize: 20 }}>Trophy case</h2>
+        <Link className="cardlink" href="/student/trophies">
+          See all →
         </Link>
       </div>
-      <div className="trophy-grid" style={{ marginTop: 10 }}>
-        {badges.map((b) => (
-          <div key={b.key} className={`trophy ${b.earned ? "on" : ""}`} title={b.hint}>
-            <span className="em">{b.emoji}</span>
-            <span className="nm">{b.label}</span>
-            <span className="hn">{b.earned ? "Earned" : b.hint}</span>
+      <div className="trophies">
+        {badges.slice(0, 5).map((b) => (
+          <div key={b.key} className={`trophy ${b.earned ? "" : "locked"}`} title={b.hint}>
+            <span className="em" aria-hidden>
+              {b.emoji}
+            </span>
+            <div className="nm">{b.label}</div>
+            <div className="hn">{b.earned ? "Earned" : b.hint}</div>
           </div>
         ))}
       </div>
