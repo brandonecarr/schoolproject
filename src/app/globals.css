@@ -2734,6 +2734,106 @@ a:hover {
   gap: var(--gap);
 }
 
+
+/* --- Messages: thread list and thread pane --------------------------------
+   One treatment for all three roles — MessageThread is shared, so this styles
+   the teacher's, the parent's and the student's conversation at once. */
+
+.threadlist .threadrow {
+  display: flex;
+  align-items: flex-start;
+  gap: 11px;
+  padding: 13px 15px;
+  border-bottom: 1px solid var(--line);
+  text-decoration: none;
+  color: inherit;
+}
+.threadlist .threadrow:last-child {
+  border-bottom: 0;
+}
+.threadlist .threadrow:hover {
+  background: var(--surface2);
+  text-decoration: none;
+}
+.threadlist .threadrow.on {
+  background: var(--accent-soft);
+}
+.threadrow .who {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  align-items: baseline;
+}
+.threadrow .nm {
+  font-size: 13.5px;
+  font-weight: 600;
+}
+.threadrow .tm {
+  font-size: 11px;
+  color: var(--ink3);
+  white-space: nowrap;
+}
+.threadrow .prev {
+  font-size: 12.5px;
+  color: var(--ink3);
+  margin-top: 2px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.thread {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-height: 240px;
+}
+.msg {
+  display: flex;
+}
+.msg.mine {
+  justify-content: flex-end;
+}
+.bubble {
+  max-width: 74%;
+  border-radius: var(--radius);
+  padding: 12px 15px;
+  background: var(--surface2);
+  border: 1px solid var(--line);
+  color: var(--ink);
+  font-size: 14px;
+  line-height: 1.55;
+}
+.msg.mine .bubble {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+}
+.msg-meta {
+  font-size: 11px;
+  font-weight: 700;
+  opacity: 0.72;
+  margin-bottom: 4px;
+}
+/* The handoff specifies .72 for this line. That reads fine as dark ink on the
+   grey bubble, but white at .72 on a saturated accent fill washes out to
+   near-invisible — verified on screen. Own messages get more. */
+.msg.mine .msg-meta {
+  opacity: 0.88;
+}
+.composer {
+  display: flex;
+  gap: 8px;
+  margin-top: 14px;
+  padding-top: 14px;
+  border-top: 1px solid var(--line);
+}
+.composer input {
+  flex: 1;
+  min-width: 200px;
+  background: var(--surface2);
+}
+
 /* --- Accessibility (8.1) -------------------------------------------------- */
 
 /* Skip link. First thing in the tab order, invisible until focused. Without it

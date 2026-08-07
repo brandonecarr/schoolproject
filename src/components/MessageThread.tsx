@@ -53,10 +53,10 @@ export function MessageThread({
           </p>
         )}
       </div>
-      <form action={sendMessage} className="row" style={{ marginTop: 12, gap: 8 }}>
+      <form action={sendMessage} className="composer">
         <input type="hidden" name="studentId" value={studentId} />
         <input type="hidden" name="redirectTo" value={redirectTo} />
-        <input name="body" placeholder={placeholder} required style={{ flex: 1, minWidth: 200 }} />
+        <input name="body" placeholder={placeholder} required />
         <button className="btn">Send</button>
       </form>
     </div>

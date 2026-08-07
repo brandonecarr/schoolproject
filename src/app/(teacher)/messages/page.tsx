@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { requireTeacher } from "@/lib/auth";
 import { prisma } from "@/lib/db";
-import { Pill } from "@/components/ui";
+import { Pill, Avatar } from "@/components/ui";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Messages — Cohort" };
@@ -39,25 +39,24 @@ export default async function MessagesInboxPage() {
           <h1>Messages</h1>
         </div>
       </div>
-      <div className="card" style={{ padding: "6px 18px" }}>
+      <div className="card2 nopad threadlist" style={{ maxWidth: 620 }}>
         {rows.map(({ s, latest, unread }) => (
-          <Link
-            key={s.id}
-            href={`/messages/${s.id}`}
-            style={{ display: "block", textDecoration: "none", color: "inherit" }}
-          >
-            <div style={{ padding: "14px 0", borderTop: "1px solid var(--rule)" }}>
-              <div className="spread">
-                <strong>{s.name}</strong>
+          <Link key={s.id} href={`/messages/${s.id}`} className="threadrow">
+            <Avatar name={s.name} size={34} />
+            <span style={{ flex: 1, minWidth: 0 }}>
+              <span className="who">
+                <span className="nm">{s.name}</span>
                 <span className="row" style={{ gap: 8 }}>
-                  {unread > 0 && <Pill tone="mark">{unread} new</Pill>}
-                  {latest && <span className="small muted">{timeOf(latest.createdAt)}</span>}
+                  {unread > 0 && <Pill tone="info">{unread} new</Pill>}
+                  {latest && <span className="tm">{timeOf(latest.createdAt)}</span>}
                 </span>
-              </div>
-              <div className="small muted" style={{ marginTop: 2 }}>
-                {latest ? `${latest.senderName}: ${latest.body.slice(0, 80)}` : "No messages yet — start the conversation"}
-              </div>
-            </div>
+              </span>
+              <span className="prev">
+                {latest
+                  ? `${latest.senderName}: ${latest.body}`
+                  : "No messages yet — start the conversation"}
+              </span>
+            </span>
           </Link>
         ))}
       </div>
