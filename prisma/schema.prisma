@@ -462,3 +462,37 @@ model Token {
   usedAt    String? // ISO timestamp — null until consumed
   createdAt DateTime @default(now())
 }
+
+// Ground truth about how a rail actually behaves, one immutable row per
+// real-world outcome. This is the table that eventually retires the ⚑ verify
+// flags in src/lib/rules.ts: those flags say "we guessed", and the only thing
+// that can honestly clear them is an observed invoice cycle. Nothing in here is
+// ever inferred, scraped, or written by a model — it is only ever recorded from
+// something a state or vendor actually did to a real invoice.
+//
+// Append-only by convention: Invoice.rejectionReason holds only the LATEST
+// rejection, so the history used to be destroyed on every rework. These rows
+// are the history.
+model RailObservation {
+  id          String  @id @default(cuid())
+  schoolId    String
+  invoiceId   String
+  railId      String
+  programCode String? // state code at the time of the outcome, for per-program rollups
+  outcome     String // approved | paid | rejected
+  // The reason EXACTLY as the portal worded it. Never normalised, never
+  // trimmed to a preset — the verbatim text IS the asset, because the preset
+  // taxonomy is what we are trying to learn.
+  reasonRaw   String  @default("")
+  // Which RAILS[].rejectionReasons entry the teacher filed it under. Empty
+  // means none of them fit: those rows are how the taxonomy grows.
+  reasonKey   String  @default("")
+  observedAt  String // ISO timestamp
+  recordedBy  String? // user id — who witnessed it
+
+  createdAt DateTime @default(now())
+
+  @@index([railId])
+  @@index([schoolId])
+  @@index([invoiceId])
+}

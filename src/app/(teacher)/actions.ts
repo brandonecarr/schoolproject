@@ -12,6 +12,7 @@ import { requireTeacher, logAudit } from "@/lib/auth";
 import { evidenceFor } from "@/lib/evidence";
 import { purposeNarrative, progressNarrative } from "@/lib/ai";
 import { PROGRAMS } from "@/lib/rules";
+import { recordRailObservation } from "@/lib/observe";
 import {
   assignmentMax,
   rubricConfig,
@@ -409,6 +410,24 @@ export async function setInvoiceStatus(formData: FormData) {
   if (status === "approved") data.approvedAt = now;
   if (status === "paid") data.paidAt = now;
   await prisma.invoice.update({ where: { id }, data });
+
+  // Positive ground truth. Rejections teach us the taxonomy; payments are the
+  // only thing that can honestly retire a rail's ⚑ verify flag.
+  if (status === "approved" || status === "paid") {
+    const student = await prisma.student.findUnique({
+      where: { id: inv.studentId },
+      select: { esaProgram: true },
+    });
+    await recordRailObservation({
+      schoolId: school!.id,
+      invoiceId: inv.id,
+      railId: inv.railId,
+      programCode: student?.esaProgram ?? null,
+      outcome: status,
+      recordedBy: user.id,
+    });
+  }
+
   await logAudit(user.id, "invoice_status", `${id} → ${status}`);
   revalidatePath("/invoices");
   revalidatePath("/cashflow");
@@ -418,22 +437,49 @@ export async function setInvoiceStatus(formData: FormData) {
 
 // Reject an invoice with a reason. Increments rejectionCount so the first-pass
 // approval-rate metric can tell a clean approval from a reworked one.
+//
+// Two fields, deliberately: `reason` is the taxonomy entry the teacher filed it
+// under (may be empty when none of our guesses fit), and `reasonRaw` is what the
+// portal actually said. The verbatim text is the asset — the preset list is what
+// we're trying to learn, so collapsing a real rejection into "Other" would throw
+// away the only ground truth we get.
 export async function rejectInvoice(formData: FormData) {
   const { user, school } = await requireTeacher();
   const id = String(formData.get("id"));
-  const reason = String(formData.get("reason") || "").trim();
+  const filed = String(formData.get("reason") || "").trim();
+  const verbatim = String(formData.get("reasonRaw") || "").trim();
   const inv = await prisma.invoice.findFirst({ where: { id, schoolId: school!.id } });
   if (!inv) redirect("/invoices");
+
+  // Prefer the portal's own wording in the summary a teacher reads later; fall
+  // back to the filed category when she didn't paste anything.
+  const shown = verbatim || filed || "No reason recorded";
   await prisma.invoice.update({
     where: { id },
     data: {
       status: "rejected",
       rejectedAt: new Date().toISOString(),
-      rejectionReason: reason || "No reason recorded",
+      rejectionReason: shown,
       rejectionCount: { increment: 1 },
     },
   });
-  await logAudit(user.id, "invoice_rejected", `${id}: ${reason}`);
+
+  const student = await prisma.student.findUnique({
+    where: { id: inv.studentId },
+    select: { esaProgram: true },
+  });
+  await recordRailObservation({
+    schoolId: school!.id,
+    invoiceId: inv.id,
+    railId: inv.railId,
+    programCode: student?.esaProgram ?? null,
+    outcome: "rejected",
+    reasonRaw: verbatim,
+    reasonKey: filed,
+    recordedBy: user.id,
+  });
+
+  await logAudit(user.id, "invoice_rejected", `${id}: ${shown}`);
   revalidatePath("/invoices");
   revalidatePath("/cashflow");
   redirect(`/invoices/${id}`);

@@ -2359,3 +2359,19 @@ a.mod-item:hover {
 .turned-in-row:hover {
   background: #fafbf8;
 }
+
+/* Progress toward a rail's rules being confirmed by real invoice cycles.
+   Deliberately thin and unemphatic: it reports how much we DON'T know yet, so
+   it shouldn't read as an achievement bar. */
+.verifybar {
+  height: 4px;
+  border-radius: 999px;
+  background: var(--rule);
+  overflow: hidden;
+}
+.verifybar span {
+  display: block;
+  height: 100%;
+  background: var(--mark);
+  border-radius: 999px;
+}

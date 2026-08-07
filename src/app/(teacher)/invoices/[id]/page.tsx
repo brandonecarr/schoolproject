@@ -6,6 +6,8 @@ import { readiness, RAILS } from "@/lib/rules";
 import { fmt } from "@/lib/dates";
 import { Pill, Notice, VerifyFlag } from "@/components/ui";
 import type { Tone } from "@/components/ui";
+import { RailKnowledge } from "@/components/RailKnowledge";
+import { observationsForRail } from "@/lib/observe";
 import {
   saveNarrative,
   setInvoiceStatus,
@@ -26,6 +28,9 @@ const STATUS_TONE: Record<string, Tone | "mark"> = {
 
 const daysBetween = (a: string, b: string) =>
   Math.round((Date.parse(b) - Date.parse(a)) / 86_400_000);
+
+/** Give a sentence a full stop only if it doesn't already end in one. */
+const endPunctuated = (s: string) => (/[.!?:;]$/.test(s.trim()) ? s.trim() : `${s.trim()}.`);
 
 // A single hidden-status transition button.
 function TransitionButton({
@@ -65,6 +70,9 @@ export default async function InvoicePacketPage({
   const s = await prisma.student.findUnique({ where: { id: inv.studentId } });
   const rail = (inv.railId ? RAILS[inv.railId] : null) ?? sessionRail;
   const e = await evidenceFor(inv.studentId, inv.periodStart, inv.periodEnd);
+  // Everything this school has actually watched this rail do — the counterweight
+  // to the predictions in rules.ts.
+  const obs = rail ? await observationsForRail(school!.id, rail.id) : [];
   const r = readiness(inv.evidenceScore);
   const graded = e.submissions.filter((x) => x.status === "graded");
   const daysToCash =
@@ -122,8 +130,10 @@ export default async function InvoicePacketPage({
       ) : inv.status === "rejected" ? (
         <Notice tone="bad">
           <strong>Rejected{inv.rejectedAt ? ` ${fmt(inv.rejectedAt)}` : ""}:</strong>{" "}
-          {inv.rejectionReason || "No reason recorded"}. Regenerate the documentation from the latest
-          evidence, review it, then resubmit.
+          {/* The reason is now the portal's verbatim wording, which usually ends
+              in its own punctuation — don't add a second full stop. */}
+          {endPunctuated(inv.rejectionReason || "No reason recorded")} Regenerate the documentation
+          from the latest evidence, review it, then resubmit.
         </Notice>
       ) : (
         <Notice tone="warn">
@@ -170,24 +180,40 @@ export default async function InvoicePacketPage({
             If {rail ? rail.label : "the state"} sends this back, record why — it feeds the rework loop
             and your first-pass approval rate.
           </p>
-          <form action={rejectInvoice} className="row" style={{ alignItems: "flex-end", gap: 12 }}>
+          <form action={rejectInvoice}>
             <input type="hidden" name="id" value={inv.id} />
-            <div style={{ flex: 1, minWidth: 260 }}>
-              <label htmlFor="reason">Rejection reason</label>
-              {rail && rail.rejectionReasons.length ? (
-                <select id="reason" name="reason">
-                  {rail.rejectionReasons.map((x) => (
-                    <option key={x} value={x}>
-                      {x}
-                    </option>
-                  ))}
-                  <option value="Other (see portal notes)">Other (see portal notes)</option>
-                </select>
-              ) : (
-                <input id="reason" name="reason" placeholder="Why it was rejected" />
-              )}
+            <div style={{ maxWidth: 560 }}>
+              <label htmlFor="reasonRaw">What the portal actually said</label>
+              <textarea
+                id="reasonRaw"
+                name="reasonRaw"
+                required
+                rows={2}
+                placeholder="Paste the rejection notice word for word"
+              />
+              <p className="small muted" style={{ margin: "4px 0 12px" }}>
+                Paste it verbatim, even if it&apos;s badly worded. Our category list below is a{" "}
+                <em>guess</em> — the portal&apos;s own wording is what teaches us the real one.
+              </p>
             </div>
-            <button className="btn ghost">Mark rejected</button>
+            <div className="row" style={{ alignItems: "flex-end", gap: 12 }}>
+              <div style={{ flex: 1, minWidth: 260 }}>
+                <label htmlFor="reason">Closest category {rail ? `(${rail.label})` : ""}</label>
+                {rail && rail.rejectionReasons.length ? (
+                  <select id="reason" name="reason" defaultValue="">
+                    {rail.rejectionReasons.map((x) => (
+                      <option key={x} value={x}>
+                        {x}
+                      </option>
+                    ))}
+                    <option value="">None of these fit</option>
+                  </select>
+                ) : (
+                  <input id="reason" name="reason" placeholder="Category, if you know one" />
+                )}
+              </div>
+              <button className="btn ghost">Mark rejected</button>
+            </div>
           </form>
         </div>
       )}
@@ -252,21 +278,7 @@ export default async function InvoicePacketPage({
         </div>
       </div>
 
-      {rail && (
-        <div className="card" style={{ marginTop: 12 }}>
-          <div className="eyebrow">Most common rejection reasons for {rail.label}</div>
-          <ul className="small muted" style={{ margin: "10px 0 0", paddingLeft: 18, lineHeight: 1.9 }}>
-            {rail.rejectionReasons.map((x) => (
-              <li key={x}>{x}</li>
-            ))}
-          </ul>
-          {rail.verify && (
-            <VerifyFlag>
-              Placeholder list — replace with the real taxonomy from design-partner interviews.
-            </VerifyFlag>
-          )}
-        </div>
-      )}
+      {rail && <RailKnowledge rail={rail} obs={obs} />}
     </>
   );
 }
