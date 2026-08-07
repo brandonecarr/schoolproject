@@ -6,8 +6,8 @@ import { readiness, PROGRAMS } from "@/lib/rules";
 import { today, fmt } from "@/lib/dates";
 import { dueLabel, daysBetween } from "@/lib/due";
 import { typeMeta } from "@/lib/lms";
-import { EvidenceBar } from "@/components/EvidenceBar";
-import { Pill } from "@/components/ui";
+import { Icon } from "@/components/icons";
+import { Bar, Card, CardHead, PageHead, Pill, StackBar, StatCard } from "@/components/ui";
 import { reimbursementMetrics, formatPct } from "@/lib/metrics";
 
 export const dynamic = "force-dynamic";
@@ -47,42 +47,76 @@ export default async function Dashboard() {
     return { a, inHand, total: mine.length, daysLeft: daysBetween(td, a.dueDate) };
   });
 
+  // Oldest thing waiting on the teacher. "3 waiting" is a number; "oldest 4
+  // days" is the one that makes someone open the queue.
+  const oldestSub = await prisma.submission.findFirst({
+    where: { schoolId, status: "submitted", submittedAt: { not: null } },
+    orderBy: { submittedAt: "asc" },
+    select: { submittedAt: true },
+  });
+  const oldestDays = oldestSub?.submittedAt ? daysBetween(oldestSub.submittedAt.slice(0, 10), td) : null;
+
+  const onEsa = students.filter((x) => x.esaProgram).length;
+  const openCycles = invoices.filter((i) => i.status === "draft" || i.status === "submitted").length;
+  const COUNT_WORD = ["No", "One", "Two", "Three", "Four", "Five", "Six", "Seven", "Eight", "Nine", "Ten"];
+  const word = (n: number) => COUNT_WORD[n] ?? String(n);
+  const subline =
+    `${word(students.length)} student${students.length === 1 ? "" : "s"}, ` +
+    `${openCycles === 0 ? "no invoice cycle" : `${word(openCycles).toLowerCase()} invoice cycle${openCycles === 1 ? "" : "s"}`} open. ` +
+    `Here's what needs you today.`;
+
+  // Paid / in review / not built, as shares of everything this year.
+  const totalMoney = m.paidTotal + m.inFlight + m.draftTotal;
+  const share = (v: number) => (totalMoney > 0 ? (v / totalMoney) * 100 : 0);
+
   return (
     <>
-      <section className="cmd-hero">
-        <div className="spread">
-          <div>
-            <div className="eyebrow">{fmt(today())}</div>
-            <h1>Good morning, {user.name.split(" ")[0]}.</h1>
-          </div>
-          <div className="row">
+      <PageHead
+        eyebrow={fmt(today())}
+        title={`Good morning, ${user.name.split(" ")[0]}.`}
+        sub={subline}
+        actions={
+          <>
             <Link className="btn sec" href="/attendance">
               Take attendance
             </Link>
-            <Link className="btn mark" href="/invoices">
+            <Link className="btn" href="/invoices">
               ESA invoices
             </Link>
-          </div>
-        </div>
-        <div className="cmd-metrics">
-          <div className="cmd-metric">
-            <div className="n">{students.length}</div>
-            <div className="l">Students</div>
-          </div>
-          <div className={`cmd-metric ${ungraded > 0 ? "accent" : ""}`}>
-            <div className="n">{ungraded}</div>
-            <div className="l">Waiting to grade</div>
-          </div>
-          <div className="cmd-metric">
-            <div className="n">{avg}</div>
-            <div className="l">Avg evidence</div>
-          </div>
-          <div className="cmd-metric">
-            <div className="n">{hasReimbursementData ? formatPct(m.firstPassRate) : "—"}</div>
-            <div className="l">First-pass approval</div>
-          </div>
-        </div>
-      </section>
+          </>
+        }
+      />
+
+      <div className="statrow">
+        <StatCard
+          glyph={<Icon name="students" />}
+          tone="info"
+          label="Students"
+          value={students.length}
+          delta={onEsa > 0 ? `${onEsa} on ESA` : "None on ESA"}
+        />
+        <StatCard
+          glyph={<Icon name="grading" />}
+          tone={ungraded > 0 ? "warn" : "good"}
+          label="Waiting to grade"
+          value={ungraded}
+          delta={ungraded === 0 ? "Queue is clear" : oldestDays != null ? `Oldest: ${oldestDays} days` : "Just arrived"}
+        />
+        <StatCard
+          glyph={<Icon name="evidence" />}
+          tone={avg >= 90 ? "good" : avg >= 70 ? "warn" : "bad"}
+          label="Avg evidence"
+          value={avg}
+          delta={`Across ${students.length} student${students.length === 1 ? "" : "s"}`}
+        />
+        <StatCard
+          glyph={<Icon name="invoices" />}
+          tone="info"
+          label="First-pass approval"
+          value={hasReimbursementData ? formatPct(m.firstPassRate) : "—"}
+          delta={m.decided > 0 ? `${m.firstPassPaid} of ${m.decided} accepted` : "Nothing decided yet"}
+        />
+      </div>
 
       {attToday === 0 && (
         <div className="notice warn" style={{ marginTop: 16 }}>
@@ -91,110 +125,117 @@ export default async function Dashboard() {
         </div>
       )}
 
-      <div className="cmd-grid">
-        <div>
-          <div className="spread" style={{ margin: "6px 2px 12px" }}>
-            <div>
-              <div className="eyebrow">Needs attention</div>
-              <h2>Who isn&apos;t invoice-ready</h2>
-            </div>
-            <Link className="btn ghost sm" href="/evidence">
-              Full board
-            </Link>
-          </div>
-          {triage.map(({ s, e }) => {
-            const r = readiness(e.score);
-            return (
-              <div key={s.id} className={`attn-row ${r.tone}`}>
-                <div className="who">
-                  <Link href={`/students/${s.id}`} style={{ fontWeight: 600, textDecoration: "none" }}>
-                    {s.name}
-                  </Link>
-                  <div className="small muted">
-                    Grade {s.grade} · {s.esaProgram ? PROGRAMS[s.esaProgram]?.label ?? s.esaProgram : "Private pay"}
+      <div className="split">
+        {/* Sorted ascending by evidence score — least ready first. This is the
+            point of the screen, and alphabetical would defeat it. */}
+        <Card pad={false}>
+          <CardHead eyebrow="Needs attention" title="Who isn't invoice-ready" href="/evidence" linkLabel="Full board" />
+          <div className="rowlist">
+            {triage.map(({ s: st, e }) => {
+              const r = readiness(e.score);
+              return (
+                <Link key={st.id} href={`/students/${st.id}`} className="rowitem attnrow">
+                  <div style={{ minWidth: 0 }}>
+                    <div className="rowname">{st.name}</div>
+                    <div className="rowmeta">
+                      Grade {st.grade} ·{" "}
+                      {st.esaProgram ? PROGRAMS[st.esaProgram]?.label ?? st.esaProgram : "Private pay"}
+                    </div>
                   </div>
-                </div>
-                <div className="bar">
-                  <EvidenceBar parts={e.parts} legend={false} />
-                </div>
-                <Pill tone={r.tone}>{r.label}</Pill>
-                <div className="sc">{e.score}</div>
-              </div>
-            );
-          })}
-        </div>
+                  <Bar pct={e.score} tone={r.tone} />
+                  <Pill tone={r.tone}>{r.label}</Pill>
+                  <span className="num rowscore">{e.score}</span>
+                </Link>
+              );
+            })}
+          </div>
+        </Card>
 
-        <div>
-          <div className="card">
+        <div className="stack">
+          <Card>
             <div className="eyebrow">Getting paid</div>
             {hasReimbursementData ? (
               <>
-                <h3 style={{ margin: "6px 0 8px" }}>
-                  {formatPct(m.firstPassRate)} approved first-pass
-                </h3>
-                <p className="small muted" style={{ margin: 0 }}>
-                  {m.avgDaysToCash != null ? `${m.avgDaysToCash} days to cash · ` : ""}$
-                  {m.inFlight.toLocaleString()} in flight, ${m.paidTotal.toLocaleString()} paid.{" "}
-                  <Link href="/invoices">Open ESA invoices</Link>.
+                <h3 className="cardfig">{formatPct(m.firstPassRate)} approved first-pass</h3>
+                <p className="cardbody">
+                  {m.avgDaysToCash != null ? `${m.avgDaysToCash} days to cash · ` : ""}
+                  <strong className="num">${m.inFlight.toLocaleString()}</strong> in flight,{" "}
+                  <strong className="num">${m.paidTotal.toLocaleString()}</strong> paid this year.
                 </p>
+                <div style={{ marginTop: 12 }}>
+                  <StackBar
+                    parts={[
+                      { pct: share(m.paidTotal), tone: "good" },
+                      { pct: share(m.inFlight), tone: "info" },
+                      { pct: share(m.draftTotal), tone: "line" },
+                    ]}
+                  />
+                  <div className="legend">
+                    <span className="k">
+                      <i style={{ background: "var(--good-f)" }} /> Paid
+                    </span>
+                    <span className="k">
+                      <i style={{ background: "var(--accent)" }} /> In review
+                    </span>
+                    <span className="k">
+                      <i style={{ background: "var(--line)" }} /> Not built
+                    </span>
+                  </div>
+                </div>
               </>
             ) : (
               <>
-                <h3 style={{ margin: "6px 0 8px" }}>Nothing submitted yet</h3>
-                <p className="small muted" style={{ margin: 0 }}>
+                <h3 className="cardfig">Nothing submitted yet</h3>
+                <p className="cardbody">
                   Build packets from the teaching you&apos;ve already logged.{" "}
                   <Link href="/invoices">ESA invoices</Link>.
                 </p>
               </>
             )}
-          </div>
-          <div className="card">
+          </Card>
+
+          <Card>
             <div className="eyebrow">Grading queue</div>
-            <h3 style={{ margin: "6px 0 10px" }}>
+            <h3 className="cardfig">
               {ungraded} submission{ungraded === 1 ? "" : "s"} waiting
             </h3>
-            <p className="small muted" style={{ margin: "0 0 12px" }}>
+            <p className="cardbody">
               Graded work with feedback is the strongest evidence a state accepts.
             </p>
-            <Link className="btn sm" href="/grading">
+            <Link className="btn tint sm" href="/grading" style={{ marginTop: 12 }}>
               Open grading queue
             </Link>
-          </div>
+          </Card>
 
-          <div className="card">
-            <div className="spread">
-              <div className="eyebrow">Coming due soon</div>
-              <Link className="small" href="/assignments">
-                Assignments →
-              </Link>
-            </div>
+          <Card pad={false}>
+            <CardHead eyebrow="Coming due soon" title="" href="/assignments" linkLabel="All" />
             {upcomingRows.length === 0 ? (
-              <p className="small muted" style={{ margin: "8px 0 0" }}>
+              <p className="cardbody" style={{ padding: "0 var(--card-pad) var(--card-pad)" }}>
                 No assignments due ahead. <Link href="/assignments">Assign some work</Link>.
               </p>
             ) : (
-              <div style={{ marginTop: 8 }}>
+              <div className="rowlist">
                 {upcomingRows.map(({ a, inHand, total, daysLeft }) => {
-                  const m = typeMeta(a.type);
+                  const tm = typeMeta(a.type);
                   const tone = daysLeft <= 1 ? "warn" : "info";
                   return (
-                    <div key={a.id} className="due-row compact">
-                      <span className="due-ic" aria-hidden>
-                        {m.icon}
+                    <div key={a.id} className="rowitem duerow">
+                      <span className="glyph" aria-hidden>
+                        {tm.icon}
                       </span>
-                      <span className="due-main">
-                        <span className="due-title">{a.title}</span>
-                        <span className="small muted">
+                      <span style={{ minWidth: 0 }}>
+                        <span className="rowname ellip">{a.title}</span>
+                        <span className="rowmeta">
                           {inHand}/{total} turned in · {fmt(a.dueDate)}
                         </span>
                       </span>
-                      <span className={`due-when ${tone}`}>{dueLabel(daysLeft)}</span>
+                      <Pill tone={tone}>{dueLabel(daysLeft)}</Pill>
                     </div>
                   );
                 })}
               </div>
             )}
-          </div>
+          </Card>
         </div>
       </div>
     </>

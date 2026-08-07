@@ -52,6 +52,16 @@
   --good: oklch(0.51 0.14 155);
   --warn: oklch(0.51 0.15 72);
   --bad: oklch(0.51 0.19 25);
+
+  /* Fill variants, at the handoff's ORIGINAL lightness. The darkening above
+     exists for text contrast, and a bar or an icon tile carries no text — the
+     numeral beside it does. Using the text colour as a fill made every warn bar
+     read brown instead of amber, which lost the design's intent for no
+     accessibility gain. Status is still never colour alone: every bar has an
+     adjacent figure and every pill a word. */
+  --good-f: oklch(0.58 0.14 155);
+  --warn-f: oklch(0.68 0.15 72);
+  --bad-f: oklch(0.58 0.19 25);
   --good-s: oklch(0.95 0.04 155);
   --warn-s: oklch(0.95 0.05 72);
   --bad-s: oklch(0.95 0.04 25);
@@ -215,12 +225,12 @@ h3 {
   font-size: 17px;
 }
 .eyebrow {
-  font-size: 10.5px;
-  letter-spacing: 0.18em;
+  font-size: 11px;
+  letter-spacing: 0.09em;
   text-transform: uppercase;
-  color: var(--ink-soft);
+  color: var(--ink3);
   font-weight: 700;
-  font-family: var(--sans);
+  font-family: var(--font);
 }
 .muted {
   color: var(--ink-soft);
@@ -459,11 +469,11 @@ h3 {
 
 /* cards */
 .card {
-  background: var(--card);
-  border: 1px solid rgba(20, 28, 38, 0.06);
+  background: var(--surface);
+  border: 1px solid var(--line);
   border-radius: var(--radius);
-  padding: 18px;
-  box-shadow: var(--shadow-sm);
+  padding: var(--card-pad);
+  box-shadow: var(--shadow);
 }
 .card + .card {
   margin-top: 12px;
@@ -540,11 +550,12 @@ h3 {
 }
 .pill {
   display: inline-block;
-  padding: 3px 9px;
+  padding: 3px 10px;
   border-radius: 20px;
   font-size: 11.5px;
   font-weight: 700;
-  letter-spacing: 0.02em;
+  letter-spacing: 0.01em;
+  white-space: nowrap;
 }
 .pill.good {
   background: var(--good-soft);
@@ -2915,6 +2926,373 @@ a.mod-item:hover {
 }
 .signout:hover {
   text-decoration: underline;
+}
+
+
+/* ============================================================================
+   REDESIGN PRIMITIVES
+   ============================================================================ */
+
+.card2 {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  padding: var(--card-pad);
+}
+/* Row lists run full-bleed so a hover background reaches the card edge. */
+.card2.nopad {
+  padding: 0;
+  overflow: hidden;
+}
+
+.pagehead {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 20px;
+  margin-bottom: 22px;
+}
+.pagehead h1 {
+  font-size: var(--h1);
+  margin: 2px 0 0;
+}
+.pagesub {
+  margin: 6px 0 0;
+  font-size: 14.5px;
+  color: var(--ink2);
+  max-width: 66ch;
+}
+
+.cardhead {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  gap: 14px;
+  padding: var(--card-pad) var(--card-pad) 12px;
+}
+.card2:not(.nopad) > .cardhead:first-child {
+  padding: 0 0 12px;
+}
+.cardhead h2 {
+  font-size: 18px;
+  margin: 3px 0 0;
+}
+.cardlink {
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--accent-dark);
+  white-space: nowrap;
+}
+
+/* --- Metric cards ---------------------------------------------------------- */
+
+.statrow {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: var(--gap);
+}
+.statcard {
+  display: flex;
+  align-items: center;
+  gap: 13px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  padding: var(--card-pad);
+}
+.statcard .tile {
+  width: 44px;
+  height: 44px;
+  flex: 0 0 44px;
+  border-radius: 13px;
+  display: grid;
+  place-items: center;
+  font-size: 19px;
+}
+.statcard .tile svg {
+  width: 20px;
+  height: 20px;
+}
+.statcard .tile.good {
+  background: var(--good-s);
+  color: var(--good);
+}
+.statcard .tile.warn {
+  background: var(--warn-s);
+  color: var(--warn);
+}
+.statcard .tile.bad {
+  background: var(--bad-s);
+  color: var(--bad);
+}
+.statcard .tile.info {
+  background: var(--accent-soft);
+  color: var(--accent-dark);
+}
+.statlabel {
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--ink2);
+}
+.statvalue {
+  font-family: var(--num);
+  font-size: 26px;
+  font-weight: 700;
+  letter-spacing: -0.03em;
+  line-height: 1.15;
+  margin-top: 1px;
+}
+.statdelta {
+  font-size: 11.5px;
+  font-weight: 600;
+  margin-top: 1px;
+}
+.statdelta.good {
+  color: var(--good);
+}
+.statdelta.warn {
+  color: var(--warn);
+}
+.statdelta.bad {
+  color: var(--bad);
+}
+.statdelta.info {
+  color: var(--ink3);
+}
+
+/* --- Bars ------------------------------------------------------------------ */
+
+.bar2 {
+  height: 7px;
+  border-radius: 4px;
+  background: var(--line);
+  overflow: hidden;
+  min-width: 60px;
+}
+.bar2 .fill {
+  display: block;
+  height: 100%;
+  border-radius: 4px;
+}
+.bar2 .fill.good {
+  background: var(--good-f);
+}
+.bar2 .fill.warn {
+  background: var(--warn-f);
+}
+.bar2 .fill.bad {
+  background: var(--bad-f);
+}
+.bar2 .fill.info {
+  background: var(--accent);
+}
+
+.stackbar {
+  display: flex;
+  height: 9px;
+  border-radius: 5px;
+  overflow: hidden;
+  background: var(--line);
+}
+.stackbar .seg.good {
+  background: var(--good-f);
+}
+.stackbar .seg.warn {
+  background: var(--warn-f);
+}
+.stackbar .seg.bad {
+  background: var(--bad-f);
+}
+.stackbar .seg.info {
+  background: var(--accent);
+}
+.stackbar .seg.line {
+  background: var(--line);
+}
+
+.legend {
+  display: flex;
+  gap: 16px;
+  margin-top: 10px;
+  font-size: 11.5px;
+  color: var(--ink2);
+}
+.legend span.k {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.legend i {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  display: inline-block;
+}
+
+/* --- Avatar ---------------------------------------------------------------- */
+
+.avatar {
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: var(--accent-mid);
+  color: var(--accent-dark);
+  font-family: var(--head);
+  font-weight: 700;
+}
+
+/* --- Row lists ------------------------------------------------------------- */
+
+.rowlist {
+  display: flex;
+  flex-direction: column;
+}
+.rowitem {
+  display: grid;
+  align-items: center;
+  gap: 14px;
+  padding: var(--row-pad);
+  padding-left: var(--card-pad);
+  padding-right: var(--card-pad);
+  border-top: 1px solid var(--line);
+  text-decoration: none;
+  color: inherit;
+}
+.rowitem:hover {
+  background: var(--surface2);
+  text-decoration: none;
+}
+.rowname {
+  font-size: 14px;
+  font-weight: 600;
+}
+.rowmeta {
+  font-size: 12px;
+  color: var(--ink3);
+}
+.num {
+  font-family: var(--num);
+  font-variant-numeric: tabular-nums;
+}
+
+/* --- Table card ------------------------------------------------------------ */
+
+.thead {
+  display: grid;
+  gap: 14px;
+  background: var(--surface2);
+  border-bottom: 1px solid var(--line);
+  padding: 12px var(--card-pad);
+  font-size: 11px;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: var(--ink3);
+  font-weight: 700;
+}
+
+/* --- Two-column body ------------------------------------------------------- */
+
+.split {
+  display: grid;
+  grid-template-columns: 1.35fr 1fr;
+  gap: var(--gap);
+  align-items: start;
+  margin-top: var(--gap);
+}
+.stack {
+  display: flex;
+  flex-direction: column;
+  gap: var(--gap);
+}
+
+@media (max-width: 1180px) {
+  .split {
+    grid-template-columns: 1fr;
+  }
+  .statrow {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+
+/* --- Dashboard-specific row shapes ----------------------------------------- */
+
+/* name | evidence bar | pill | score — the score column is fixed so the
+   numerals line up down the list regardless of name length. */
+.attnrow {
+  /* The handoff's 1.4fr name column assumed short pills ("Thin"); readiness()
+     returns the full sentence, so the name gets more room and the bar less. */
+  grid-template-columns: minmax(120px, 1.2fr) minmax(60px, 0.9fr) auto 42px;
+  gap: 12px;
+}
+.rowscore {
+  font-size: 16px;
+  font-weight: 700;
+  text-align: right;
+}
+.duerow {
+  grid-template-columns: auto 1fr auto;
+  gap: 12px;
+}
+.glyph {
+  width: 30px;
+  height: 30px;
+  flex: 0 0 30px;
+  border-radius: 9px;
+  background: var(--accent-soft);
+  color: var(--accent-dark);
+  display: grid;
+  place-items: center;
+  font-size: 14px;
+}
+.ellip {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.rowitem .rowname,
+.rowitem .rowmeta {
+  display: block;
+}
+.cardfig {
+  font-size: 20px;
+  margin: 6px 0 8px;
+}
+.cardbody {
+  font-size: 13.5px;
+  color: var(--ink2);
+  margin: 0;
+  line-height: 1.55;
+}
+
+/* Buttons, to the redesign spec. */
+.btn {
+  background: var(--accent);
+  border-color: var(--accent);
+  font-size: 13.5px;
+  padding: 11px 17px;
+}
+.btn.sec {
+  background: var(--surface);
+  color: var(--ink);
+  border-color: var(--line);
+  box-shadow: var(--shadow);
+}
+.btn.sec:hover {
+  border-color: var(--accent);
+}
+.btn.tint {
+  background: var(--accent-soft);
+  color: var(--accent-dark);
+  border-color: var(--accent);
+  font-weight: 700;
+}
+.btn.sm {
+  padding: 8px 13px;
+  font-size: 12.5px;
 }
 
 /* --- Accessibility (8.1) -------------------------------------------------- */
