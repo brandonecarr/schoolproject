@@ -54,7 +54,10 @@ const NAV: { group: string; items: { href: string; label: string; icon: string }
   },
   {
     group: "Family",
-    items: [{ href: "/messages", label: "Messages", icon: "messages" }],
+    items: [
+      { href: "/announcements", label: "Announcements", icon: "messages" },
+      { href: "/messages", label: "Messages", icon: "messages" },
+    ],
   },
   {
     group: "Admin",

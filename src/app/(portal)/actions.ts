@@ -10,7 +10,8 @@
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/db";
-import { requireRole, logAudit } from "@/lib/auth";
+import { requireRole, requireUser, logAudit } from "@/lib/auth";
+import { canSee } from "@/lib/announcements";
 import { hashPassword } from "@/lib/password";
 import { deleteStudentData } from "@/lib/retention";
 import { autoScoreQuiz, parseItems, parseQuizAnswers } from "@/lib/lms";
@@ -328,4 +329,31 @@ export async function deleteChildData(formData: FormData) {
   revalidatePath("/parent");
   revalidatePath("/parent/children");
   redirect("/parent/children?deleted=1");
+}
+
+// Confirm you've read an announcement.
+//
+// Re-checks visibility rather than trusting the id in the form: a posted id is
+// user input, and acknowledging a draft or another audience's notice would both
+// create a false record and reveal that it exists.
+export async function acknowledgeAnnouncement(formData: FormData) {
+  const { user } = await requireUser();
+  const id = String(formData.get("id"));
+  const back = user.role === "student" ? "/student/announcements" : "/parent/announcements";
+
+  const a = await prisma.announcement.findFirst({ where: { id, schoolId: user.schoolId } });
+  if (!a || !canSee(a, user.role)) redirect(back);
+
+  // Idempotent: a double-click is one reader, enforced by the unique index too.
+  const existing = await prisma.announcementAck.findFirst({
+    where: { announcementId: id, userId: user.id },
+  });
+  if (!existing) {
+    await prisma.announcementAck.create({
+      data: { announcementId: id, userId: user.id, at: new Date().toISOString() },
+    });
+    await logAudit(user.id, "announcement_acknowledged", `${id}: ${a.title}`);
+  }
+  revalidatePath(back);
+  redirect(back);
 }

@@ -17,7 +17,8 @@ export type NotifyType =
   | "absence"
   | "message"
   | "report"
-  | "invoice";
+  | "invoice"
+  | "announcement";
 
 export type NotifyInput = {
   schoolId: string;
@@ -78,6 +79,21 @@ export async function staffUserIdsFor(schoolId: string): Promise<string[]> {
     where: { schoolId, role: { in: ["owner", "teacher"] } },
   });
   return staff.map((s) => s.id);
+}
+
+// Everyone on the family side of the school, by role. Used by announcements,
+// which address a role rather than a particular child.
+export async function familyUserIdsByRole(
+  schoolId: string,
+  audience: "all" | "parents" | "students"
+): Promise<string[]> {
+  const roles =
+    audience === "parents" ? ["parent"] : audience === "students" ? ["student"] : ["parent", "student"];
+  const users = await prisma.user.findMany({
+    where: { schoolId, role: { in: roles } },
+    select: { id: true },
+  });
+  return users.map((u) => u.id);
 }
 
 // Family side of one child: parents + the student.

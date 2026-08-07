@@ -623,3 +623,53 @@ model CalendarEvent {
 
   @@index([schoolId, startDate])
 }
+
+// One-to-many broadcast from the school to families.
+//
+// Deliberately distinct from the two things it looks like:
+//   Message      is a 1:1 thread about ONE child. "School closed Friday" is not
+//                a conversation and should not fork into twelve of them.
+//   Notification is delivery, not content — it carries a title and a link and
+//                is marked read. An announcement is the thing being linked TO,
+//                and it stays readable after the notification is dismissed.
+//
+// Publishing an announcement CREATES notifications; the two are layers, not
+// alternatives.
+model Announcement {
+  id         String  @id @default(cuid())
+  schoolId   String
+  authorId   String
+  authorName String
+  title      String
+  body       String  @default("")
+  bodyFormat String  @default("markdown") // markdown | plain
+
+  /** all | parents | students. Staff always see everything. */
+  audience String @default("all")
+  /** Sticks to the top of the family list — for "start here" notices. */
+  pinned   Boolean @default(false)
+  /** Ask recipients to confirm they have read it. Turns a broadcast into a
+   *  record, which is what a school actually needs for a closure or a policy. */
+  requireAck Boolean @default(false)
+
+  /** Null means draft. Set once, on publish — editing afterwards does NOT
+   *  re-notify, because a typo fix should not ping forty phones. */
+  publishedAt String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([schoolId, publishedAt])
+}
+
+model AnnouncementAck {
+  id             String   @id @default(cuid())
+  announcementId String
+  userId         String
+  at             String // ISO timestamp
+  createdAt      DateTime @default(now())
+
+  // One acknowledgement per person — a second click is not a second reader.
+  @@unique([announcementId, userId])
+  @@index([announcementId])
+}

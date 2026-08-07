@@ -23,7 +23,8 @@ import {
 } from "@/lib/lms";
 import { packByKey } from "@/lib/outcomes";
 import { recordOutcomesForSubmission, masteryForStudent } from "@/lib/mastery";
-import { notifyUsers, parentUserIdsFor, studentUserIdFor } from "@/lib/notify";
+import { notifyUsers, parentUserIdsFor, studentUserIdFor, familyUserIdsByRole } from "@/lib/notify";
+import { excerpt } from "@/lib/announcements";
 import { runMasteryPaths } from "@/lib/paths-run";
 import { bandFor, describeBand, isSelfReferential } from "@/lib/paths";
 import { deleteStudentData } from "@/lib/retention";
@@ -1584,4 +1585,121 @@ export async function regenerateCalendarToken() {
   await logAudit(user.id, "calendar_token_rotated", user.id);
   revalidatePath("/calendar");
   redirect("/calendar?rotated=1");
+}
+
+// --- Announcements ---
+// A broadcast, not a conversation. Publishing is the moment notifications fire,
+// and it happens exactly once: editing afterwards fixes the text without
+// pinging forty phones again.
+const AUDIENCE_VALUES = new Set(["all", "parents", "students"]);
+
+export async function saveAnnouncement(formData: FormData) {
+  const { user, school } = await requireTeacher();
+  const id = String(formData.get("id") || "").trim();
+  const title = String(formData.get("title") || "").trim();
+  const body = String(formData.get("body") || "").trim();
+  const audienceRaw = String(formData.get("audience") || "all");
+  const audience = AUDIENCE_VALUES.has(audienceRaw) ? audienceRaw : "all";
+  const pinned = formData.get("pinned") === "on";
+  const requireAck = formData.get("requireAck") === "on";
+  // The submit button carries the intent, so one form does draft and publish.
+  const publishNow = String(formData.get("intent") || "") === "publish";
+
+  if (!title) redirect("/announcements?error=title");
+
+  if (id) {
+    const existing = await prisma.announcement.findFirst({ where: { id, schoolId: school!.id } });
+    if (!existing) redirect("/announcements");
+    const nowPublishing = publishNow && !existing.publishedAt;
+    const updated = await prisma.announcement.update({
+      where: { id },
+      data: {
+        title,
+        body,
+        audience,
+        pinned,
+        requireAck,
+        // publishedAt is set once and never moved — it is the timestamp families
+        // see, and rewriting it on every edit would reorder their list.
+        ...(nowPublishing ? { publishedAt: new Date().toISOString() } : {}),
+      },
+    });
+    if (nowPublishing) await announce(updated, school!.id, user.id);
+    await logAudit(user.id, nowPublishing ? "announcement_published" : "announcement_updated", `${id}: ${title}`);
+    revalidatePath("/announcements");
+    redirect(`/announcements?${nowPublishing ? "published" : "saved"}=1`);
+  }
+
+  const created = await prisma.announcement.create({
+    data: {
+      schoolId: school!.id,
+      authorId: user.id,
+      authorName: user.name,
+      title,
+      body,
+      bodyFormat: "markdown",
+      audience,
+      pinned,
+      requireAck,
+      publishedAt: publishNow ? new Date().toISOString() : null,
+    },
+  });
+  if (publishNow) await announce(created, school!.id, user.id);
+  await logAudit(user.id, publishNow ? "announcement_published" : "announcement_drafted", `${created.id}: ${title}`);
+  revalidatePath("/announcements");
+  redirect(`/announcements?${publishNow ? "published" : "saved"}=1`);
+}
+
+// Fan out notifications for a newly published announcement.
+async function announce(
+  a: { id: string; title: string; body: string; audience: string; requireAck: boolean },
+  schoolId: string,
+  actorId: string
+) {
+  const audience = (AUDIENCE_VALUES.has(a.audience) ? a.audience : "all") as
+    | "all"
+    | "parents"
+    | "students";
+  const userIds = await familyUserIdsByRole(schoolId, audience);
+  // Parents land on the parent list, students on theirs; one link can't serve
+  // both, so the notification is written per role.
+  const parents = await prisma.user.findMany({
+    where: { id: { in: userIds }, role: "parent" },
+    select: { id: true },
+  });
+  const students = await prisma.user.findMany({
+    where: { id: { in: userIds }, role: "student" },
+    select: { id: true },
+  });
+  const base = {
+    schoolId,
+    type: "announcement" as const,
+    title: a.requireAck ? `Please read: ${a.title}` : a.title,
+    body: excerpt(a.body),
+  };
+  await notifyUsers(parents.map((p) => p.id), { ...base, linkPath: "/parent/announcements" }, actorId);
+  await notifyUsers(students.map((s) => s.id), { ...base, linkPath: "/student/announcements" }, actorId);
+}
+
+export async function deleteAnnouncement(formData: FormData) {
+  const { user, school } = await requireTeacher();
+  const id = String(formData.get("id"));
+  const a = await prisma.announcement.findFirst({ where: { id, schoolId: school!.id } });
+  if (!a) redirect("/announcements");
+  await prisma.announcementAck.deleteMany({ where: { announcementId: id } });
+  await prisma.announcement.delete({ where: { id } });
+  await logAudit(user.id, "announcement_deleted", `${id}: ${a.title}`);
+  revalidatePath("/announcements");
+  redirect("/announcements?deleted=1");
+}
+
+export async function togglePinAnnouncement(formData: FormData) {
+  const { user, school } = await requireTeacher();
+  const id = String(formData.get("id"));
+  const a = await prisma.announcement.findFirst({ where: { id, schoolId: school!.id } });
+  if (!a) redirect("/announcements");
+  await prisma.announcement.update({ where: { id }, data: { pinned: !a.pinned } });
+  await logAudit(user.id, "announcement_pin", `${id} → ${!a.pinned}`);
+  revalidatePath("/announcements");
+  redirect("/announcements");
 }
