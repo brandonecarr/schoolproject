@@ -25,6 +25,11 @@ datasource db {
 model School {
   id        String   @id @default(cuid())
   name      String
+  /// The school's subdomain: cedar-grove.<root domain>. Public and effectively
+  /// permanent — it is in every link the school has sent a family, in their
+  /// bookmarks, and in the iCal URLs parents have already subscribed to. It is
+  /// deliberately NOT regenerated when the school's name is edited.
+  slug      String   @unique
   state     String
   esaAmount Float
   address   String   @default("")
@@ -73,7 +78,12 @@ model User {
   schoolId        String
   role            String // owner | teacher | parent | student
   name            String
-  email           String   @unique
+  /// Unique per SCHOOL, not globally. The same person legitimately holds two
+  /// accounts in this market: a parent with children in two programmes, or a
+  /// teacher who works at a co-op as well as their own microschool. A global
+  /// unique index turns that into "this email is taken" with no way forward.
+  /// Login is therefore always tenant-scoped — see the subdomain middleware.
+  email           String
   password        String
   studentId       String? // set for role=student — the Student they represent
   studentIdsJson  String? // set for role=parent — JSON array of Student ids
@@ -81,6 +91,9 @@ model User {
   createdByParent Boolean  @default(false)
   consentGivenAt  String?
   createdAt       DateTime @default(now())
+
+  @@unique([schoolId, email])
+  @@index([email])
 }
 
 model Student {

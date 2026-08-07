@@ -49,6 +49,11 @@ async function main() {
   const school = await prisma.school.create({
     data: {
       name: "Cedar Grove Learning Collective",
+      // The subdomain. Short on purpose — it is what families type and
+      // bookmark, and "cedar-grove-learning-collective" is a mouthful. Real
+      // signups suggest a slug and let the school shorten it before it is
+      // committed, because it is permanent once links are out.
+      slug: "cedar-grove",
       state: "AZ",
       esaAmount: 7400,
       address: "412 N Willow St, Mesa AZ",
