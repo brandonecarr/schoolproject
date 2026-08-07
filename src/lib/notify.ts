@@ -10,6 +10,7 @@
 
 import { prisma } from "@/lib/db";
 import { sendEmail, renderEmail, appUrl, emailConfigured } from "@/lib/email";
+import { originFor } from "@/lib/tenant-config";
 
 export type NotifyType =
   | "graded"
@@ -65,7 +66,7 @@ async function emailNotify(userIds: string[], input: NotifyInput): Promise<void>
       where: { id: { in: userIds }, emailAlerts: true },
       select: { email: true },
     }),
-    prisma.school.findUnique({ where: { id: input.schoolId }, select: { name: true } }),
+    prisma.school.findUnique({ where: { id: input.schoolId }, select: { name: true, slug: true } }),
   ]);
   if (recipients.length === 0) return;
 
@@ -74,7 +75,12 @@ async function emailNotify(userIds: string[], input: NotifyInput): Promise<void>
     body: input.body ?? "",
     linkPath: input.linkPath ?? "",
     schoolName: school?.name ?? "Your school",
-    appUrl: appUrl(),
+    // The school's own address. A notification email sent to a Cedar Grove
+    // parent has to link to cedar-grove.<root>, not to whatever host the
+    // deployment answers on — the cookie is host-only, so a link to the wrong
+    // origin lands them on a sign-in page. originFor is null untenanted, where
+    // there is only one origin and appUrl is right.
+    appUrl: (school && originFor(school.slug)) || appUrl(),
   });
   // Sequential: a microschool sends a handful at a time, and one address at a
   // time keeps a single bad recipient from taking the rest down with it.

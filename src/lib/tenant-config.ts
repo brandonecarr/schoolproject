@@ -12,6 +12,8 @@
 // wildcard DNS record and certificate actually exist. Turning it on before
 // then would send every school to an address that doesn't resolve.
 
+import { tenantOrigin } from "@/lib/tenant";
+
 /** e.g. "cohort.school", or "localhost:3000" to try tenancy locally. Empty
  *  when tenancy is off. */
 export function rootDomain(): string {
@@ -26,4 +28,16 @@ export function multiTenant(): boolean {
 /** https in production, http for a local ROOT_DOMAIN=localhost:3000. */
 export function tenantProtocol(): string {
   return rootDomain().startsWith("localhost") ? "http" : "https";
+}
+
+/**
+ * A school's own origin, for links that leave the request that made them —
+ * an email, a background job.
+ *
+ * Null when tenancy is off, because then there is only one origin and the
+ * caller has a better source for it (the request itself, or APP_URL).
+ */
+export function originFor(slug: string): string | null {
+  const root = rootDomain();
+  return root ? tenantOrigin(slug, root, tenantProtocol()) : null;
 }

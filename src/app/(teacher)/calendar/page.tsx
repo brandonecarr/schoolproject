@@ -10,6 +10,7 @@
 // with a month grid. The number is the point.
 
 import { requireTeacher } from "@/lib/auth";
+import { currentOrigin } from "@/lib/tenant-server";
 import { prisma } from "@/lib/db";
 import { fmt, today, periodStart } from "@/lib/dates";
 import {
@@ -60,7 +61,12 @@ export default async function CalendarPage({
   const loggedDates = new Set(logged.map((a) => a.date));
   const unlogged = inPeriod.filter((d) => !loggedDates.has(d));
 
-  const feedUrl = user.calendarToken ? `/calendar/${user.calendarToken}.ics` : null;
+  // Absolute: this is copied out of the page and pasted into Apple Calendar,
+  // where a relative path means nothing. Built from the address the school is
+  // already using, so on a subdomain it is the school's own.
+  const feedUrl = user.calendarToken
+    ? `${await currentOrigin()}/calendar/${user.calendarToken}.ics`
+    : null;
 
   return (
     <>

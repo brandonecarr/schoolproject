@@ -4,6 +4,7 @@
 import { requireUser } from "@/lib/auth";
 import { FamilyCalendar } from "@/components/FamilyCalendar";
 import { familyCalendarFor, ensureCalendarToken } from "@/lib/family-calendar";
+import { currentOrigin } from "@/lib/tenant-server";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Calendar — Cohort" };
@@ -12,6 +13,8 @@ export default async function ParentCalendarPage() {
   const { user } = await requireUser();
   const items = await familyCalendarFor(user);
   const token = await ensureCalendarToken(user.id, user.calendarToken);
+  // Absolute — a parent pastes this into their own calendar app.
+  const origin = await currentOrigin();
 
   return (
     <>
@@ -22,7 +25,7 @@ export default async function ParentCalendarPage() {
       </p>
       <FamilyCalendar
         items={items}
-        feedUrl={`/calendar/${token}.ics`}
+        feedUrl={`${origin}/calendar/${token}.ics`}
         emptyNote="Nothing scheduled in the next few weeks."
       />
     </>

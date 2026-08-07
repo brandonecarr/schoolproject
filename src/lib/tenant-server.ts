@@ -18,8 +18,8 @@ import "server-only";
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/db";
-import { classifyHost, tenantOrigin, type HostKind } from "@/lib/tenant";
-import { rootDomain, tenantProtocol } from "@/lib/tenant-config";
+import { classifyHost, type HostKind } from "@/lib/tenant";
+import { originFor, rootDomain } from "@/lib/tenant-config";
 
 export async function currentHost(): Promise<string> {
   const h = await headers();
@@ -40,13 +40,27 @@ export async function currentSlug(): Promise<string | null> {
   return kind.kind === "tenant" ? kind.slug : null;
 }
 
-/** A school's own origin, for links that have to leave this host. Returns null
- *  when tenancy is off, because then there is only one origin and the caller
- *  should use relative paths. */
-export function originFor(slug: string): string | null {
-  const root = rootDomain();
-  return root ? tenantOrigin(slug, root, tenantProtocol()) : null;
+/**
+ * The origin this request actually arrived on.
+ *
+ * For links a person will copy out of the page and paste somewhere else: an
+ * iCal subscription URL, an invite link a teacher texts to a parent. Those have
+ * to be absolute, and they have to be the address the school is already using —
+ * which is exactly the address this request came in on, in every mode. On a
+ * subdomain it is the school's own; untenanted it is whatever host the
+ * deployment answers to; on a preview URL it is that preview.
+ */
+export async function currentOrigin(): Promise<string> {
+  const h = await headers();
+  const host = await currentHost();
+  const proto = h.get("x-forwarded-proto") || (host.startsWith("localhost") ? "http" : "https");
+  return `${proto}://${host}`;
 }
+
+// Re-exported so callers have one tenancy import. The implementation lives in
+// tenant-config because it needs no request — background jobs and the email
+// sender have a school but no Host header.
+export { originFor } from "@/lib/tenant-config";
 
 /**
  * Move a tokenised link to the school it belongs to.

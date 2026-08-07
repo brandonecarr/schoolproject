@@ -142,6 +142,35 @@ describe("the signup handoff", () => {
   });
 });
 
+// A link that leaves the app has to point at the SCHOOL's address. With
+// host-only cookies, a link to the wrong origin is a link to a sign-in page.
+describe("links that leave the app carry the school's own address", () => {
+  const surfaces = [
+    "src/app/(teacher)/invites/page.tsx", // invite + reset links a teacher shares
+    "src/app/(teacher)/calendar/page.tsx", // iCal subscription URL
+    "src/app/(portal)/parent/calendar/page.tsx",
+    "src/app/(portal)/student/calendar/page.tsx",
+  ];
+
+  it.each(surfaces)("%s builds its URLs from currentOrigin", (path) => {
+    expect(read(path)).toContain("currentOrigin");
+  });
+
+  it.each(surfaces)("%s does not reassemble a host by hand", (path) => {
+    // The version of this that shipped for months read the Host header inline
+    // in one file and used a bare relative path in three others — so the iCal
+    // URL a parent was told to paste into Apple Calendar was "/calendar/x.ics".
+    expect(read(path)).not.toMatch(/x-forwarded-proto/);
+  });
+
+  it("email links resolve the school rather than the deployment", () => {
+    const notify = read("src/lib/notify.ts");
+    expect(notify).toContain("originFor(school.slug)");
+    // Untenanted still needs an answer, and appUrl is it.
+    expect(notify).toContain("appUrl()");
+  });
+});
+
 describe("the apex serves only the public surface", () => {
   const proxy = read("src/proxy.ts");
 

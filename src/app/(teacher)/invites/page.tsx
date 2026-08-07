@@ -1,10 +1,10 @@
-import { headers } from "next/headers";
 import Link from "next/link";
 import { requireTeacher } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { Pill, Notice } from "@/components/ui";
 import { tokenUsable } from "@/lib/tokens";
 import { createParentInvite, generateResetLink } from "../actions";
+import { currentOrigin } from "@/lib/tenant-server";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Invite families — Cohort" };
@@ -18,8 +18,10 @@ export default async function InvitesPage({
   const schoolId = school!.id;
   const sp = await searchParams;
 
-  const h = await headers();
-  const base = `${h.get("x-forwarded-proto") ?? "http"}://${h.get("host") ?? "localhost:3000"}`;
+  // The address the school is already using, which on a subdomain is their
+  // own. A link built from anywhere else would drop the family on a host where
+  // their session cookie does not exist.
+  const base = await currentOrigin();
 
   const students = await prisma.student.findMany({ where: { schoolId }, orderBy: { createdAt: "asc" } });
   const parents = await prisma.user.findMany({ where: { schoolId, role: "parent" } });
