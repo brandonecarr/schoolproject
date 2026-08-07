@@ -36,6 +36,22 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
   const e = await evidenceFor(inv.studentId, inv.periodStart, inv.periodEnd);
   const graded = e.submissions.filter((x) => x.status === "graded");
 
+  // Teacher's inline marks on the work in this period. A reviewer asking for
+  // "evidence of instruction delivered" is asking for exactly this: the child's
+  // work with the teacher's specific corrections on it, not just a score.
+  const pinRows = e.submissions.length
+    ? await prisma.annotation.findMany({
+        where: { submissionId: { in: e.submissions.map((x) => x.id) } },
+        orderBy: { createdAt: "asc" },
+      })
+    : [];
+  const pinsByFile = new Map<string, typeof pinRows>();
+  for (const p of pinRows) {
+    const list = pinsByFile.get(p.fileId) ?? [];
+    list.push(p);
+    pinsByFile.set(p.fileId, list);
+  }
+
   const printCss = `
   *{box-sizing:border-box}
   body{margin:0;padding:44px;font-family:ui-serif,Georgia,"Times New Roman",serif;color:#141C26;font-size:12pt;line-height:1.55;background:#fff;max-width:840px}
@@ -132,7 +148,16 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
           .map((f) =>
             f.mime === "application/pdf"
               ? `<figure><div style="border:1px solid #DCDFD8;border-radius:4px;padding:24px;text-align:center;font-family:sans-serif;font-size:9pt;color:#5C6672">PDF attachment</div><figcaption>${esc(f.label)}</figcaption></figure>`
-              : `<figure><img src="/files/${esc(f.id)}" alt="${esc(f.label)}"><figcaption>${esc(f.label)}</figcaption></figure>`
+              : `<figure><img src="/files/${esc(f.id)}" alt="${esc(f.label)}"><figcaption>${esc(f.label)}${
+                  // A numbered key rather than an overlay: pin positions depend
+                  // on the rendered image box, which a print engine decides, and
+                  // a note in the wrong place is worse than a note in a list.
+                  (pinsByFile.get(f.id) ?? []).length
+                    ? `<ol style="margin:4px 0 0;padding-left:14px">${(pinsByFile.get(f.id) ?? [])
+                        .map((p) => `<li>${esc(p.body)}</li>`)
+                        .join("")}</ol>`
+                    : ""
+                }</figcaption></figure>`
           )
           .join("")}</div>`
       : ""

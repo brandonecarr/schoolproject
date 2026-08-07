@@ -673,3 +673,35 @@ model AnnouncementAck {
   @@unique([announcementId, userId])
   @@index([announcementId])
 }
+
+// A pinned comment on a point of a student's uploaded work.
+//
+// IMAGES ONLY. Annotating a PDF needs a renderer to know where page 2 is on
+// screen; that is a different feature and pretending otherwise would put pins
+// in the wrong place.
+//
+// Coordinates are FRACTIONS of the image (0..1), never pixels. The same photo
+// renders at 320px in the grading queue, full width on a phone, and at print
+// scale in the ESA packet — a pixel offset would be wrong in two of those three.
+//
+// Worth more than the feature sounds: "here is the child's work with the
+// teacher's specific marks on it" is far stronger evidence of instruction
+// delivered than a score, and it is exactly what rails ask to see.
+model Annotation {
+  id           String @id @default(cuid())
+  schoolId     String
+  submissionId String
+  fileId       String
+  /** 0..1 from the left edge. */
+  x            Float
+  /** 0..1 from the top edge. */
+  y            Float
+  body         String
+  authorId     String
+  authorName   String
+
+  createdAt DateTime @default(now())
+
+  @@index([submissionId])
+  @@index([fileId])
+}

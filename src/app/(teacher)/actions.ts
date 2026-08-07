@@ -25,6 +25,7 @@ import { packByKey } from "@/lib/outcomes";
 import { recordOutcomesForSubmission, masteryForStudent } from "@/lib/mastery";
 import { notifyUsers, parentUserIdsFor, studentUserIdFor, familyUserIdsByRole } from "@/lib/notify";
 import { excerpt } from "@/lib/announcements";
+import { clamp01, isAnnotatable } from "@/lib/annotate";
 import { runMasteryPaths } from "@/lib/paths-run";
 import { bandFor, describeBand, isSelfReferential } from "@/lib/paths";
 import { deleteStudentData } from "@/lib/retention";
@@ -1702,4 +1703,51 @@ export async function togglePinAnnouncement(formData: FormData) {
   await logAudit(user.id, "announcement_pin", `${id} → ${!a.pinned}`);
   revalidatePath("/announcements");
   redirect("/announcements");
+}
+
+// --- Inline annotation on uploaded work ---
+// Pins live on the submission, not the file, so a resubmitted photo starts
+// clean rather than inheriting marks about work the student has since redone.
+export async function addAnnotation(formData: FormData) {
+  const { user, school } = await requireTeacher();
+  const submissionId = String(formData.get("submissionId"));
+  const body = String(formData.get("body") || "").trim().slice(0, 600);
+  const x = clamp01(Number(formData.get("x")));
+  const y = clamp01(Number(formData.get("y")));
+
+  const sub = await prisma.submission.findFirst({
+    where: { id: submissionId, schoolId: school!.id },
+  });
+  if (!sub || !sub.fileId || !body) redirect("/grading");
+
+  // Only pin on something we can actually place a pin on.
+  const file = await prisma.fileRec.findUnique({ where: { id: sub.fileId } });
+  if (!isAnnotatable(file)) redirect("/grading");
+
+  await prisma.annotation.create({
+    data: {
+      schoolId: school!.id,
+      submissionId,
+      fileId: sub.fileId,
+      x,
+      y,
+      body,
+      authorId: user.id,
+      authorName: user.name,
+    },
+  });
+  await logAudit(user.id, "annotation_added", `${submissionId} @ ${x.toFixed(2)},${y.toFixed(2)}`);
+  revalidatePath("/grading");
+  redirect("/grading");
+}
+
+export async function deleteAnnotation(formData: FormData) {
+  const { user, school } = await requireTeacher();
+  const id = String(formData.get("id"));
+  const a = await prisma.annotation.findFirst({ where: { id, schoolId: school!.id } });
+  if (!a) redirect("/grading");
+  await prisma.annotation.delete({ where: { id } });
+  await logAudit(user.id, "annotation_deleted", id);
+  revalidatePath("/grading");
+  redirect("/grading");
 }

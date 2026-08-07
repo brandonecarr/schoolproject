@@ -2375,3 +2375,40 @@ a.mod-item:hover {
   background: var(--mark);
   border-radius: 999px;
 }
+
+/* Annotation pins over a student's uploaded work. Positioned by percentage so
+   they track the image at any render size — see src/lib/annotate.ts. The
+   translate(-50%,-50%) centres the marker ON the clicked point rather than
+   hanging it below and to the right. */
+.pin {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  min-width: 22px;
+  height: 22px;
+  padding: 0 5px;
+  border-radius: 999px;
+  background: var(--mark);
+  color: var(--ink);
+  border: 2px solid #fff;
+  box-shadow: 0 1px 4px rgba(20, 28, 38, 0.35);
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 18px;
+  text-align: center;
+  cursor: default;
+  user-select: none;
+}
+.pin.draft {
+  background: #fff;
+  border-color: var(--mark-deep);
+  color: var(--mark-deep);
+}
+.pinkey {
+  margin: 10px 0 0;
+  padding-left: 20px;
+  font-size: 13.5px;
+  line-height: 1.7;
+}
+.pinkey li {
+  margin-bottom: 2px;
+}

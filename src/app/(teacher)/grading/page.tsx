@@ -12,7 +12,9 @@ import {
   scoreItem,
   type Item,
 } from "@/lib/lms";
-import { saveGrade, returnSubmission } from "../actions";
+import { saveGrade, returnSubmission, deleteAnnotation } from "../actions";
+import { Annotator, type Pin } from "@/components/Annotator";
+import { isAnnotatable, numbered } from "@/lib/annotate";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Grading — Cohort" };
@@ -39,6 +41,38 @@ export default async function GradingPage({
     a: assignments.find((x) => x.id === s.assignmentId),
     st: students.find((x) => x.id === s.studentId),
   }));
+
+  // Existing pins, and which turned-in files can carry one. Two queries for the
+  // whole queue rather than two per row.
+  const fileIds = queueRaw.map((s) => s.fileId).filter((x): x is string => Boolean(x));
+  const [files, annotations] = await Promise.all([
+    fileIds.length
+      ? prisma.fileRec.findMany({
+          where: { id: { in: fileIds } },
+          select: { id: true, mime: true, ext: true },
+        })
+      : Promise.resolve([]),
+    queueRaw.length
+      ? prisma.annotation.findMany({
+          where: { submissionId: { in: queueRaw.map((s) => s.id) } },
+          orderBy: { createdAt: "asc" },
+        })
+      : Promise.resolve([]),
+  ]);
+  const annotatableIds = new Set(files.filter(isAnnotatable).map((f) => f.id));
+  const pinsBySubmission = new Map<string, Pin[]>();
+  for (const p of annotations) {
+    const list = pinsBySubmission.get(p.submissionId) ?? [];
+    list.push({
+      id: p.id,
+      x: p.x,
+      y: p.y,
+      body: p.body,
+      authorName: p.authorName,
+      createdAt: p.createdAt.toISOString(),
+    });
+    pinsBySubmission.set(p.submissionId, list);
+  }
 
   return (
     <>
@@ -83,16 +117,27 @@ export default async function GradingPage({
                 <Pill tone="info">Due {fmt(a ? a.dueDate : null)}</Pill>
               </div>
 
-              {/* type-specific view + inputs live inside the grade form */}
+              {/* The work preview sits OUTSIDE the grade form. It carries no
+                  grade inputs, and the annotator has its own <form> — a nested
+                  form is invalid HTML, so the browser silently drops the inner
+                  one and the pin button ends up submitting the grade instead. */}
+              {a && a.type === "upload" && (
+                <UploadView
+                  submissionId={s.id}
+                  fileId={s.fileId}
+                  note={s.responseText}
+                  annotatable={annotatableIds.has(s.fileId ?? "")}
+                  pins={pinsBySubmission.get(s.id) ?? []}
+                />
+              )}
+
+              {/* type-specific inputs live inside the grade form */}
               <form action={saveGrade}>
                 <input type="hidden" name="id" value={s.id} />
 
                 {a && a.type === "quiz" && <QuizGrade a={a} answersJson={s.answersJson} />}
                 {a && a.type === "rubric" && (
                   <RubricGrade a={a} responseText={s.responseText} fileId={s.fileId} />
-                )}
-                {a && a.type === "upload" && (
-                  <UploadView fileId={s.fileId} note={s.responseText} />
                 )}
                 {a && (a.type === "written" || !["quiz", "rubric", "upload"].includes(a.type)) && (
                   <p className="response" style={{ margin: "10px 0 0" }}>
@@ -285,28 +330,59 @@ function RubricGrade({
   );
 }
 
-// --- Upload view: preview the turned-in file ---
-function UploadView({ fileId, note }: { fileId: string | null; note: string }) {
+// --- Upload view: preview the turned-in file, and pin notes on it ---
+function UploadView({
+  submissionId,
+  fileId,
+  note,
+  annotatable,
+  pins,
+}: {
+  submissionId: string;
+  fileId: string | null;
+  note: string;
+  annotatable: boolean;
+  pins: Pin[];
+}) {
   return (
     <div style={{ marginTop: 10 }}>
       {note && <p className="response">{note}</p>}
-      {fileId ? (
-        <a href={`/files/${fileId}`} target="_blank" rel="noreferrer">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img
-            src={`/files/${fileId}`}
-            alt="Turned-in work"
-            style={{
-              maxWidth: 320,
-              width: "100%",
-              border: "1px solid var(--rule)",
-              borderRadius: 10,
-              display: "block",
-            }}
-          />
-        </a>
-      ) : (
+      {!fileId ? (
         <p className="muted small">No file was attached.</p>
+      ) : annotatable ? (
+        <Annotator submissionId={submissionId} fileId={fileId} pins={pins} />
+      ) : (
+        <>
+          <a href={`/files/${fileId}`} target="_blank" rel="noreferrer">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={`/files/${fileId}`}
+              alt="Turned-in work"
+              style={{
+                maxWidth: 320,
+                width: "100%",
+                border: "1px solid var(--rule)",
+                borderRadius: 10,
+                display: "block",
+              }}
+            />
+          </a>
+          <p className="small muted" style={{ margin: "6px 0 0" }}>
+            Pinned notes need an image — this file can only be opened.
+          </p>
+        </>
+      )}
+      {fileId && pins.length > 0 && (
+        <div className="row" style={{ gap: 8, marginTop: 8, flexWrap: "wrap" }}>
+          {numbered(pins).map((m) => (
+            <form key={m.id} action={deleteAnnotation}>
+              <input type="hidden" name="id" value={m.id} />
+              <button className="btn ghost sm" title={m.body}>
+                Remove pin {m.n}
+              </button>
+            </form>
+          ))}
+        </div>
       )}
     </div>
   );

@@ -4,6 +4,8 @@ import { requireRole } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { fmt } from "@/lib/dates";
 import { Pill } from "@/components/ui";
+import { PinnedWork } from "@/components/PinnedWork";
+import type { Pin } from "@/components/Annotator";
 import {
   typeMeta,
   parseItems,
@@ -35,6 +37,21 @@ export default async function SubmittedWorkView({
   if (!["submitted", "graded"].includes(sub.status)) redirect("/student/work");
 
   const asg = await prisma.assignment.findUnique({ where: { id: sub.assignmentId } });
+
+  // Teacher's pins on this submission, read-only for the student.
+  const pins: Pin[] = (
+    await prisma.annotation.findMany({
+      where: { submissionId: sub.id },
+      orderBy: { createdAt: "asc" },
+    })
+  ).map((p) => ({
+    id: p.id,
+    x: p.x,
+    y: p.y,
+    body: p.body,
+    authorName: p.authorName,
+    createdAt: p.createdAt.toISOString(),
+  }));
   if (!asg) redirect("/student/work");
   const course = await prisma.course.findUnique({ where: { id: asg.courseId } });
   const m = typeMeta(asg.type);
@@ -86,7 +103,7 @@ export default async function SubmittedWorkView({
           {asg.type === "rubric" && (
             <RubricReadOnly text={sub.responseText} fileId={sub.fileId} />
           )}
-          {asg.type === "upload" && <UploadReadOnly fileId={sub.fileId} note={sub.responseText} />}
+          {asg.type === "upload" && <UploadReadOnly fileId={sub.fileId} note={sub.responseText} pins={pins} />}
           {asg.type === "checkoff" && <CheckoffReadOnly answersJson={sub.answersJson} />}
         </div>
       </div>
@@ -111,31 +128,43 @@ function RubricReadOnly({ text, fileId }: { text: string; fileId: string | null 
   );
 }
 
-function UploadReadOnly({ fileId, note }: { fileId: string | null; note: string }) {
+function UploadReadOnly({
+  fileId,
+  note,
+  pins,
+}: {
+  fileId: string | null;
+  note: string;
+  pins: Pin[];
+}) {
   return (
     <>
       {note && <p className="response" style={{ marginTop: 0 }}>{note}</p>}
-      {fileId ? (
+      {!fileId ? (
+        <p className="muted small">No file was attached.</p>
+      ) : pins.length > 0 ? (
+        <>
+          {/* Read-only on purpose: submitted work stays locked, and the pins are
+              the teacher's marks, not a conversation the student edits. */}
+          <PinnedWork fileId={fileId} pins={pins} alt="Your turned-in work" />
+          <p className="small muted" style={{ margin: "8px 0 0" }}>
+            The numbered notes are your teacher&apos;s marks on your work.
+          </p>
+        </>
+      ) : (
         <a href={`/files/${fileId}`} target="_blank" rel="noreferrer">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
             src={`/files/${fileId}`}
             alt="Your turned-in work"
-            style={{
-              maxWidth: 340,
-              width: "100%",
-              border: "1px solid var(--rule)",
-              borderRadius: 10,
-              display: "block",
-            }}
+            style={{ maxWidth: 340, width: "100%", border: "1px solid var(--rule)", borderRadius: 10, display: "block" }}
           />
         </a>
-      ) : (
-        <p className="muted small">No file was attached.</p>
       )}
     </>
   );
 }
+
 
 function CheckoffReadOnly({ answersJson }: { answersJson: string }) {
   const a = parseCheckoffAnswer(answersJson);
