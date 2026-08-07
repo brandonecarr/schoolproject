@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { requireTeacher } from "@/lib/auth";
+import { configuredStates } from "@/lib/rules";
 import { importStudents } from "../../actions";
 
 export const dynamic = "force-dynamic";
@@ -41,7 +42,7 @@ export default async function ImportRosterPage() {
           style={{ minHeight: 200, fontFamily: "var(--mono)", fontSize: 13 }}
         />
         <p className="small muted" style={{ margin: "10px 0 0" }}>
-          <strong>esaProgram</strong> is a two-letter state code (AZ, FL, IA, UT, AR) or blank for
+          <strong>esaProgram</strong> is a two-letter state code ({configuredStates().join(", ")}) or blank for
           private pay. A header row is optional — it&apos;s skipped automatically. Amounts default to $0
           / the school ESA amount when omitted.
         </p>

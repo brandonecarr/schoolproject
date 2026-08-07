@@ -218,6 +218,18 @@ export function programOptions(): (Program & { code: string })[] {
     .sort((a, b) => a.label.localeCompare(b.label));
 }
 
+/**
+ * The state codes that have a program configured.
+ *
+ * Exported so user-facing copy can be DERIVED rather than written out. The
+ * signup form used to say "AZ, FL, IA, UT and AR" in prose; by the time anyone
+ * noticed, PROGRAMS held 23 states and the sentence was turning away eighteen
+ * states' worth of schools. Nothing hand-counts this list again.
+ */
+export function configuredStates(): string[] {
+  return Object.keys(PROGRAMS).sort();
+}
+
 export function railForState(state: string): Rail | null {
   const p = PROGRAMS[state];
   return p ? RAILS[p.rail] : null;

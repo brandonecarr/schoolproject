@@ -37,7 +37,8 @@ export function letterheadCss(brand: Brand): string {
   .letterhead{display:flex;align-items:center;gap:14px;border-bottom:3px solid ${brand.accent};padding-bottom:10px;margin-bottom:18px}
   .letterhead img{height:46px;width:auto;max-width:190px;object-fit:contain}
   .letterhead .name{font-family:ui-serif,Georgia,serif;font-size:15pt;line-height:1.25;color:#141C26}
-  .letterhead .addr{font-family:-apple-system,Segoe UI,Roboto,sans-serif;font-size:9pt;color:#5C6672}`;
+  .letterhead .addr{font-family:-apple-system,Segoe UI,Roboto,sans-serif;font-size:9pt;color:#5C6672}
+  .letterhead .prov{margin-top:2px;font-variant-numeric:tabular-nums}`;
 }
 
 /**
@@ -91,6 +92,7 @@ export function letterhead(brand: Brand): string {
   return `<div class="letterhead">${logo}<div>
     <div class="name">${esc(brand.schoolName)}</div>
     ${brand.address ? `<div class="addr">${esc(brand.address)}</div>` : ""}
+    ${brand.providerLine ? `<div class="addr prov">${esc(brand.providerLine)}</div>` : ""}
   </div></div>`;
 }
 

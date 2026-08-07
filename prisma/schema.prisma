@@ -58,6 +58,28 @@ model School {
   // and picks a foreground that actually meets contrast against it.
   accentColor String @default("")
 
+  // --- Identity with whoever administers the money --------------------------
+  // The number a reviewer matches an invoice against: the ClassWallet vendor
+  // ID, the Step Up provider ID, the state's approved-provider number. It goes
+  // on the packet, which is the point — our packets carried no such number.
+  //
+  // Cohort CANNOT check any of these. Every marketplace is behind the school's
+  // own login; there is no public directory and no API. So this is a claim the
+  // school makes, dated and attributed, never a verification we performed. See
+  // the header of src/lib/provider.ts for why that distinction is load-bearing.
+  providerId          String  @default("")
+  // Which administrator issued it — a rail id from lib/rules.ts. Stored rather
+  // than derived from `state`, because a state can re-bid its contract and a
+  // multi-state operator can sit on a rail its address does not imply. A wrong
+  // administrator on a packet is a guaranteed rejection.
+  providerRail        String  @default("")
+  // ISO date someone last said "yes, this is still active". Status (none /
+  // attested / stale) is DERIVED from this in provider.ts, never stored — a
+  // stored status is a second copy of the truth that drifts on the first edit.
+  providerAttestedAt  String?
+  // Who said it. An attestation with nobody behind it is not an attestation.
+  providerAttestedById String?
+
   createdAt DateTime @default(now())
 }
 

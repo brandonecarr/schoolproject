@@ -2,7 +2,8 @@ import Link from "next/link";
 import { requireTeacher } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { evidenceFor } from "@/lib/evidence";
-import { readiness, PROGRAMS } from "@/lib/rules";
+import { readiness, PROGRAMS, railForState } from "@/lib/rules";
+import { providerStatus } from "@/lib/provider";
 import { today, fmt } from "@/lib/dates";
 import { dueLabel, daysBetween } from "@/lib/due";
 import { typeMeta } from "@/lib/lms";
@@ -80,6 +81,22 @@ export default async function Dashboard({
   // school through it, and it is not something they can change later.
   const origin = welcome ? await currentOrigin() : null;
 
+  // The provider ID a reviewer matches an invoice against. Silence when the
+  // school has no rail; a prompt when it has one and no number on file; a
+  // reminder when nobody has stood behind the number in six months.
+  const pIdentity = {
+    providerId: school!.providerId,
+    providerRail: school!.providerRail,
+    providerAttestedAt: school!.providerAttestedAt,
+  };
+  const pStatus = railForState(school!.state) ? providerStatus(pIdentity, td) : "attested";
+  const providerNudge =
+    pStatus === "none"
+      ? "No provider ID on file — your reimbursement packets go out without the number a reviewer uses to match them to your approved-provider record."
+      : pStatus === "stale"
+        ? "Your provider ID hasn't been confirmed in a while. If it's lapsed with your administrator, every invoice built on it bounces."
+        : null;
+
   return (
     <>
       {origin && (
@@ -141,6 +158,16 @@ export default async function Dashboard({
         <div className="notice warn" style={{ marginTop: 16 }}>
           Attendance isn&apos;t logged for today yet — it&apos;s the single biggest input to every ESA
           invoice. <Link href="/attendance">Take it now</Link>.
+        </div>
+      )}
+
+      {/* Only for schools that actually have an administrator to be approved
+          by. A school in a state with no configured program has no provider ID
+          to record, and nagging them for one would be nagging them for
+          something that does not exist. */}
+      {providerNudge && (
+        <div className="notice warn" style={{ marginTop: 16 }}>
+          {providerNudge} <Link href="/settings">Settings</Link>.
         </div>
       )}
 

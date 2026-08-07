@@ -4,10 +4,20 @@ import { prisma } from "@/lib/db";
 import { Notice } from "@/components/ui";
 import { ConfirmSubmit } from "@/components/ConfirmSubmit";
 import { accentOf, readableOn, accentIsLegible, logoDataUri, DEFAULT_ACCENT } from "@/lib/branding";
-import { updateRetention, uploadLogo, removeLogo, updateAccent } from "../actions";
+import { ADMINISTRATORS, administratorFor, providerStatus, providerSummary } from "@/lib/provider";
+import { railForState } from "@/lib/rules";
+import { today } from "@/lib/dates";
+import { updateRetention, uploadLogo, removeLogo, updateAccent, updateProviderIdentity } from "../actions";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Settings — Cohort" };
+
+const PROVIDER_MSG: Record<string, { tone: "good" | "bad"; text: string }> = {
+  saved: { tone: "good", text: "Provider ID saved. It now appears on every reimbursement packet you print." },
+  cleared: { tone: "good", text: "Provider ID removed. Packets no longer carry one." },
+  bad: { tone: "bad", text: "That doesn't look like a provider ID — check you copied the number, not a link." },
+  rail: { tone: "bad", text: "Choose which administrator issued the ID." },
+};
 
 const LOGO_MSG: Record<string, { tone: "good" | "bad"; text: string }> = {
   ok: { tone: "good", text: "Logo updated. It now heads every packet you print." },
@@ -21,7 +31,7 @@ const LOGO_MSG: Record<string, { tone: "good" | "bad"; text: string }> = {
 export default async function SettingsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ saved?: string; logo?: string }>;
+  searchParams: Promise<{ saved?: string; logo?: string; provider?: string }>;
 }) {
   const { school } = await requireTeacher();
   const sp = await searchParams;
@@ -36,11 +46,33 @@ export default async function SettingsPage({
   const accent = accentOf(school);
   const legible = accentIsLegible(accent);
   const logoMsg = sp.logo ? LOGO_MSG[sp.logo] : null;
+  const providerMsg = sp.provider ? PROVIDER_MSG[sp.provider] : null;
+
+  // Who last stood behind the provider ID. Looked up rather than denormalised
+  // onto School — a name that changes should change everywhere at once.
+  const attestedBy = school!.providerAttestedById
+    ? await prisma.user.findFirst({
+        where: { id: school!.providerAttestedById, schoolId: school!.id },
+        select: { name: true },
+      })
+    : null;
+  const identity = {
+    providerId: school!.providerId,
+    providerRail: school!.providerRail,
+    providerAttestedAt: school!.providerAttestedAt,
+  };
+  const pStatus = providerStatus(identity, today());
+  // Default the administrator to whatever this school's state implies, so the
+  // common case is one field and a tick rather than a dropdown decision.
+  const impliedRail = railForState(school!.state)?.id ?? "";
+  const chosenRail = school!.providerRail || impliedRail;
+  const admin = administratorFor(chosenRail);
 
   return (
     <>
       {sp.saved && <Notice tone="good">Settings saved.</Notice>}
       {logoMsg && <Notice tone={logoMsg.tone}>{logoMsg.text}</Notice>}
+      {providerMsg && <Notice tone={providerMsg.tone}>{providerMsg.text}</Notice>}
       <div className="topbar">
         <div>
           <div className="eyebrow">School</div>
@@ -154,6 +186,86 @@ export default async function SettingsPage({
             </div>
           </div>
         </div>
+      </div>
+
+      {/* PROVIDER IDENTITY.
+          The number a reviewer matches an invoice against. Cohort records it
+          and prints it; Cohort cannot check it, because every administrator's
+          directory sits behind this school's own login. The copy says so in
+          those words — a "verified provider" badge here would be a claim about
+          public money that nobody at Cohort is in a position to make. */}
+      <div className="card" style={{ marginTop: 12 }}>
+        <div className="eyebrow">Your provider ID</div>
+        <p className="small muted" style={{ margin: "6px 0 14px", maxWidth: "68ch" }}>
+          The number {admin ? admin.label : "your ESA administrator"} issued you when they approved
+          your school. A reviewer uses it to match your invoice to their approved-provider list, so
+          it goes at the top of every packet Cohort prints. If you leave it blank, packets go out
+          without it.
+        </p>
+
+        <div className={`notice ${pStatus === "attested" ? "good" : pStatus === "stale" ? "warn" : ""}`}>
+          {providerSummary(identity, today(), attestedBy?.name)}
+        </div>
+
+        <form action={updateProviderIdentity} style={{ marginTop: 14 }}>
+          <div className="grid g2" style={{ gap: 14 }}>
+            <div>
+              <label htmlFor="providerRail">Who administers your program</label>
+              <select id="providerRail" name="providerRail" defaultValue={chosenRail}>
+                <option value="">Choose…</option>
+                {ADMINISTRATORS.map((a) => (
+                  <option key={a.rail} value={a.rail}>
+                    {a.label}
+                  </option>
+                ))}
+              </select>
+              {impliedRail && !school!.providerRail && (
+                <p className="small muted" style={{ margin: "6px 0 0" }}>
+                  Pre-selected from your state. Change it if your program moved to someone else —
+                  a packet sent to the wrong administrator is rejected on sight.
+                </p>
+              )}
+            </div>
+            <div>
+              <label htmlFor="providerId">{admin ? admin.idLabel : "Provider ID"}</label>
+              <input
+                id="providerId"
+                name="providerId"
+                defaultValue={school!.providerId}
+                spellCheck={false}
+                placeholder="e.g. 90210"
+              />
+              <p className="small muted" style={{ margin: "6px 0 0" }}>
+                {admin ? admin.hint : "The number on your approval letter."}
+              </p>
+            </div>
+          </div>
+
+          <label
+            style={{ display: "flex", gap: 10, alignItems: "flex-start", margin: "14px 0 0", fontWeight: 400 }}
+          >
+            <input type="checkbox" name="attest" style={{ width: "auto", margin: "3px 0 0" }} />
+            <span className="small">
+              I&apos;ve checked this ID is active with {admin ? admin.label : "my administrator"}{" "}
+              today. Cohort can&apos;t check this for you — their directory needs your login — so we
+              record that you did, with today&apos;s date and your name, and ask again in six months.
+            </span>
+          </label>
+
+          <div className="row" style={{ gap: 10, marginTop: 14, alignItems: "center" }}>
+            <button className="btn">Save</button>
+            {admin?.confirmAt && (
+              <a
+                className="btn ghost sm"
+                href={admin.confirmAt}
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                Open {admin.label} ↗
+              </a>
+            )}
+          </div>
+        </form>
       </div>
 
       <div className="setgrid" style={{ marginTop: 12 }}>

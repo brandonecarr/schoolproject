@@ -3,6 +3,7 @@ import Link from "next/link";
 import { signup } from "./actions";
 import { SlugField } from "./SlugField";
 import { rootDomain } from "@/lib/tenant-config";
+import { configuredStates } from "@/lib/rules";
 
 export const metadata: Metadata = { title: "Create your school — Cohort" };
 export const dynamic = "force-dynamic";
@@ -22,6 +23,7 @@ export default async function SignupPage({
   const { error } = await searchParams;
   const message = error ? ERRORS[error] : undefined;
   const root = rootDomain();
+  const states = configuredStates();
 
   return (
     <div className="auth">
@@ -67,8 +69,14 @@ export default async function SignupPage({
               <input id="esaAmount" name="esaAmount" type="number" min={0} defaultValue={7400} />
             </div>
           </div>
+          {/* Derived from PROGRAMS, never written out. The hand-written version
+              of this sentence named five states long after twenty-three were
+              configured, which is eighteen states of founders told, on the
+              signup form, that we had nothing for them. */}
           <p className="small muted" style={{ margin: "6px 0 0" }}>
-            ESA rails are configured for AZ, FL, IA, UT and AR. Other states work without one.
+            Reimbursement rules are configured for {states.length} states —{" "}
+            <span className="mono">{states.join(" ")}</span>. Any other state works too; you just
+            won&apos;t get program-specific checks on your invoices.
           </p>
 
           <div className="sep" style={{ margin: "18px 0" }} />

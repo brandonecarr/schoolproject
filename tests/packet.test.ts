@@ -125,3 +125,50 @@ describe("every printed document carries the school's identity", () => {
     expect(offenders).toEqual([]);
   });
 });
+
+// --- Provider ID on the letterhead -----------------------------------------
+//
+// The reason the provider ID is captured at all: it is the number a reviewer
+// matches an invoice against, and our packets carried none. If it stops
+// reaching the page, the feature is decorative.
+
+describe("the packet carries the school's provider ID", () => {
+  const school = {
+    name: "Cedar Grove Learning Collective",
+    address: "412 N Willow St, Mesa AZ",
+    accentColor: "",
+    providerId: "CW-90210",
+    providerRail: "classwallet",
+  };
+
+  it("prints it under the address, naming the administrator", () => {
+    const html = letterhead(brandOf(school, null));
+    expect(html).toContain("ClassWallet provider ID: CW-90210");
+    // Under the address, not above the school name — a reviewer reads the
+    // school first and the reference number second.
+    expect(html.indexOf("412 N Willow")).toBeLessThan(html.indexOf("CW-90210"));
+  });
+
+  it("prints no provider line when the school has recorded none", () => {
+    const html = letterhead(brandOf({ ...school, providerId: "" }, null));
+    expect(html).not.toMatch(/provider/i);
+    // The rest of the letterhead is unaffected.
+    expect(html).toContain("Cedar Grove Learning Collective");
+  });
+
+  it("escapes it — this value is typed by a user and lands in generated HTML", () => {
+    const html = letterhead(
+      brandOf({ ...school, providerId: '"><script>alert(1)</script>' }, null)
+    );
+    expect(html).not.toContain("<script>");
+    expect(html).toContain("&lt;script&gt;");
+  });
+
+  it("survives a school row that predates the columns", () => {
+    // Every existing school has these unset; brandOf must not throw on
+    // undefined, and the packet must render exactly as it did before.
+    const html = letterhead(brandOf({ name: "Oak Hill", address: "" }, null));
+    expect(html).toContain("Oak Hill");
+    expect(html).not.toMatch(/provider/i);
+  });
+});

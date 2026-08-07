@@ -10,6 +10,7 @@ import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/db";
 import { requireTeacher, logAudit } from "@/lib/auth";
 import { parseAccent } from "@/lib/branding";
+import { administratorFor, looksLikeProviderId } from "@/lib/provider";
 import { evidenceFor } from "@/lib/evidence";
 import { purposeNarrative, progressNarrative } from "@/lib/ai";
 import { PROGRAMS } from "@/lib/rules";
@@ -1912,6 +1913,64 @@ export async function removeLogo() {
   await logAudit(user.id, "school_logo_removed", schoolId);
   revalidatePath("/settings");
   redirect("/settings?logo=removed");
+}
+
+/**
+ * Record the school's provider ID, or re-confirm the one on file.
+ *
+ * Two operations in one action because they are one thought to the person
+ * doing them: "here is my number / yes it is still good". `attest` decides
+ * whether the date and the name are refreshed.
+ *
+ * Cohort checks nothing here. Every administrator's directory is behind the
+ * school's own login, so this writes down what the school says and who said
+ * it. See the header of src/lib/provider.ts.
+ */
+export async function updateProviderIdentity(formData: FormData) {
+  const { user, school } = await requireTeacher();
+  const providerId = String(formData.get("providerId") || "").trim();
+  const providerRail = String(formData.get("providerRail") || "").trim();
+
+  // Clearing the field is a legitimate action — a school that leaves a program
+  // should be able to take the number off its packets.
+  if (!providerId) {
+    await prisma.school.update({
+      where: { id: school!.id },
+      data: { providerId: "", providerRail: "", providerAttestedAt: null, providerAttestedById: null },
+    });
+    await logAudit(user.id, "provider_id_cleared", school!.providerId || "(none)");
+    revalidatePath("/settings");
+    redirect("/settings?provider=cleared");
+  }
+
+  if (!looksLikeProviderId(providerId)) redirect("/settings?provider=bad");
+  if (!administratorFor(providerRail)) redirect("/settings?provider=rail");
+
+  // The date moves only when someone actually ticks the box. Saving a typo fix
+  // must not silently renew an attestation nobody re-made.
+  const attest = formData.get("attest") === "on";
+  const changed = providerId !== school!.providerId || providerRail !== school!.providerRail;
+
+  await prisma.school.update({
+    where: { id: school!.id },
+    data: {
+      providerId,
+      providerRail,
+      // A new number has never been confirmed, whatever the old one's date said.
+      ...(attest
+        ? { providerAttestedAt: today(), providerAttestedById: user.id }
+        : changed
+          ? { providerAttestedAt: null, providerAttestedById: null }
+          : {}),
+    },
+  });
+  await logAudit(
+    user.id,
+    attest ? "provider_id_attested" : "provider_id_updated",
+    `${providerRail}:${providerId}`
+  );
+  revalidatePath("/settings");
+  redirect("/settings?provider=saved");
 }
 
 export async function updateAccent(formData: FormData) {

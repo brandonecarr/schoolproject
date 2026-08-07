@@ -72,9 +72,17 @@ export function accentIsLegible(bg: string): boolean {
   return contrastRatio(readableOn(hex), hex) >= AA_NORMAL;
 }
 
+import { packetProviderLine } from "@/lib/provider";
+
 export type Brand = {
   schoolName: string;
   address: string;
+  /** "ClassWallet provider ID: 90210", or "" when the school has recorded none.
+   *  Sits under the address on the letterhead because that is where a reviewer
+   *  looks to match a claim to their approved-provider list. Built by
+   *  packetProviderLine in lib/provider.ts; a claim the school made, which is
+   *  exactly what a provider ID on an invoice has always been. */
+  providerLine: string;
   /** The school's colour. Safe for RULES AND EDGES at any value — a border
    *  carries no text, so contrast never applies to it. */
   accent: string;
@@ -99,7 +107,16 @@ export type Brand = {
 };
 
 export function brandOf(
-  school: { name: string; address?: string | null; accentColor?: string | null } | null | undefined,
+  school:
+    | {
+        name: string;
+        address?: string | null;
+        accentColor?: string | null;
+        providerId?: string | null;
+        providerRail?: string | null;
+      }
+    | null
+    | undefined,
   logo: { mime: string; data: Uint8Array } | null
 ): Brand {
   const accent = accentOf(school);
@@ -107,6 +124,11 @@ export function brandOf(
   return {
     schoolName: school?.name ?? "",
     address: school?.address ?? "",
+    providerLine: packetProviderLine({
+      providerId: school?.providerId ?? "",
+      providerRail: school?.providerRail ?? "",
+      providerAttestedAt: null,
+    }),
     accent,
     onAccent: readableOn(accent),
     surface,
