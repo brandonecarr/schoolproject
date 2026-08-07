@@ -7,6 +7,7 @@
 
 import { NextResponse } from "next/server";
 import { purgeAllSchools } from "@/lib/retention";
+import { mayRunDestructiveJobs } from "@/lib/environment";
 
 export const dynamic = "force-dynamic";
 
@@ -19,6 +20,11 @@ export async function GET(req: Request) {
       return NextResponse.json({ error: "unauthorized" }, { status: 401 });
     }
   }
+  // This job permanently deletes student records past the retention window.
+  // A preview deployment sharing the production database must never run it.
+  const allowed = mayRunDestructiveJobs();
+  if (!allowed.ok) return NextResponse.json({ error: allowed.reason }, { status: 409 });
+
   const results = await purgeAllSchools();
   const total = results.reduce(
     (a, r) => a + r.attendance + r.observations + r.submissions + r.files,

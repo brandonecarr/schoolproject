@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { canSee, sortForFamily, needsAck, excerpt, AUDIENCES } from "@/lib/announcements";
+import { renderEmail, looksLikeEmail, sendEmail } from "@/lib/email";
 
 const a = (o: Partial<Parameters<typeof canSee>[0]> = {}) => ({
   id: "a1",
@@ -117,5 +118,62 @@ describe("AUDIENCES", () => {
       expect(canSee(a({ audience: opt.value }), "parent") || canSee(a({ audience: opt.value }), "student")).toBe(true);
     }
     expect(AUDIENCES.map((x) => x.value)).toEqual(["all", "parents", "students"]);
+  });
+});
+
+// --- Email ------------------------------------------------------------------
+describe("renderEmail", () => {
+  const base = {
+    title: "Volcano field notes graded",
+    body: "Nice work on the diagram.",
+    linkPath: "/parent/feed",
+    schoolName: "Cedar Grove",
+    appUrl: "https://cohort.example/",
+  };
+
+  it("names the school in the subject, so it isn't mistaken for spam", () => {
+    expect(renderEmail(base).subject).toBe("Volcano field notes graded — Cedar Grove");
+  });
+
+  it("builds an absolute link and doesn't double the slash", () => {
+    expect(renderEmail(base).text).toContain("https://cohort.example/parent/feed");
+    expect(renderEmail(base).text).not.toContain("example//parent");
+  });
+
+  it("tells the reader how to stop them", () => {
+    expect(renderEmail(base).text).toContain("turn these emails off");
+  });
+
+  it("caps a runaway subject line", () => {
+    expect(renderEmail({ ...base, title: "x".repeat(400) }).subject.length).toBeLessThanOrEqual(160);
+  });
+
+  it("handles an empty link path without producing a broken URL", () => {
+    expect(renderEmail({ ...base, linkPath: "" }).text).toContain("https://cohort.example/");
+  });
+});
+
+describe("looksLikeEmail", () => {
+  it("accepts ordinary addresses", () => {
+    for (const a of ["dana@example.com", "a.b+c@sub.example.co.uk"]) expect(looksLikeEmail(a)).toBe(true);
+  });
+
+  it("rejects the things that actually turn up", () => {
+    for (const a of ["", "  ", "dana", "dana@", "@example.com", "dana@localhost", "a b@example.com"]) {
+      expect(looksLikeEmail(a), a).toBe(false);
+    }
+  });
+});
+
+describe("sendEmail without configuration", () => {
+  it("fails closed and never throws", async () => {
+    // The rule this protects: in-app notifications must keep working exactly as
+    // they do today when no provider is set up.
+    const saved = { ...process.env };
+    delete process.env.RESEND_API_KEY;
+    delete process.env.EMAIL_FROM;
+    const r = await sendEmail({ to: "dana@example.com", subject: "s", text: "t" });
+    expect(r).toEqual({ sent: false, reason: "not_configured" });
+    process.env = saved;
   });
 });

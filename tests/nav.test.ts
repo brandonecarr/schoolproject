@@ -1,4 +1,4 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, afterEach } from "vitest";
 import {
   TEACHER_NAV,
   DEFAULT_PINS,
@@ -158,5 +158,58 @@ describe("pinnedItems", () => {
 
   it("handles no pins", () => {
     expect(pinnedItems([])).toEqual([]);
+  });
+});
+
+// --- Deployment guard -------------------------------------------------------
+// Kept here rather than in its own file because it's three functions; move it
+// out if it grows.
+describe("environment guard", () => {
+  const saved = { ...process.env };
+  afterEach(() => {
+    process.env = { ...saved };
+  });
+
+  it("says nothing when the scoping is correct", async () => {
+    const { isPreviewOnProductionDb, mayRunDestructiveJobs } = await import("@/lib/environment");
+    process.env.VERCEL_ENV = "preview";
+    delete process.env.DB_ENVIRONMENT; // preview cannot see the production marker
+    expect(isPreviewOnProductionDb()).toBe(false);
+    expect(mayRunDestructiveJobs().ok).toBe(true);
+  });
+
+  it("catches a preview that can see the production marker", async () => {
+    // If preview can read a variable scoped to production, the scoping is
+    // shared — which is the same reason the database URL is shared.
+    const { isPreviewOnProductionDb } = await import("@/lib/environment");
+    process.env.VERCEL_ENV = "preview";
+    process.env.DB_ENVIRONMENT = "production";
+    expect(isPreviewOnProductionDb()).toBe(true);
+  });
+
+  it("never fires on production itself", async () => {
+    const { isPreviewOnProductionDb, mayRunDestructiveJobs } = await import("@/lib/environment");
+    process.env.VERCEL_ENV = "production";
+    process.env.DB_ENVIRONMENT = "production";
+    expect(isPreviewOnProductionDb()).toBe(false);
+    expect(mayRunDestructiveJobs().ok).toBe(true);
+  });
+
+  it("refuses the retention purge from a shared preview", async () => {
+    const { mayRunDestructiveJobs } = await import("@/lib/environment");
+    process.env.VERCEL_ENV = "preview";
+    process.env.DB_ENVIRONMENT = "production";
+    const r = mayRunDestructiveJobs();
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.reason).toContain("preview deployment");
+  });
+
+  it("stays quiet with no marker set, rather than guessing", async () => {
+    // A banner that cries wolf gets ignored, and is then worth nothing on the
+    // day it is right.
+    const { isPreviewOnProductionDb } = await import("@/lib/environment");
+    process.env.VERCEL_ENV = "preview";
+    delete process.env.DB_ENVIRONMENT;
+    expect(isPreviewOnProductionDb()).toBe(false);
   });
 });

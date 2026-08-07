@@ -454,3 +454,18 @@ export async function removePortfolioEntry(formData: FormData) {
   revalidatePath("/student/portfolio");
   redirect("/student/portfolio?removed=1");
 }
+
+// Turn email alerts on or off for yourself.
+//
+// A single switch rather than per-event preferences. A microschool sends a
+// handful of notifications a week; a preference matrix would be more UI than
+// the thing it configures, and the honest choice a parent wants to make is
+// "email me" or "don't".
+export async function setEmailAlerts(formData: FormData) {
+  const { user } = await requireUser();
+  const on = String(formData.get("on")) === "1";
+  await prisma.user.update({ where: { id: user.id }, data: { emailAlerts: on } });
+  const back = String(formData.get("back") || "/");
+  revalidatePath(back);
+  redirect(`${back}?email=${on ? "on" : "off"}`);
+}

@@ -15,7 +15,8 @@
     "smoke": "tsx scripts/smoke.ts",
     "purge": "tsx scripts/purge.ts",
     "watch": "tsx scripts/watch.ts",
-    "interpret": "tsx scripts/interpret.ts"
+    "interpret": "tsx scripts/interpret.ts",
+    "purge:school": "tsx scripts/purge-school.ts"
   },
   "dependencies": {
     "@prisma/adapter-pg": "^7.9.1",

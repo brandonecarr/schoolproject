@@ -12,6 +12,16 @@ import "dotenv/config";
 import { PrismaClient } from "../src/generated/prisma/client";
 import { PrismaPg } from "@prisma/adapter-pg";
 import { hashPassword } from "../src/lib/password";
+import { randomBytes } from "node:crypto";
+
+// Demo passwords.
+//
+// "demo1234" on a deployed URL is an open door, and this app holds children's
+// records. So the seed generates a random password unless DEMO_PASSWORD is set
+// explicitly, and prints it once at the end. Set DEMO_PASSWORD=demo1234 locally
+// if you want the old convenience; never set it on a deployment.
+const DEMO_PASSWORD = process.env.DEMO_PASSWORD || randomBytes(9).toString("base64url");
+const PASSWORD_WAS_GENERATED = !process.env.DEMO_PASSWORD;
 
 const connectionString = process.env.DIRECT_URL ?? process.env.DATABASE_URL;
 if (!connectionString) throw new Error("Set DATABASE_URL (or DIRECT_URL) to your Supabase database before seeding.");
@@ -51,7 +61,7 @@ async function main() {
       role: "owner",
       name: "Sarah Whitfield",
       email: "sarah@cedargrove.school",
-      password: hashPassword("demo1234"),
+      password: hashPassword(DEMO_PASSWORD),
     },
   });
 
@@ -91,7 +101,7 @@ async function main() {
         role: "parent",
         name: k.parent,
         email: k.pemail,
-        password: hashPassword("demo1234"),
+        password: hashPassword(DEMO_PASSWORD),
         studentIdsJson: JSON.stringify([students[i].id]),
         consentGivenAt: new Date().toISOString(),
       },
@@ -105,7 +115,7 @@ async function main() {
       role: "student",
       name: "Eli Booker",
       email: "eli@cedargrove.school",
-      password: hashPassword("demo1234"),
+      password: hashPassword(DEMO_PASSWORD),
       studentId: students[0].id,
       createdByParent: true,
     },
@@ -284,6 +294,16 @@ async function main() {
   }
 
   console.log("Seeded Cedar Grove Learning Collective.");
+  console.log("");
+  console.log("  Sign in:  sarah@cedargrove.school   (owner)");
+  console.log("            dana@example.com          (parent)");
+  console.log("            eli@cedargrove.school     (student)");
+  console.log(`  Password: ${DEMO_PASSWORD}`);
+  if (PASSWORD_WAS_GENERATED) {
+    console.log("");
+    console.log("  ^ Generated, and shown ONCE. Save it now — it is not stored anywhere");
+    console.log("    in plain text. Set DEMO_PASSWORD to choose your own instead.");
+  }
 }
 
 main()

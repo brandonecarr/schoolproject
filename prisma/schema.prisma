@@ -51,6 +51,10 @@ model User {
   // or reorder the groups, so a new feature always lands in its proper group
   // whether or not anything is pinned. See the note in src/lib/nav.ts.
   pinnedNav       String?
+  // Email alongside in-app notifications. Default ON for families (the point is
+  // that they find out) and OFF for staff, who live in the app all day and would
+  // just be emailing themselves about their own school.
+  emailAlerts     Boolean  @default(true)
   schoolId        String
   role            String // owner | teacher | parent | student
   name            String

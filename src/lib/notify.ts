@@ -9,6 +9,7 @@
 // half-built preference UI pretending to control something that doesn't exist.
 
 import { prisma } from "@/lib/db";
+import { sendEmail, renderEmail, appUrl, emailConfigured } from "@/lib/email";
 
 export type NotifyType =
   | "graded"
@@ -47,7 +48,39 @@ export async function notifyUsers(
       linkPath: input.linkPath ?? "",
     })),
   });
+
+  // Email is strictly ADDITIONAL to the in-app row above, never a replacement.
+  // It is also fire-and-forget: a provider outage must not fail the grading or
+  // invoicing action that triggered it, and the recipient still has the
+  // notification waiting when they sign in.
+  void emailNotify(targets, input).catch(() => {});
+
   return targets.length;
+}
+
+async function emailNotify(userIds: string[], input: NotifyInput): Promise<void> {
+  if (!emailConfigured()) return;
+  const [recipients, school] = await Promise.all([
+    prisma.user.findMany({
+      where: { id: { in: userIds }, emailAlerts: true },
+      select: { email: true },
+    }),
+    prisma.school.findUnique({ where: { id: input.schoolId }, select: { name: true } }),
+  ]);
+  if (recipients.length === 0) return;
+
+  const { subject, text } = renderEmail({
+    title: input.title,
+    body: input.body ?? "",
+    linkPath: input.linkPath ?? "",
+    schoolName: school?.name ?? "Your school",
+    appUrl: appUrl(),
+  });
+  // Sequential: a microschool sends a handful at a time, and one address at a
+  // time keeps a single bad recipient from taking the rest down with it.
+  for (const r of recipients) {
+    await sendEmail({ to: r.email, subject, text });
+  }
 }
 
 // --- audience resolvers --------------------------------------------------
