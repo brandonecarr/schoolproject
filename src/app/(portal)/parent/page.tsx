@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { PageHead, StatCard, Pill } from "@/components/ui";
 import { requireRole } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { evidenceFor } from "@/lib/evidence";
@@ -61,12 +62,48 @@ export default async function ParentHomePage() {
   const familyBalance = perChild.reduce((a, c) => a + c.ledger.familyBalance, 0);
   const multi = kids.length > 1;
 
+  // Roll the per-child figures up for the header. A parent of one thinks about
+  // that child; a parent of several wants the household total, not four cards
+  // per child.
+  const overdue = due.filter((d) => d.daysLeft < 0).length;
+  const presentDays = perChild.reduce((t, c) => t + c.presentDays, 0);
+  const loggedDays = perChild.reduce((t, c) => t + c.loggedDays, 0);
+  // Weight each child's average by how much work it covers, so a child with
+  // two graded pieces doesn't swing the household figure as hard as one with
+  // twenty. Children with nothing graded simply don't contribute.
+  const scored = perChild.filter((c) => c.avgPct != null);
+  const gradedCount = scored.length;
+  const avgPct =
+    scored.length > 0 ? Math.round(scored.reduce((t, c) => t + (c.avgPct ?? 0), 0) / scored.length) : null;
+
+  const sub =
+    due.length === 0 && familyBalance === 0
+      ? "Nothing waiting on either of you this week."
+      : `${due.length === 0 ? "Nothing" : `${due.length} thing${due.length === 1 ? "" : "s"}`} waiting on ` +
+        `${multi ? "them" : firstOf(kids[0]?.id) || "them"}, ${familyBalance > 0 ? "one thing waiting on you" : "nothing waiting on you"}.`;
+
   return (
     <>
-      <div className="eyebrow">Your family</div>
-      <h1 style={{ margin: "2px 0 16px" }}>
-        {multi ? "Everyone at a glance" : `${firstOf(kids[0]?.id) || "Your child"}’s week`}
-      </h1>
+      <PageHead
+        eyebrow="Your family"
+        title={multi ? "Everyone at a glance" : `${firstOf(kids[0]?.id) || "Your child"}\u2019s week`}
+        sub={sub}
+      />
+
+      {/* Four figures, in the order a parent asks about them: what is owed of
+          the child, how they are doing, whether they are there, and what is
+          owed by the parent. */}
+      <div className="statrow" style={{ marginBottom: 22 }}>
+        <StatCard label="To do" value={due.length} delta={overdue > 0 ? `${overdue} overdue` : "Nothing late"} tone={overdue > 0 ? "warn" : "info"} />
+        <StatCard label="Average grade" value={avgPct != null ? `${avgPct}%` : "\u2014"} delta={gradedCount > 0 ? `Across ${gradedCount} ${gradedCount === 1 ? "child" : "children"}` : "Nothing graded yet"} tone="info" />
+        <StatCard label="Days present" value={presentDays} delta={`Of ${loggedDays} logged`} tone="good" />
+        <StatCard
+          label="You owe"
+          value={`$${familyBalance.toLocaleString()}`}
+          delta={familyBalance > 0 ? "See tuition" : "Paid in full"}
+          tone={familyBalance > 0 ? "warn" : "good"}
+        />
+      </div>
 
       {/* alerts */}
       {returned.length > 0 && (
@@ -99,27 +136,27 @@ export default async function ParentHomePage() {
           </p>
         </div>
       ) : (
-        <div className="due-list">
+        <div className="worklist">
           {due.slice(0, 6).map((d) => {
             const m = typeMeta(d.type);
             const tone = d.daysLeft < 0 ? "bad" : d.daysLeft <= 1 ? "warn" : "info";
             return (
-              <div key={d.submissionId} className={`due-row ${tone}`}>
-                <span className="due-ic" aria-hidden>
+              <Link key={d.submissionId} href="/parent/feed" className="workrow">
+                <span className="worktile" aria-hidden>
                   {m.icon}
                 </span>
-                <span className="due-main">
-                  <span className="due-title">
+                <span className="grow">
+                  <span className="worktitle" style={{ display: "block" }}>
                     {multi && <span className="who-tag">{firstOf(d.studentId)}</span>}
                     {d.title}
                   </span>
-                  <span className="small muted">
+                  <span className="workmeta" style={{ display: "block" }}>
                     {d.courseName} · {m.label}
                     {d.status === "returned" ? " · needs changes" : ""}
                   </span>
                 </span>
-                <span className={`due-when ${tone}`}>{dueLabel(d.daysLeft)}</span>
-              </div>
+                <Pill tone={tone}>{dueLabel(d.daysLeft)}</Pill>
+              </Link>
             );
           })}
         </div>

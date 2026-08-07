@@ -2646,6 +2646,94 @@ a:hover {
   background: var(--accent-mid);
 }
 
+
+/* --- Shared bits that used to live in the old student block ----------------
+   These are used by the PARENT pages too, so replacing that block wholesale
+   deleted styling the family portal depended on. Restored in the new language
+   rather than reinstated verbatim. */
+
+/* Which child a row belongs to, for a parent of several. */
+.who-tag {
+  display: inline-block;
+  background: var(--accent-soft);
+  color: var(--accent-dark);
+  font-size: 10.5px;
+  font-weight: 700;
+  padding: 2px 7px;
+  border-radius: 20px;
+  margin-right: 7px;
+  vertical-align: 1px;
+}
+
+/* Work already handed in — listed, not actionable. */
+.turned-in-row {
+  padding: 13px 0;
+  border-top: 1px solid var(--line);
+}
+.turned-in-row:first-child {
+  border-top: 0;
+}
+
+/* Per-child snapshot cards on the parent home. */
+.child-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: var(--gap);
+}
+.child-card .kidfigs {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 10px;
+  margin-top: 12px;
+}
+.child-card .kidfig .n {
+  font-family: var(--num);
+  font-size: 19px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+.child-card .kidfig .l {
+  font-size: 11px;
+  color: var(--ink3);
+  margin-top: 1px;
+}
+
+
+/* --- Shared bits that used to live in the old student block ----------------
+   Used by the PARENT pages too, so replacing that block wholesale deleted
+   styling the family portal depended on — the due rows and child snapshot
+   cards rendered as unformatted text. Restored in the new language rather
+   than reinstated verbatim. */
+
+/* Which child a row belongs to, for a parent of several. */
+.who-tag {
+  display: inline-block;
+  background: var(--accent-soft);
+  color: var(--accent-dark);
+  font-size: 10.5px;
+  font-weight: 700;
+  padding: 2px 7px;
+  border-radius: 20px;
+  margin-right: 7px;
+  vertical-align: 1px;
+}
+
+/* Work already handed in — listed, not actionable. */
+.turned-in-row {
+  padding: 13px 0;
+  border-top: 1px solid var(--line);
+}
+.turned-in-row:first-child {
+  border-top: 0;
+}
+
+/* Per-child snapshot cards on the parent home. */
+.child-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: var(--gap);
+}
+
 /* --- Accessibility (8.1) -------------------------------------------------- */
 
 /* Skip link. First thing in the tab order, invisible until focused. Without it
