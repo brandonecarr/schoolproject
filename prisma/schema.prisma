@@ -496,3 +496,50 @@ model RailObservation {
   @@index([schoolId])
   @@index([invoiceId])
 }
+
+// Tier-1 watcher state: one mutable row per source in src/lib/sources.ts.
+// Answers "is the watcher healthy", which matters because the failure mode of a
+// scraper is silence — a source that has been 403ing for three weeks looks
+// exactly like a source where nothing has changed.
+model WatchState {
+  id             String  @id @default(cuid())
+  sourceId       String  @unique // slug from SOURCES — not a foreign key, the registry lives in code
+  lastCheckedAt  String? // ISO — when we last successfully reached it
+  lastAttemptAt  String? // ISO — when we last tried, successful or not
+  lastChangedAt  String? // ISO — a source that has NEVER changed is suspicious, not reassuring
+  lastHash       String?
+  lastStatus     String  @default("new") // ok | http_error | fetch_error | too_small
+  lastError      String  @default("")
+  failureStreak  Int     @default(0)
+  /** Escalated to Tier 2 but not yet interpreted. Step 3 drains this. */
+  pendingReview  Boolean @default(false)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+// Append-only, written ONLY when a source's fingerprint actually changes. That
+// keeps storage proportional to real change (a few dozen rows a year) rather
+// than to polling frequency, and each consecutive pair is exactly the
+// before/after that Tier 2 needs to interpret.
+model SourceSnapshot {
+  id         String  @id @default(cuid())
+  sourceId   String
+  url        String
+  hash       String
+  /** Normalised, extracted text at this point in time — the diff material. */
+  text       String
+  fetchedAt  String // ISO
+  httpStatus Int     @default(0)
+  /** Net character change against the previous snapshot; negative often means
+   *  the page broke rather than that content was removed. */
+  delta      Int     @default(0)
+  /** 0..1 share of tokens that moved. */
+  magnitude  Float   @default(0)
+  /** Whether this change cleared the bar for a Tier-2 model call. */
+  escalated  Boolean @default(false)
+
+  createdAt DateTime @default(now())
+
+  @@index([sourceId, fetchedAt])
+}

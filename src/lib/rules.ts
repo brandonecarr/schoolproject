@@ -188,11 +188,18 @@ export const PROGRAMS: Record<string, Program> = {
   MT: { rail: "statedirect", program: "Education Savings Account", label: "Montana ESA", kind: "esa", amount: 8000, live: true, limited: "Students with a disability" },
   NH: { rail: "statedirect", program: "Education Freedom Account", label: "New Hampshire EFA", kind: "esa", amount: 5200, live: true },
   NC: { rail: "classwallet", program: "ESA+", label: "North Carolina ESA+", kind: "esa", amount: 9000, live: true, limited: "Students with a disability", alsoRuns: ["Opportunity Scholarship (private school tuition)"] },
-  OH: { rail: "classwallet", program: "Afterschool Child Enrichment (ACE)", label: "Ohio ACE", kind: "esa", amount: 1000, live: true, alsoRuns: ["EdChoice Scholarship (private school tuition)"] },
+  // Ohio's ACE enrichment ESA wound down (final claims October 2025), so the
+  // billable Ohio program is now the EdChoice voucher. Caught by the source
+  // watcher's URL validation, which is exactly the class of change it exists
+  // for — a program can end while our table still offers it.
+  OH: { rail: "statedirect", program: "EdChoice Scholarship", label: "Ohio EdChoice", kind: "voucher", amount: 6166, live: true, alsoRuns: ["Afterschool Child Enrichment (ACE) — ended, final claims October 2025"] },
   OK: { rail: "statedirect", program: "Parental Choice Tax Credit", label: "Oklahoma Parental Choice Tax Credit", kind: "taxcredit", amount: 7500, live: true },
   SC: { rail: "classwallet", program: "Education Scholarship Trust Fund", label: "South Carolina ESTF", kind: "esa", amount: 7500, live: true },
   TN: { rail: "studentfirst", program: "Education Freedom Scholarship", label: "Tennessee EFS", kind: "esa", amount: 7300, live: true, alsoRuns: ["Individualized Education Account (IEA)"] },
-  TX: { rail: "odyssey", program: "Education Savings Account", label: "Texas ESA", kind: "esa", amount: 10500, live: false, alsoRuns: ["Special-needs award (~$30,000)"] },
+  // Renamed from "Education Savings Account" to Texas Education Freedom
+  // Accounts in October 2025, and it is now funding students — the `live: false`
+  // written yesterday from pre-launch reporting was already stale.
+  TX: { rail: "odyssey", program: "Texas Education Freedom Accounts (TEFA)", label: "Texas Education Freedom Accounts", kind: "esa", amount: 10500, live: true, alsoRuns: ["Special-needs award (~$30,000)"] },
   UT: { rail: "ace", program: "Utah Fits All Scholarship", label: "Utah Fits All", kind: "esa", amount: 8000, live: true },
   WV: { rail: "studentfirst", program: "Hope Scholarship", label: "West Virginia Hope Scholarship", kind: "esa", amount: 5200, live: true },
   WY: { rail: "odyssey", program: "Steamboat Legacy Scholarship", label: "Wyoming ESA", kind: "esa", amount: 7000, live: true },

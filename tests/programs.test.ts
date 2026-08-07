@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { PROGRAMS, RAILS, railForState, programOptions } from "@/lib/rules";
+import { SOURCES } from "@/lib/sources";
 
 // These guard the integrity of the funding table, not the accuracy of it.
 // Accuracy is a Phase 0 interview problem — see the ⚑ note in src/lib/rules.ts.
@@ -47,10 +48,52 @@ describe("program metadata", () => {
     }
   });
 
-  it("marks programs that are enacted but not yet disbursing", () => {
-    // A school can select these to plan, but must not invoice against them.
-    expect(PROGRAMS.TX.live).toBe(false);
-    expect(PROGRAMS.AZ.live).toBe(true);
+  it("carries an explicit live flag on every program", () => {
+    // `live: false` means enacted but not yet disbursing — selectable so a
+    // school can plan, but it must not be invoiced against. Asserted
+    // structurally rather than by naming a program: every entry is currently
+    // live (Texas started funding in 2026), and an assertion pinned to one
+    // state silently stops testing anything the moment that state flips.
+    for (const [state, p] of Object.entries(PROGRAMS)) {
+      expect(typeof p.live, `${state} live`).toBe("boolean");
+      expect(["esa", "taxcredit", "voucher", "allotment"]).toContain(p.kind);
+    }
+  });
+});
+
+describe("SOURCES ↔ PROGRAMS coherence", () => {
+  it("watches every program we let a school select", () => {
+    // A program in the dropdown with no source is a rule we would never notice
+    // changing — the exact gap this watcher exists to close.
+    const watched = new Set(SOURCES.filter((s) => s.programCode).map((s) => s.programCode));
+    for (const state of Object.keys(PROGRAMS)) {
+      expect(watched.has(state), `${state} has no watch source`).toBe(true);
+    }
+  });
+
+  it("watches every rail", () => {
+    const watched = new Set(SOURCES.filter((s) => s.railId).map((s) => s.railId));
+    for (const id of Object.keys(RAILS)) {
+      // statedirect is not a vendor — there is no single page to watch for it.
+      if (id === "statedirect") continue;
+      expect(watched.has(id), `rail ${id} has no watch source`).toBe(true);
+    }
+  });
+
+  it("never points a source at a program or rail that does not exist", () => {
+    for (const s of SOURCES) {
+      if (s.programCode) expect(PROGRAMS[s.programCode], `${s.id} → ${s.programCode}`).toBeDefined();
+      if (s.railId) expect(RAILS[s.railId], `${s.id} → ${s.railId}`).toBeDefined();
+    }
+  });
+
+  it("uses unique ids — the id is the database key, so a collision merges histories", () => {
+    const ids = SOURCES.map((s) => s.id);
+    expect(new Set(ids).size).toBe(ids.length);
+  });
+
+  it("uses https everywhere — these feed decisions about real money", () => {
+    for (const s of SOURCES) expect(s.url.startsWith("https://"), `${s.id}: ${s.url}`).toBe(true);
   });
 });
 
