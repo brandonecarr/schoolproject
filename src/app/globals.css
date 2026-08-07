@@ -426,7 +426,7 @@ h3 {
   justify-content: space-between;
   align-items: flex-start;
   gap: 20px;
-  margin-bottom: 26px;
+  margin-bottom: 22px;
 }
 
 /* simple top nav for parent/student */
@@ -3293,6 +3293,148 @@ a.mod-item:hover {
 .btn.sm {
   padding: 8px 13px;
   font-size: 12.5px;
+}
+
+
+/* --- Type scale ------------------------------------------------------------ */
+
+h1 {
+  font-size: var(--h1);
+  font-family: var(--head);
+  letter-spacing: -0.02em;
+  margin: 2px 0 0;
+}
+h2 {
+  font-size: 18px;
+  font-family: var(--head);
+  letter-spacing: -0.02em;
+}
+h3 {
+  font-size: 16px;
+  font-family: var(--head);
+  letter-spacing: -0.02em;
+}
+.topbar h1 {
+  margin: 2px 0 0;
+}
+body {
+  font-family: var(--font);
+  background: var(--bg);
+  color: var(--ink);
+  text-wrap: pretty;
+  -webkit-font-smoothing: antialiased;
+}
+.muted,
+.small.muted {
+  color: var(--ink3);
+}
+a {
+  color: var(--accent-dark);
+}
+a:hover {
+  color: var(--accent-dark);
+}
+
+
+/* --- Attendance roll -------------------------------------------------------
+   Styled as the handoff's pill toggles, but still radio inputs inside labels:
+   the page is a plain server form, so the roll saves with JavaScript off. The
+   handoff draws two states; we keep three, because absent and excused are a
+   real distinction — lib/engagement.ts takes both out of the expected-days
+   denominator, and a state reviewer reads them differently. */
+
+.rollrow {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 14px var(--card-pad);
+  border-top: 1px solid var(--line);
+}
+.rollrow:first-child {
+  border-top: 0;
+}
+.rollrow:hover {
+  background: var(--surface2);
+}
+.rollrow label {
+  margin: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 0;
+  padding: 8px 18px;
+  border-radius: 100px;
+  border: 1px solid var(--line);
+  background: var(--surface);
+  color: var(--ink2);
+  font-size: 13px;
+  font-weight: 700;
+  text-transform: capitalize;
+  cursor: pointer;
+  transition: background 0.14s ease, color 0.14s ease, border-color 0.14s ease;
+}
+/* The radio itself is the accessible control and stays in the DOM; it is
+   visually replaced by the pill, not removed from it. */
+.rollrow label input[type="radio"] {
+  position: absolute;
+  opacity: 0;
+  width: 1px;
+  height: 1px;
+}
+.rollrow label:hover {
+  border-color: var(--accent);
+}
+.rollrow label:has(input:checked) {
+  color: #fff;
+  border-color: transparent;
+}
+.rollrow label:has(input[value="present"]:checked) {
+  background: var(--good-f);
+}
+.rollrow label:has(input[value="absent"]:checked) {
+  background: var(--bad-f);
+}
+.rollrow label:has(input[value="excused"]:checked) {
+  background: var(--warn-f);
+}
+.rollrow label:has(input:focus-visible) {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+/* --- Grading queue: a card per submission ---------------------------------- */
+
+.queuegrid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: var(--gap);
+  align-items: stretch;
+}
+.queuegrid > .card,
+.queuegrid > .card2 {
+  display: flex;
+  flex-direction: column;
+}
+/* Actions pinned to the bottom so cards of different heights line up. */
+.queuegrid .qactions {
+  margin-top: auto;
+  padding-top: 12px;
+  display: flex;
+  gap: 8px;
+}
+.qresponse {
+  background: var(--surface2);
+  border-radius: var(--radius-sm);
+  padding: 11px 13px;
+  font-size: 12.5px;
+  color: var(--ink2);
+  margin: 10px 0 0;
+  line-height: 1.5;
+}
+
+@media (max-width: 1180px) {
+  .queuegrid {
+    grid-template-columns: repeat(2, 1fr);
+  }
 }
 
 /* --- Accessibility (8.1) -------------------------------------------------- */

@@ -40,18 +40,9 @@ export default async function AttendancePage({
 
       <form action={saveAttendance}>
         <input type="hidden" name="date" value={date} />
-        <div className="card" style={{ padding: "10px 16px" }}>
+        <div className="card2 nopad">
           {students.map((s) => (
-            <div
-              key={s.id}
-              style={{
-                display: "flex",
-                alignItems: "center",
-                gap: 14,
-                padding: "12px 0",
-                borderTop: "1px solid var(--rule)",
-              }}
-            >
+            <div key={s.id} className="rollrow">
               <div style={{ flex: 1, fontWeight: 600 }}>
                 {s.name}
                 <span className="small muted" style={{ fontWeight: 400 }}>
