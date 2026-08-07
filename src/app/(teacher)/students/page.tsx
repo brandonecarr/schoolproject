@@ -6,7 +6,7 @@ import { readiness, PROGRAMS, RAILS, programOptions } from "@/lib/rules";
 import { FundingSelect } from "@/components/FundingSelect";
 import { VerificationChip } from "@/components/VerificationNote";
 import { verificationCounts, programVerification } from "@/lib/observe";
-import { Pill, Notice } from "@/components/ui";
+import { Pill, Notice, Avatar, Bar } from "@/components/ui";
 import { addStudent } from "../actions";
 
 export const dynamic = "force-dynamic";
@@ -102,27 +102,45 @@ export default async function StudentsPage({
           </button>
         </form>
       </details>
-      <div className="card" style={{ padding: "16px 10px" }}>
+      {/* The handoff's columns: student · grade · funding · evidence · present ·
+          avg grade. Evidence is a bar plus the number, never the bar alone —
+          status is not encoded in colour by itself anywhere in this app. */}
+      <div className="card2 nopad">
         <table>
           <thead>
             <tr>
-              <th>Name</th>
+              <th>Student</th>
               <th>Grade</th>
               <th>Funding</th>
               <th>Evidence</th>
-              <th><span className="sr-only">Actions</span></th>
+              <th>Present</th>
+              <th style={{ textAlign: "right" }}>Avg grade</th>
+              <th>
+                <span className="sr-only">Actions</span>
+              </th>
             </tr>
           </thead>
           <tbody>
             {rows.map(({ s, e }) => {
               const r = readiness(e.score);
+              const graded = e.submissions.filter((x) => x.status === "graded" && x.score != null);
+              const earned = graded.reduce((t, x) => t + (x.score ?? 0), 0);
+              const possible = graded.reduce((t, x) => t + x.points, 0);
+              const avg = possible > 0 ? Math.round((earned / possible) * 100) : null;
               return (
                 <tr key={s.id}>
                   <td>
-                    <strong>{s.name}</strong>
-                    <div className="small muted">{s.familyName} family</div>
+                    <span className="row" style={{ gap: 10 }}>
+                      <Avatar name={s.name} size={32} />
+                      <span>
+                        <span className="rowname" style={{ display: "block" }}>
+                          {s.name}
+                        </span>
+                        <span className="rowmeta">{s.familyName} family</span>
+                      </span>
+                    </span>
                   </td>
-                  <td>{s.grade}</td>
+                  <td className="num">{s.grade}</td>
                   <td className="small">
                     {s.esaProgram ? (PROGRAMS[s.esaProgram]?.label ?? s.esaProgram) : "Private pay"}
                     {/* Per-program, not per-rail: two states can share an
@@ -134,7 +152,18 @@ export default async function StudentsPage({
                     )}
                   </td>
                   <td>
-                    <Pill tone={r.tone}>{e.score}</Pill>
+                    <span className="row" style={{ gap: 9, minWidth: 130 }}>
+                      <Bar pct={e.score} tone={r.tone} />
+                      <span className="num" style={{ fontWeight: 700 }}>
+                        {e.score}
+                      </span>
+                    </span>
+                  </td>
+                  <td className="num">
+                    {e.presentDays}/{e.attendance.length}
+                  </td>
+                  <td className="num" style={{ textAlign: "right", fontWeight: 700 }}>
+                    {avg != null ? `${avg}%` : "—"}
                   </td>
                   <td style={{ textAlign: "right" }}>
                     <Link className="btn sec sm" href={`/students/${s.id}`}>
@@ -147,6 +176,22 @@ export default async function StudentsPage({
           </tbody>
         </table>
       </div>
+
+      {/* The handoff puts a bad-tone strip under the table naming the student
+          whose packet would be questioned. Derived, not hardcoded: it names
+          whoever is actually at risk, and says nothing when nobody is. */}
+      {(() => {
+        const atRisk = rows.filter(({ e }) => readiness(e.score).tone === "bad");
+        if (atRisk.length === 0) return null;
+        const names = atRisk.map(({ s }) => s.name);
+        return (
+          <div className="notice bad" style={{ marginTop: 12 }}>
+            <strong>{names.join(", ")}</strong>{" "}
+            {names.length === 1 ? "has" : "have"} thin evidence for this period —{" "}
+            {names.length === 1 ? "that packet" : "those packets"} would likely be questioned.
+          </div>
+        );
+      })()}
     </>
   );
 }

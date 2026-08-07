@@ -1,5 +1,6 @@
 import { requireRole } from "@/lib/auth";
 import { prisma } from "@/lib/db";
+import { Pill } from "@/components/ui";
 import { fmt } from "@/lib/dates";
 
 export const dynamic = "force-dynamic";
@@ -41,10 +42,11 @@ export default async function ParentReportsPage() {
         </div>
       ) : (
         reports.map((r) => (
-          <div key={r.id} className="card">
+          <div key={r.id} className="card2" style={{ marginTop: 12 }}>
             <div className="spread" style={{ alignItems: "baseline" }}>
               <div>
-                <div className="eyebrow">
+                <Pill tone="good">Released</Pill>
+                <div className="eyebrow" style={{ marginTop: 8 }}>
                   {fmt(r.periodStart)} – {fmt(r.periodEnd)}
                 </div>
                 {kids.length > 1 && <h2 style={{ margin: "4px 0 0" }}>{nameOf(r.studentId)}</h2>}

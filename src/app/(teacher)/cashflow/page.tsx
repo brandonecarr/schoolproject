@@ -26,6 +26,13 @@ export default async function CashflowPage() {
   const railV = rail ? railVerification(vidx, rail.id) : null;
   const outstanding = invoices.filter((i) => i.status !== "paid");
   const nameOf = (id: string) => students.find((s) => s.id === id)?.name || "—";
+  // Bars scale to the largest bucket, not to a fixed dollar ceiling — a school
+  // billing $9k a quarter and one billing $90k both get a readable chart. The
+  // 1.15 is headroom: without it the tallest bar touches the top of the plot,
+  // and when every bucket is equal (which is the common case for a school on
+  // level monthly tuition) all three max out and the chart reads as broken
+  // rather than as flat.
+  const peak = Math.max(1, ...f.buckets.map((b) => b.esa + b.family)) * 1.15;
 
   return (
     <>
@@ -40,18 +47,50 @@ export default async function CashflowPage() {
         founders on credit cards.
       </p>
 
-      <div className="grid g3" style={{ marginTop: 18 }}>
-        {f.buckets.map((b) => (
-          <div key={b.key} className="card">
-            <div className="eyebrow">{b.label}</div>
-            <div className="score" style={{ margin: "8px 0 4px" }}>
-              ${(b.esa + b.family).toLocaleString()}
-            </div>
-            <div className="small muted">
-              ESA ${b.esa.toLocaleString()} · Families ${b.family.toLocaleString()}
-            </div>
-          </div>
-        ))}
+      {/* The handoff draws eight monthly columns. forecast() in lib/billing.ts
+          produces three 90-day buckets, and reshaping it to months would be a
+          domain change rather than a restyle — so the real buckets get the
+          chart's treatment. Each bar is stacked: ESA money and family money
+          arrive from different places and on different clocks, which is the
+          distinction this page exists to make. */}
+      <div className="card2" style={{ marginTop: 18 }}>
+        <div className="eyebrow">Expected to land</div>
+        <div className="chart" style={{ marginTop: 10 }}>
+          {f.buckets.map((b) => {
+            const total = b.esa + b.family;
+            const h = (v: number) => Math.round((v / peak) * 150);
+            return (
+              <div key={b.key} className="col">
+                <div className="val">{total > 0 ? `$${total.toLocaleString()}` : "—"}</div>
+                <div style={{ width: "100%", display: "flex", flexDirection: "column", justifyContent: "flex-end" }}>
+                  <div
+                    className="barc"
+                    style={{ height: h(b.family), background: "var(--good-f)", borderRadius: "8px 8px 0 0" }}
+                    title={`Families $${b.family.toLocaleString()}`}
+                  />
+                  <div
+                    className="barc"
+                    style={{
+                      height: h(b.esa),
+                      background: "var(--accent)",
+                      borderRadius: b.family > 0 ? "0 0 3px 3px" : "8px 8px 3px 3px",
+                    }}
+                    title={`ESA $${b.esa.toLocaleString()}`}
+                  />
+                </div>
+                <div className="mon">{b.label}</div>
+              </div>
+            );
+          })}
+        </div>
+        <div className="legend" style={{ borderTop: "1px solid var(--line)", paddingTop: 10 }}>
+          <span className="k">
+            <i style={{ background: "var(--accent)" }} /> ESA reimbursement
+          </span>
+          <span className="k">
+            <i style={{ background: "var(--good-f)" }} /> Family tuition
+          </span>
+        </div>
       </div>
 
       <div className="sep" />

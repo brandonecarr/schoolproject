@@ -1297,6 +1297,1117 @@ input[type="date"]::-webkit-calendar-picker-indicator {
 }
 
 /* ============================================================================
+   FEATURE CSS — gradebook, notification centre, markdown editor, work cards,
+   worksheets, item banks, mastery board, assignment builder, module paths,
+   grading, annotations, portfolio, conferences.
+   ============================================================================
+
+   RESTORED. The redesign's R6 commit replaced the block that began with the
+   "3) STUDENT" comment, on the assumption it held the student styles. That
+   comment was the last section header in the file, so everything built after
+   it in phases 6, 7 and 8 sat in the same unlabelled stretch — 1,338 lines,
+   of which the student HUD was about a tenth. Deleting it left 94 class names
+   with no rules and a dozen screens rendering as unstyled text.
+
+   These rules read the token aliases (--rule, --blue, --mark ...), which now
+   point at the redesign's palette, so they pick up the new colours unchanged.
+   Anything the redesign restyled deliberately is defined LATER in this file
+   and wins on source order.
+
+   Sections here are unlabelled because they always were; that is the thing
+   that made this easy to delete by accident. Worth splitting up next time
+   something in here is touched.
+   ============================================================================ */
+
+/* ---- 3) STUDENT: "game HUD" (bright, playful, gamified) ---- */
+.hud {
+  border-radius: var(--radius-lg);
+  padding: 24px 26px;
+  color: #23310a;
+  background: linear-gradient(135deg, #d9f26a 0%, var(--mark) 45%, #b6d63f 100%);
+  box-shadow: 0 10px 30px rgba(143, 165, 36, 0.35);
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  flex-wrap: wrap;
+}
+.quest {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  background: #fff;
+  border: 1px solid rgba(20, 28, 38, 0.06);
+  border-radius: var(--radius);
+  padding: 16px 18px;
+  box-shadow: var(--shadow-sm);
+  margin-bottom: 10px;
+}
+.quest .marker {
+  flex: 0 0 30px;
+  width: 30px;
+  height: 30px;
+  border-radius: 9px;
+  background: var(--blue-soft);
+  color: var(--blue);
+  display: grid;
+  place-items: center;
+  font-weight: 700;
+}
+
+/* ============================================================
+   LMS — assignment types, builders, completion, grading, worksheets
+   ============================================================ */
+
+/* shared small controls */
+.subcard {
+  background: #fafbf8;
+  border: 1px solid var(--rule);
+  border-radius: var(--radius-sm);
+  padding: 12px 14px;
+}
+.check {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  cursor: pointer;
+}
+.check input {
+  width: auto;
+  margin: 0;
+}
+.filepick {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  color: var(--ink-soft);
+}
+.filepick input[type="file"] {
+  font-size: 12px;
+}
+.xbtn {
+  border: 0;
+  background: transparent;
+  color: var(--ink-soft);
+  font-size: 20px;
+  line-height: 1;
+  cursor: pointer;
+  padding: 2px 6px;
+  border-radius: 6px;
+}
+.xbtn:hover {
+  background: var(--bad-soft);
+  color: var(--bad);
+}
+.linkbtn {
+  border: 0;
+  background: transparent;
+  color: var(--blue);
+  cursor: pointer;
+  padding: 0;
+  font: inherit;
+}
+.linkbtn:hover {
+  text-decoration: underline;
+}
+.pointsbox {
+  border: 1px dashed var(--rule);
+  border-radius: var(--radius-sm);
+  padding: 9px 12px;
+  font-weight: 700;
+  color: var(--blue);
+  text-align: center;
+}
+
+/* type picker */
+.type-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 10px;
+}
+.type-card {
+  text-align: left;
+  border: 1.5px solid var(--rule);
+  background: var(--card);
+  border-radius: var(--radius);
+  padding: 12px 14px;
+  cursor: pointer;
+  transition: border-color 0.15s var(--ease), box-shadow 0.15s var(--ease),
+    transform 0.15s var(--ease);
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+.type-card:hover {
+  border-color: var(--blue-soft);
+  box-shadow: var(--shadow-sm);
+  transform: translateY(-1px);
+}
+.type-card.on {
+  border-color: var(--blue);
+  box-shadow: var(--ring);
+}
+.type-card .tc-ic {
+  font-size: 20px;
+  color: var(--blue);
+}
+.type-card .tc-lb {
+  font-weight: 700;
+}
+.type-card .tc-bl {
+  font-size: 12px;
+  color: var(--ink-soft);
+  line-height: 1.4;
+}
+
+/* quiz/worksheet item editor */
+.qitem {
+  margin-top: 10px;
+}
+.qnum {
+  width: 26px;
+  height: 26px;
+  flex: 0 0 auto;
+  border-radius: 50%;
+  background: var(--blue-soft);
+  color: var(--blue);
+  font-weight: 700;
+  font-size: 13px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-top: 4px;
+}
+
+/* targeting chips */
+.chip-wrap {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.chip {
+  border: 1px solid var(--rule);
+  background: var(--card);
+  border-radius: 999px;
+  padding: 6px 12px;
+  font-size: 13px;
+  cursor: pointer;
+  transition: all 0.12s var(--ease);
+}
+.chip:hover {
+  border-color: var(--blue-soft);
+}
+.chip.on {
+  background: var(--blue);
+  color: #fff;
+  border-color: var(--blue);
+}
+.chip.on .muted {
+  color: rgba(255, 255, 255, 0.7) !important;
+}
+
+/* type chip in the assignments list */
+.typechip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  background: var(--blue-soft);
+  color: var(--blue);
+  border-radius: 6px;
+  padding: 3px 8px;
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+/* student completion (WorkCard) */
+.workcard .marker {
+  flex: 0 0 auto;
+}
+.reslink {
+  display: inline-block;
+  margin-top: 8px;
+  color: var(--blue);
+  text-decoration: none;
+}
+.reslink:hover {
+  text-decoration: underline;
+}
+.dropzone {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  border: 2px dashed var(--rule);
+  border-radius: var(--radius);
+  padding: 22px;
+  cursor: pointer;
+  color: var(--ink-soft);
+  transition: border-color 0.15s var(--ease), background 0.15s var(--ease);
+}
+.dropzone:hover {
+  border-color: var(--blue);
+  background: var(--blue-soft);
+}
+.dropzone .dz-ic {
+  font-size: 26px;
+  color: var(--blue);
+}
+.dropzone input[type="file"] {
+  font-size: 12px;
+}
+.crit-list {
+  margin: 6px 0 0;
+  padding-left: 18px;
+  font-size: 14px;
+}
+.crit-list li {
+  margin: 2px 0;
+}
+
+/* quiz answering */
+.quizbody {
+  display: grid;
+  gap: 14px;
+}
+.qblock {
+  border-top: 1px solid var(--rule);
+  padding-top: 12px;
+}
+.qblock:first-child {
+  border-top: 0;
+  padding-top: 0;
+}
+.qhead {
+  display: flex;
+  gap: 8px;
+  align-items: baseline;
+}
+.qhead .qn {
+  width: 22px;
+  height: 22px;
+  flex: 0 0 auto;
+  border-radius: 50%;
+  background: var(--mark);
+  color: #2f3908;
+  font-weight: 700;
+  font-size: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.qhead .qp {
+  flex: 1;
+  font-weight: 600;
+}
+.qhead .qpts {
+  flex: 0 0 auto;
+}
+.choices {
+  display: grid;
+  gap: 6px;
+  margin-top: 8px;
+  margin-left: 30px;
+}
+.choice {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  border: 1px solid var(--rule);
+  border-radius: var(--radius-sm);
+  padding: 8px 12px;
+  cursor: pointer;
+  transition: all 0.12s var(--ease);
+}
+.choice:hover {
+  border-color: var(--blue-soft);
+  background: #fafbf8;
+}
+.choice.on {
+  border-color: var(--blue);
+  background: var(--blue-soft);
+  font-weight: 600;
+}
+.choice input {
+  width: auto;
+  margin: 0;
+}
+.qtext {
+  margin-top: 8px;
+  margin-left: 30px;
+  width: calc(100% - 30px);
+}
+
+/* matching + ordering answer grids */
+.matchgrid,
+.ordergrid {
+  display: grid;
+  gap: 8px;
+  margin-top: 8px;
+  margin-left: 30px;
+}
+.matchrow {
+  display: grid;
+  grid-template-columns: 1fr 220px;
+  gap: 10px;
+  align-items: center;
+}
+.matchleft {
+  font-weight: 600;
+}
+.matchrow select,
+.orderrow select {
+  margin: 0;
+}
+.orderrow {
+  display: grid;
+  grid-template-columns: 84px 1fr;
+  gap: 10px;
+  align-items: center;
+}
+.orderstep {
+  font-weight: 600;
+}
+@media (max-width: 640px) {
+  .matchrow {
+    grid-template-columns: 1fr;
+    gap: 4px;
+  }
+}
+
+/* grading */
+.gradecard .response,
+.response {
+  background: #fafbf8;
+  border-left: 3px solid var(--rule);
+  padding: 8px 14px;
+  border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+  white-space: pre-wrap;
+}
+.autoscore {
+  background: var(--good-soft);
+  color: var(--good);
+  border-radius: var(--radius-sm);
+  padding: 8px 12px;
+  font-size: 13px;
+  font-weight: 600;
+}
+ol.qgrade {
+  margin: 12px 0 0;
+  padding-left: 20px;
+  display: grid;
+  gap: 12px;
+}
+.qg-prompt {
+  font-weight: 600;
+}
+.qg-answer {
+  font-size: 14px;
+  margin-top: 2px;
+}
+.qg-answer .ok {
+  color: var(--good);
+  font-weight: 700;
+}
+.qg-answer .no {
+  color: var(--bad);
+  font-weight: 700;
+}
+table.rubric-grade {
+  width: 100%;
+  border-collapse: collapse;
+}
+table.rubric-grade td {
+  padding: 7px 4px;
+  border-bottom: 1px solid var(--rule);
+  vertical-align: middle;
+}
+.returnbox {
+  margin-top: 12px;
+  border-top: 1px solid var(--rule);
+  padding-top: 10px;
+}
+.returnbox summary {
+  cursor: pointer;
+  font-size: 13px;
+  color: var(--ink-soft);
+}
+
+/* worksheet library */
+.ws-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: 12px;
+}
+.ws-card {
+  display: block;
+  text-decoration: none;
+  color: inherit;
+  border: 1px solid var(--rule);
+  border-radius: var(--radius);
+  padding: 16px;
+  background: var(--card);
+  transition: box-shadow 0.15s var(--ease), transform 0.15s var(--ease),
+    border-color 0.15s var(--ease);
+}
+.ws-card:hover {
+  box-shadow: var(--shadow-md);
+  transform: translateY(-2px);
+  border-color: var(--blue-soft);
+}
+.ws-subj {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--mark-deep);
+  font-weight: 700;
+}
+.ws-title {
+  font-family: var(--serif);
+  font-size: 18px;
+  font-weight: 600;
+  margin: 4px 0 8px;
+}
+.ws-preview {
+  margin: 8px 0 0;
+  padding-left: 20px;
+  display: grid;
+  gap: 12px;
+}
+.wp-prompt {
+  font-weight: 600;
+}
+.wp-choices {
+  margin: 6px 0 0;
+  padding-left: 14px;
+  list-style: none;
+  font-size: 14px;
+}
+.wp-choices li {
+  margin: 2px 0;
+}
+.wp-choices li.correct {
+  color: var(--good);
+  font-weight: 600;
+}
+.stu-check {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: 6px 12px;
+  max-height: 200px;
+  overflow-y: auto;
+}
+
+/* ============================================================
+   Dashboards — stat tiles, coming-due lists, per-child cards
+   ============================================================ */
+
+/* quick-stat tiles */
+.stat-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  gap: 10px;
+}
+
+/* coming-due list */
+.due-list {
+  display: grid;
+  gap: 8px;
+}
+a.due-row:hover {
+  box-shadow: var(--shadow-sm);
+  transform: translateY(-1px);
+}
+
+/* per-child snapshot cards (parent) */
+.child-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 12px;
+}
+.child-stats {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px;
+  margin-top: 14px;
+}
+.child-stats .cs-n {
+  font-family: var(--serif);
+  font-size: 20px;
+  font-weight: 600;
+  line-height: 1;
+}
+.child-stats .cs-sub {
+  font-family: var(--sans);
+  font-size: 12px;
+  color: var(--ink-soft);
+  font-weight: 400;
+}
+.child-stats .cs-l {
+  font-size: 11px;
+  color: var(--ink-soft);
+  margin-top: 4px;
+}
+
+/* ============================================================
+   Modules — the student's course path
+   ============================================================ */
+.mod-card.locked {
+  opacity: 0.72;
+}
+.mod-header {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--ink-soft);
+  font-weight: 700;
+  margin: 14px 0 4px;
+  padding-top: 10px;
+  border-top: 1px solid var(--rule);
+}
+.mod-header:first-child {
+  margin-top: 0;
+  padding-top: 0;
+  border-top: 0;
+}
+.mod-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 11px 12px;
+  margin: 6px 0;
+  border: 1px solid var(--rule);
+  border-radius: var(--radius-sm);
+  text-decoration: none;
+  color: inherit;
+  background: var(--card);
+  transition: box-shadow 0.15s var(--ease), transform 0.12s var(--ease);
+}
+a.mod-item:hover {
+  box-shadow: var(--shadow-sm);
+  transform: translateY(-1px);
+  border-color: var(--blue-soft);
+}
+.mod-item.done {
+  background: rgba(200, 230, 75, 0.12);
+  border-color: rgba(143, 165, 36, 0.4);
+}
+.mod-item.locked {
+  background: #f7f8f4;
+  color: var(--ink-soft);
+  cursor: default;
+}
+.mi-ic {
+  width: 28px;
+  height: 28px;
+  flex: 0 0 auto;
+  border-radius: 8px;
+  background: var(--blue-soft);
+  color: var(--blue);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+}
+.mod-item.done .mi-ic {
+  background: var(--mark);
+  color: #2f3908;
+}
+.mod-item.locked .mi-ic {
+  background: #eceee7;
+  color: #9aa3ad;
+}
+.mi-main {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.mi-title {
+  font-weight: 600;
+}
+
+/* ============================================================
+   Rich text — editor + rendered output
+   ============================================================ */
+.mdfield {
+  display: block;
+}
+.mdbar {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-wrap: wrap;
+  padding: 6px;
+  border: 1px solid var(--rule);
+  border-bottom: 0;
+  border-radius: var(--radius-sm) var(--radius-sm) 0 0;
+  background: #fafbf8;
+}
+.mdbtn {
+  min-width: 30px;
+  height: 28px;
+  padding: 0 8px;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  background: transparent;
+  cursor: pointer;
+  font: inherit;
+  font-size: 13px;
+  color: var(--ink);
+  transition: background 0.12s var(--ease), border-color 0.12s var(--ease);
+}
+.mdbtn:hover:not(:disabled) {
+  background: var(--card);
+  border-color: var(--rule);
+}
+.mdbtn.on {
+  background: var(--blue);
+  color: #fff;
+}
+.mdbtn:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+.mdfield textarea {
+  border-radius: 0 0 var(--radius-sm) var(--radius-sm);
+  box-shadow: none;
+}
+.mdpreview {
+  border: 1px solid var(--rule);
+  border-radius: 0 0 var(--radius-sm) var(--radius-sm);
+  padding: 12px 14px;
+  min-height: 96px;
+  background: var(--card);
+}
+.mdhint {
+  margin: 6px 0 0;
+}
+
+/* rendered markdown */
+.md > *:first-child {
+  margin-top: 0;
+}
+.md > *:last-child {
+  margin-bottom: 0;
+}
+.md p {
+  margin: 0 0 10px;
+}
+.md h2 {
+  font-size: 19px;
+  margin: 16px 0 8px;
+}
+.md h3 {
+  font-size: 16px;
+  margin: 14px 0 6px;
+}
+.md h4 {
+  font-size: 14.5px;
+  margin: 12px 0 6px;
+}
+.md ul,
+.md ol {
+  margin: 0 0 10px;
+  padding-left: 22px;
+}
+.md li {
+  margin: 3px 0;
+}
+.md blockquote {
+  margin: 0 0 10px;
+  padding: 2px 0 2px 14px;
+  border-left: 3px solid var(--rule);
+  color: var(--ink-soft);
+}
+.md code {
+  font-family: var(--mono);
+  font-size: 0.9em;
+  background: #f2f3ef;
+  padding: 1px 5px;
+  border-radius: 4px;
+}
+.md pre {
+  background: #f2f3ef;
+  padding: 12px 14px;
+  border-radius: var(--radius-sm);
+  overflow-x: auto;
+  margin: 0 0 10px;
+}
+.md pre code {
+  background: none;
+  padding: 0;
+}
+.md hr {
+  border: 0;
+  border-top: 1px solid var(--rule);
+  margin: 14px 0;
+}
+.md img {
+  max-width: 100%;
+  border: 1px solid var(--rule);
+  border-radius: var(--radius-sm);
+  display: block;
+  margin: 10px 0;
+}
+.md a {
+  color: var(--blue);
+}
+
+/* ============================================================
+   Notification centre
+   ============================================================ */
+.notif-list {
+  display: grid;
+  gap: 8px;
+}
+.notif {
+  background: var(--card);
+  border: 1px solid var(--rule);
+  border-left: 3px solid var(--rule);
+  border-radius: var(--radius-sm);
+  transition: box-shadow 0.15s var(--ease), transform 0.12s var(--ease);
+}
+.notif:hover {
+  box-shadow: var(--shadow-sm);
+  transform: translateY(-1px);
+}
+.notif.unread {
+  border-left-color: var(--mark-deep);
+  background: rgba(200, 230, 75, 0.07);
+}
+.notif-btn {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  width: 100%;
+  padding: 13px 15px;
+  background: transparent;
+  border: 0;
+  cursor: pointer;
+  text-align: left;
+  font: inherit;
+  color: inherit;
+}
+.notif-ic {
+  width: 30px;
+  height: 30px;
+  flex: 0 0 auto;
+  border-radius: 8px;
+  background: var(--blue-soft);
+  color: var(--blue);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 15px;
+}
+.notif.unread .notif-ic {
+  background: var(--mark);
+  color: #2f3908;
+}
+.notif-main {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.notif-title {
+  font-weight: 600;
+}
+.notif-body {
+  font-size: 13.5px;
+  color: var(--ink-soft);
+}
+.notif-when {
+  font-size: 11.5px;
+  color: var(--ink-soft);
+  margin-top: 2px;
+}
+.notif.unread .notif-when {
+  color: var(--mark-deep);
+  font-weight: 600;
+}
+
+/* ============================================================
+   Gradebook grid
+   ============================================================ */
+.gb-grid {
+  border-collapse: collapse;
+  width: max-content;
+  min-width: 100%;
+}
+.gb-grid th,
+.gb-grid td {
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--rule);
+  text-align: center;
+  vertical-align: middle;
+}
+.gb-grid thead th {
+  border-bottom: 2px solid var(--rule);
+  vertical-align: bottom;
+  min-width: 108px;
+  max-width: 150px;
+}
+.gb-head {
+  display: block;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--ink);
+  text-transform: none;
+  letter-spacing: 0;
+  line-height: 1.25;
+  white-space: normal;
+}
+.gb-ic {
+  color: var(--blue);
+  margin-right: 4px;
+}
+.gb-sub {
+  display: block;
+  font-size: 10.5px;
+  font-weight: 400;
+  color: var(--ink-soft);
+  margin-top: 3px;
+  text-transform: none;
+  letter-spacing: 0;
+}
+.gb-grid th.stick,
+.gb-grid td.stick {
+  position: sticky;
+  left: 0;
+  background: var(--card);
+  text-align: left;
+  min-width: 160px;
+  box-shadow: 1px 0 0 var(--rule);
+  z-index: 2;
+}
+.gb-total {
+  min-width: 92px;
+}
+.gb-letter {
+  font-family: var(--serif);
+  font-size: 20px;
+  font-weight: 600;
+}
+.gb-missing-tag {
+  color: var(--bad);
+  font-weight: 600;
+}
+.gb-cell {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.gb-cell input {
+  width: 54px;
+  padding: 6px 4px;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+  box-shadow: none;
+}
+.gb-late {
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--warn);
+}
+/* cell status tints */
+.g-graded {
+  background: rgba(200, 230, 75, 0.14);
+}
+.g-submitted {
+  background: var(--blue-soft);
+}
+.g-returned {
+  background: var(--bad-soft);
+}
+.g-draft {
+  background: var(--warn-soft);
+}
+.g-missing {
+  background: repeating-linear-gradient(
+    45deg,
+    var(--bad-soft),
+    var(--bad-soft) 5px,
+    #fff 5px,
+    #fff 10px
+  );
+}
+.g-assigned {
+  background: transparent;
+}
+.gb-key {
+  display: inline-block;
+  width: 18px;
+  height: 18px;
+  border-radius: 4px;
+  border: 1px solid var(--rule);
+}
+
+/* ============================================================
+   Standards & mastery
+   ============================================================ */
+.mastery-grid {
+  border-collapse: collapse;
+  width: max-content;
+  min-width: 100%;
+}
+.mastery-grid th,
+.mastery-grid td {
+  padding: 10px 8px;
+  border-bottom: 1px solid var(--rule);
+  text-align: center;
+  vertical-align: middle;
+  white-space: nowrap;
+}
+.mastery-grid th {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--ink-soft);
+  border-bottom: 1px solid var(--rule);
+}
+.mastery-grid th.stick,
+.mastery-grid td.stick {
+  position: sticky;
+  left: 0;
+  background: var(--card);
+  text-align: left;
+  min-width: 150px;
+  box-shadow: 1px 0 0 var(--rule);
+  z-index: 1;
+}
+.mg-code {
+  writing-mode: vertical-rl;
+  transform: rotate(180deg);
+  display: inline-block;
+  max-height: 92px;
+  overflow: hidden;
+  font-family: var(--mono);
+  font-size: 11px;
+}
+.mcell {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 28px;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 700;
+  border: 1px solid transparent;
+}
+.mcell.mastered {
+  background: var(--mark);
+  color: #2f3908;
+}
+.mcell.near {
+  background: var(--warn-soft);
+  color: var(--warn);
+}
+.mcell.developing {
+  background: var(--bad-soft);
+  color: var(--bad);
+}
+.mcell.none {
+  background: #f2f3ef;
+  color: #9aa3ad;
+  border-color: var(--rule);
+}
+
+/* inline standards alignment editor in the assignments table */
+.align-cell summary {
+  cursor: pointer;
+  list-style: none;
+}
+.align-cell summary::-webkit-details-marker {
+  display: none;
+}
+.align-pop {
+  margin-top: 8px;
+  padding: 10px;
+  background: #fafbf8;
+  border: 1px solid var(--rule);
+  border-radius: var(--radius-sm);
+  min-width: 220px;
+}
+
+/* standards summary block (student page + portals) */
+.std-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 0;
+  border-top: 1px solid var(--rule);
+}
+
+/* clickable "turned in" rows → read-only view */
+.turned-in-row {
+  text-decoration: none;
+  color: inherit;
+  margin: 0 -18px;
+  padding-left: 18px !important;
+  padding-right: 18px !important;
+  border-radius: var(--radius-sm);
+  transition: background 0.12s var(--ease);
+}
+
+/* Progress toward a rail's rules being confirmed by real invoice cycles.
+   Deliberately thin and unemphatic: it reports how much we DON'T know yet, so
+   it shouldn't read as an achievement bar. */
+.verifybar {
+  height: 4px;
+  border-radius: 999px;
+  background: var(--rule);
+  overflow: hidden;
+}
+.verifybar span {
+  display: block;
+  height: 100%;
+  background: var(--mark);
+  border-radius: 999px;
+}
+
+/* Annotation pins over a student's uploaded work. Positioned by percentage so
+   they track the image at any render size — see src/lib/annotate.ts. The
+   translate(-50%,-50%) centres the marker ON the clicked point rather than
+   hanging it below and to the right. */
+.pin {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  min-width: 22px;
+  height: 22px;
+  padding: 0 5px;
+  border-radius: 999px;
+  background: var(--mark);
+  color: var(--ink);
+  border: 2px solid #fff;
+  box-shadow: 0 1px 4px rgba(20, 28, 38, 0.35);
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 18px;
+  text-align: center;
+  cursor: default;
+  user-select: none;
+}
+.pin.draft {
+  background: #fff;
+  border-color: var(--mark-deep);
+  color: var(--mark-deep);
+}
+.pinkey {
+  margin: 10px 0 0;
+  padding-left: 20px;
+  font-size: 13.5px;
+  line-height: 1.7;
+}
+.pinkey li {
+  margin-bottom: 2px;
+}
+
+
+
+/* ============================================================================
    STUDENT — Ledger.
    A reading surface, not a console. Flat geometry, monospace figures, and the
    rust accent. The emoji stay: they are already the vocabulary of
@@ -2873,6 +3984,128 @@ a:hover {
   color: var(--accent-dark);
   font-size: 11px;
   font-weight: 700;
+}
+
+
+/* --- Parent: reports as a card grid ---------------------------------------- */
+
+.reportgrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: var(--gap);
+  align-items: start;
+}
+.reportgrid .card2 h3 {
+  font-size: 16.5px;
+  margin: 10px 0 2px;
+}
+.reportdate {
+  font-size: 12.5px;
+  color: var(--ink3);
+}
+.reportsum {
+  font-size: 13.5px;
+  color: var(--ink2);
+  line-height: 1.55;
+  margin: 8px 0 0;
+}
+
+/* --- Graded-work rows on the parent's progress view ------------------------ */
+
+.gradedrow {
+  padding: 13px 0;
+  border-top: 1px solid var(--line);
+}
+.gradedrow:first-child {
+  border-top: 0;
+}
+.gradedrow .top {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: baseline;
+}
+.gradedrow .ttl {
+  font-size: 14px;
+  font-weight: 600;
+}
+.gradedrow .crs {
+  font-size: 12px;
+  color: var(--ink3);
+  margin-top: 1px;
+}
+.gradedrow .fb {
+  font-size: 13px;
+  color: var(--ink2);
+  line-height: 1.55;
+  margin: 6px 0 0;
+}
+.scorepill {
+  font-family: var(--num);
+  font-size: 12.5px;
+  font-weight: 700;
+  padding: 3px 10px;
+  border-radius: 20px;
+  background: var(--accent-soft);
+  color: var(--accent-dark);
+  white-space: nowrap;
+}
+
+
+/* --- Standards summary -----------------------------------------------------
+   Another set of classes that lived in the old student block and is used well
+   beyond it — the parent's progress view, the student's home, and the teacher's
+   student page all render StandardsSummary. Without these the code and the
+   title ran together on one unspaced line. */
+
+.std-row {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 0;
+  border-top: 1px solid var(--line);
+}
+.std-row:first-of-type {
+  border-top: 0;
+}
+.std-row .code {
+  font-family: var(--num);
+  font-size: 11.5px;
+  font-weight: 700;
+  color: var(--ink3);
+  white-space: nowrap;
+}
+.std-row .ttl {
+  font-size: 13.5px;
+  min-width: 0;
+}
+
+/* The distribution bar above the list: mastered / near / developing / not yet
+   assessed, sized by count. Every segment is also stated as a number beside
+   the bar — colour alone never carries it. */
+.std-bars {
+  display: flex;
+  height: 8px;
+  border-radius: 4px;
+  overflow: hidden;
+  background: var(--line);
+  margin: 10px 0;
+}
+.std-bars span {
+  display: block;
+}
+.b-mastered {
+  background: var(--good-f);
+}
+.b-near {
+  background: var(--warn-f);
+}
+.b-developing {
+  background: var(--accent-mid);
+}
+.b-none {
+  background: var(--line);
 }
 
 /* --- Accessibility (8.1) -------------------------------------------------- */

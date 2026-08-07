@@ -57,7 +57,7 @@ export default async function ParentChildrenPage({
         <Notice tone="good">Your child&apos;s data has been permanently deleted.</Notice>
       )}
       {blocks.map(({ k, e, kidUser, graded, open, mastery }) => (
-        <div key={k.id} className="card">
+        <div key={k.id} className="card2" style={{ marginTop: 12 }}>
           <div className="spread">
             <div>
               <div className="eyebrow">Grade {k.grade}</div>
@@ -84,18 +84,18 @@ export default async function ParentChildrenPage({
 
           <div className="sep" style={{ margin: "16px 0" }} />
           <div className="eyebrow">Graded work</div>
-          <div className="rollbook" style={{ marginTop: 8 }}>
+          <div style={{ marginTop: 8 }}>
             {graded.length ? (
               graded.map((s) => (
-                <div key={s.id} className="line">
+                <div key={s.id} className="gradedrow">
                   <span style={{ flex: 1 }}>{s.assignmentTitle}</span>
-                  <span className="mono">
+                  <span className="scorepill">
                     {s.score}/{s.points}
                   </span>
                 </div>
               ))
             ) : (
-              <div className="line muted">Nothing graded yet</div>
+              <div className="gradedrow muted">Nothing graded yet</div>
             )}
           </div>
           {graded
@@ -127,9 +127,9 @@ export default async function ParentChildrenPage({
           <div className="rollbook" style={{ marginTop: 8 }}>
             {open.length ? (
               open.map((s) => (
-                <div key={s.id} className="line">
+                <div key={s.id} className="gradedrow">
                   <span style={{ flex: 1 }}>{s.assignmentTitle}</span>
-                  <span className="mono">due {fmt(s.dueDate)}</span>
+                  <span className="scorepill">due {fmt(s.dueDate)}</span>
                 </div>
               ))
             ) : (
@@ -140,7 +140,7 @@ export default async function ParentChildrenPage({
           <div className="sep" style={{ margin: "16px 0" }} />
           {kidUser ? (
             <p className="small muted" style={{ margin: 0 }}>
-              {k.name.split(" ")[0]} has a login (<span className="mono">{kidUser.email}</span>) and can
+              {k.name.split(" ")[0]} has a login (<span className="scorepill">{kidUser.email}</span>) and can
               submit work from home.
             </p>
           ) : (

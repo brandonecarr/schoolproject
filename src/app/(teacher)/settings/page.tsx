@@ -156,7 +156,8 @@ export default async function SettingsPage({
         </div>
       </div>
 
-      <div className="card" style={{ marginTop: 12 }}>
+      <div className="setgrid" style={{ marginTop: 12 }}>
+      <div className="card2">
         <div className="eyebrow">Data retention</div>
         <p className="small muted" style={{ margin: "6px 0 12px", maxWidth: "64ch" }}>
           COPPA prohibits keeping children&apos;s data indefinitely. Attendance, observations,
@@ -185,7 +186,7 @@ export default async function SettingsPage({
         </p>
       </div>
 
-      <div className="card" style={{ marginTop: 12 }}>
+      <div className="card2">
         <div className="eyebrow">Privacy &amp; security program</div>
         <p className="small muted" style={{ margin: "6px 0 10px", maxWidth: "64ch" }}>
           Draft policy documents live in the repo under <span className="mono">docs/</span> (WISP,
@@ -195,6 +196,7 @@ export default async function SettingsPage({
         <Link className="btn sec sm" href="/audit">
           View audit log
         </Link>
+      </div>
       </div>
     </>
   );
