@@ -4448,258 +4448,1074 @@ a:focus-visible {
    quiet attribution at the foot, matching how the printed packets read. */
 
 /* ============================================================================
-   LANDING — the apex, which is the only page a stranger sees.
+   LANDING — the apex, the only page a stranger sees.
 
-   Deliberately not the app's shell. There is no sidebar, no role accent and no
-   data; it is a document, so it reads as one: a single measured column, larger
-   type than the console, and generous vertical rhythm. It reuses .card /
-   .card2 / .btn / .eyebrow so it inherits the app's surfaces rather than
-   inventing a second visual language for one page.
+   Rebuilt from the design handoff in `School Cohort Landing Page.zip`. The
+   handoff's instruction was to recreate it on the app's own tokens rather than
+   paste its literals, because almost every value in it was lifted from this
+   stylesheet in the first place. So the OKLCH values below are `var(--…)`
+   wherever a token already says the same thing, and written out only where the
+   landing page genuinely needs a value the app does not have — the deep hero
+   gradient, the chartreuse mark, the oversized page card.
+
+   THE CHARTREUSE IS SCOPED TO `.lp` ON PURPOSE. `#C8E64B` was the app's
+   signature before the OKLCH rebase moved --mark onto the purple accent. The
+   handoff brings it back as the landing page's one hot accent — evidence-bar
+   fills, the play button, the final CTA. Defining it as a local custom property
+   under .lp keeps it off every other screen, so nothing in the console starts
+   rendering chartreuse because a token leaked.
    ============================================================================ */
 
 .lp {
+  /* --mono aliases --num, which is Jakarta outside the Ledger surface — so
+     `.mono` on this page was rendering in the body font and the placeholder
+     slots would have too. Rebound locally rather than globally, because the
+     console's --num is deliberately proportional for tabular figures. */
+  --mono: ui-monospace, "SF Mono", Menlo, monospace;
+  --lp-mark: #c8e64b;
+  --lp-on-mark: #2f3908;
+  --lp-dark: oklch(0.22 0.035 275);
+  --lp-dark-dim: #9db0d4;
+  --lp-dark-body: #c3cee4;
+  --lp-hair: oklch(0.94 0.008 285);
+
   background: var(--bg);
   min-height: 100vh;
-  display: flex;
-  flex-direction: column;
+  padding: 18px 18px 0;
+  color: var(--ink);
+  -webkit-font-smoothing: antialiased;
 }
+.lp ::selection {
+  background: var(--lp-mark);
+  color: var(--lp-on-mark);
+}
+.lp h1,
+.lp h2,
+.lp h3 {
+  font-family: var(--head);
+  color: var(--ink);
+}
+.lp p {
+  color: var(--ink2);
+}
+.lp a {
+  text-decoration: none;
+}
+
 .lp-wrap {
   width: 100%;
-  max-width: 940px;
+  max-width: 1180px;
   margin: 0 auto;
   padding: 0 24px;
 }
-
-.lp-bar {
-  border-bottom: 1px solid var(--line);
-  background: color-mix(in oklab, var(--surface) 80%, transparent);
-  position: sticky;
-  top: 0;
-  z-index: 5;
-  backdrop-filter: blur(8px);
+/* Every section after the hero opens on the same rhythm. One number, so the
+   page reads as a stack rather than as ten separately-tuned blocks. */
+.lp-section {
+  padding-top: 96px;
 }
-.lp-barin {
+.lp-eyebrow {
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--ink3);
+}
+.lp-h2,
+.lp-split h2,
+.lp-centerhead h2 {
+  font-size: 40px;
+  font-weight: 800;
+  line-height: 1.1;
+  letter-spacing: -0.03em;
+  margin: 10px 0 0;
+  text-wrap: pretty;
+}
+.lp-body {
+  font-size: 15.5px;
+  line-height: 1.6;
+  margin: 16px 0 0;
+  text-wrap: pretty;
+}
+
+/* --- The page card ---------------------------------------------------------
+   Header, hero and state strip share one white card that floats on the tinted
+   canvas. It is the only element on the page wider than the 1180px column. */
+
+.lp-card {
+  max-width: 1320px;
+  margin: 0 auto;
+  background: var(--surface);
+  border-radius: 26px;
+  box-shadow:
+    0 1px 2px oklch(0.4 0.06 285 / 0.05),
+    0 24px 60px oklch(0.4 0.06 285 / 0.07);
+  overflow: hidden;
+}
+
+.lp-head {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
+  gap: 24px;
+  padding: 20px 34px;
+  border-bottom: 1px solid oklch(0.955 0.008 285);
+}
+/* nowrap is load-bearing: without it "How it works" and "What it does" break to
+   two lines around 900px and the first thing above the fold reads as broken. */
+.lp-nav {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 16px;
-  padding-top: 12px;
-  padding-bottom: 12px;
+  gap: 18px;
+  white-space: nowrap;
 }
-/* .lockup / .wordmark / .brand-mark are all scoped under .auth, so the landing
-   header needs its own. Caught by looking at the page: the mark and the
-   wordmark stacked vertically, because nothing here was making them a row. */
-.lp .lockup {
+.lp-nav a,
+.lp-textlink {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--ink2);
+}
+.lp-nav a:hover,
+.lp-textlink:hover,
+.lp-footlinks a:hover {
+  color: var(--accent-dark);
+}
+.lp-dot {
+  width: 3px;
+  height: 3px;
+  border-radius: 50%;
+  background: oklch(0.85 0.01 285);
+}
+.lp-lockup {
   display: flex;
   align-items: center;
   gap: 10px;
+  justify-self: center;
 }
-.lp .brand-mark {
+.lp-mark {
   width: 30px;
   height: 30px;
   flex: 0 0 30px;
   border-radius: 9px;
+  background: var(--accent);
+  color: #fff;
   font-size: 15px;
+  font-weight: 800;
+  display: grid;
+  place-items: center;
 }
-.lp .wordmark {
+.lp-word {
   font-family: var(--head);
-  font-weight: 700;
-  font-size: 17px;
-  letter-spacing: -0.02em;
+  font-size: 20px;
+  font-weight: 800;
+  letter-spacing: -0.03em;
 }
-.lp-barnav {
+.lp-headright {
   display: flex;
   align-items: center;
-  gap: 20px;
-}
-.lp-barnav a {
-  color: var(--ink2);
-  font-size: 14px;
-  text-decoration: none;
-}
-.lp-barnav a:hover {
-  color: var(--ink);
-}
-.lp-barnav .btn {
-  text-decoration: none;
+  gap: 18px;
+  justify-self: end;
 }
 
-/* The hero carries the whole claim, so it gets the one oversized type size in
-   the product. Clamped rather than fixed: at 360px a 46px headline wraps into
-   five lines and stops being a headline. */
+/* --- Buttons --------------------------------------------------------------- */
+
+.lp-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  background: var(--accent);
+  color: #fff;
+  font-size: 14px;
+  font-weight: 700;
+  padding: 11px 8px 11px 18px;
+  border-radius: 999px;
+  box-shadow: 0 6px 18px oklch(0.55 0.19 285 / 0.28);
+}
+.lp-pill-lg {
+  font-size: 15.5px;
+  padding: 13px 10px 13px 22px;
+}
+.lp-pill-full {
+  width: 100%;
+  justify-content: center;
+  margin-top: 20px;
+  padding: 13px 18px;
+}
+.lp-pill:hover,
+.lp-markbtn:hover {
+  filter: brightness(1.08);
+}
+.lp-well {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.2);
+  display: grid;
+  place-items: center;
+  font-size: 12px;
+}
+.lp-markbtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  background: var(--lp-mark);
+  color: var(--lp-on-mark);
+  font-size: 16px;
+  font-weight: 800;
+  padding: 14px 26px;
+  border-radius: 999px;
+}
+.lp-markbtn:hover {
+  filter: brightness(1.06);
+}
+.lp a:focus-visible,
+.lp button:focus-visible {
+  outline: none;
+  box-shadow: var(--ring);
+  border-radius: 999px;
+}
+
+/* --- Hero ------------------------------------------------------------------ */
+
 .lp-hero {
-  padding: 72px 24px 8px;
-  max-width: 780px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.12fr);
+  gap: 44px;
+  align-items: start;
+  /* No right padding: the screenshot runs off the edge of the card. */
+  padding: 46px 0 0 60px;
+}
+.lp-herocopy {
+  min-width: 0;
+}
+.lp-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  background: var(--accent-soft);
+  border: 1px solid var(--accent-mid);
+  border-radius: 999px;
+  padding: 8px 18px 8px 10px;
+  font-size: 13.5px;
+  font-weight: 600;
+  color: oklch(0.4 0.16 285);
+}
+.lp-badgedot {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: #fff;
+  display: grid;
+  place-items: center;
+  color: var(--accent);
+  font-size: 12px;
 }
 .lp-hero h1 {
-  font-family: var(--head);
-  font-size: clamp(30px, 5.2vw, 46px);
-  line-height: 1.12;
-  letter-spacing: -0.03em;
-  margin: 0 0 16px;
+  font-size: clamp(38px, 3.9vw, 54px);
+  font-weight: 800;
+  line-height: 1.04;
+  letter-spacing: -0.035em;
+  margin: 22px 0 0;
+  text-wrap: balance;
 }
 .lp-lede {
   font-size: 17px;
-  line-height: 1.6;
-  color: var(--ink2);
-  margin: 0;
-  max-width: 60ch;
+  line-height: 1.55;
+  max-width: 30em;
+  margin: 18px 0 0;
 }
-.lp-cta {
+.lp-ctarow {
   display: flex;
-  flex-wrap: wrap;
   align-items: center;
-  gap: 16px;
-  margin-top: 28px;
-}
-.lp-cta .btn {
-  text-decoration: none;
-  font-size: 15px;
-  padding: 11px 22px;
-}
-
-.lp-find {
+  flex-wrap: wrap;
+  gap: 18px;
   margin-top: 24px;
 }
-.lp-find p {
-  margin: 8px 0 0;
-  line-height: 1.6;
-  max-width: 66ch;
+.lp-play {
+  display: inline-flex;
+  align-items: center;
+  gap: 14px;
+  font-size: 15.5px;
+  font-weight: 700;
+  color: oklch(0.28 0.03 285);
 }
-
-.lp-why {
-  padding-top: 64px;
-}
-.lp-cardrow {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: var(--gap);
-}
-.lp-point h2 {
-  font-family: var(--head);
-  font-size: 18px;
-  letter-spacing: -0.015em;
-  margin: 6px 0 8px;
-}
-.lp-point p {
-  margin: 0;
-  font-size: 14px;
-  line-height: 1.65;
-  color: var(--ink2);
-}
-
-.lp-how {
-  padding-top: 72px;
-}
-.lp-how h2,
-.lp-limits h2,
-.lp-end h2 {
-  font-family: var(--head);
-  font-size: 26px;
-  letter-spacing: -0.025em;
-  margin: 6px 0 24px;
-}
-.lp-steps {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  display: grid;
-  gap: 22px;
-}
-.lp-steps li {
-  display: flex;
-  gap: 18px;
-  align-items: flex-start;
-}
-/* A numeral, not a bullet: the order is the point — you cannot assemble the
-   packet before the attendance exists. */
-.lp-stepn {
-  flex: 0 0 34px;
+.lp-playdot {
   width: 34px;
   height: 34px;
   border-radius: 50%;
+  background: var(--lp-mark);
+  color: var(--lp-on-mark);
   display: grid;
   place-items: center;
-  background: var(--accent-soft);
-  color: var(--accent-dark);
-  font-family: var(--num);
-  font-weight: 700;
-  font-size: 15px;
-}
-.lp-steps h3 {
-  font-family: var(--head);
-  font-size: 16.5px;
-  margin: 5px 0 6px;
-}
-.lp-steps p {
-  margin: 0;
-  font-size: 14.5px;
-  line-height: 1.65;
-  color: var(--ink2);
-  max-width: 62ch;
+  font-size: 12px;
 }
 
-.lp-limits {
-  margin-top: 72px;
+/* The crop is load-bearing. Sizing by height with a horizontal overflow keeps
+   the dashboard bleeding off the right edge with zero vertical slack at any
+   width; sizing by width instead left up to 180px of empty panel underneath. */
+.lp-shot {
+  position: relative;
+  align-self: stretch;
+  margin-top: 8px;
+  min-height: 400px;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-right: 0;
+  border-radius: 16px 0 0 16px;
+  background: var(--surface2);
 }
-.lp-limits ul {
+.lp-shot img {
+  position: absolute;
+  inset: 0;
+  width: auto;
+  height: 100%;
+  min-width: 100%;
+  object-fit: cover;
+  object-position: left top;
+  box-shadow: -18px 24px 60px oklch(0.4 0.06 285 / 0.1);
+}
+
+.lp-strip {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 30px;
+  padding: 26px 60px 32px;
+}
+.lp-striplabel {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--ink3);
+}
+.lp-stripstates {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 30px;
+  font-size: 15px;
+  font-weight: 700;
+  color: oklch(0.34 0.02 285);
+}
+
+.lp-stripmore {
+  font-weight: 500;
+  color: var(--ink3);
+}
+.lp-find {
+  margin: 20px 34px 0;
+  padding: 14px 18px;
+  border-radius: 14px;
+  background: var(--accent-soft);
+  border: 1px solid var(--accent-mid);
+  font-size: 14.5px;
+  line-height: 1.6;
+  color: var(--ink2);
+}
+
+/* --- Split layouts --------------------------------------------------------- */
+
+.lp-split {
+  display: grid;
+  gap: 60px;
+  align-items: start;
+}
+.lp-job {
+  grid-template-columns: 0.85fr 1.15fr;
+  padding-top: 96px;
+}
+.lp-job h2 {
+  font-size: 38px;
+}
+.lp-joblist {
+  list-style: none;
   margin: 0;
   padding: 0;
-  list-style: none;
+}
+.lp-joblist li {
   display: grid;
+  grid-template-columns: auto 1fr;
   gap: 14px;
+  padding: 22px 0;
+  border-top: 1px solid var(--lp-hair);
 }
-.lp-limits li {
+.lp-joblist li:first-child {
+  border-top: 0;
+  padding-top: 0;
+}
+.lp-bullet {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--accent);
+  margin-top: 9px;
+}
+.lp-joblist h3 {
+  font-size: 19px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  margin: 0 0 6px;
+}
+.lp-joblist p {
+  font-size: 15.5px;
+  line-height: 1.6;
+  margin: 0;
+}
+
+/* --- Card grids ------------------------------------------------------------ */
+
+.lp-3up {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 20px;
+  margin-top: 34px;
+}
+.lp-step,
+.lp-feat,
+.lp-tier {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  box-shadow: var(--shadow);
+}
+.lp-step {
+  padding: 28px 26px 30px;
+}
+.lp-stepn {
+  width: 34px;
+  height: 34px;
+  border-radius: 10px;
+  background: var(--accent-soft);
+  color: var(--accent-dark);
+  font-weight: 800;
+  font-size: 15px;
+  display: grid;
+  place-items: center;
+}
+.lp-step h3 {
+  font-size: 21px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  margin: 18px 0 8px;
+}
+.lp-step p,
+.lp-feat p {
+  font-size: 15px;
+  line-height: 1.6;
+  margin: 0;
+}
+
+.lp-headrow {
+  display: flex;
+  justify-content: space-between;
+  align-items: end;
+  gap: 40px;
+}
+.lp-headrow p {
+  max-width: 30em;
+  font-size: 15.5px;
+  line-height: 1.6;
+  margin: 0;
+}
+.lp-feat {
+  padding: 26px 24px 28px;
+}
+.lp-tile {
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  background: var(--accent-soft);
+  color: var(--accent-dark);
+  display: grid;
+  place-items: center;
+  font-size: 16px;
+}
+/* Attendance gets the mark colour because attendance is the primary input to
+   every invoice — the one card that is upstream of all the others. */
+.lp-tile.mark {
+  background: var(--lp-mark);
+  color: var(--lp-on-mark);
+}
+.lp-feat h3 {
+  font-size: 18.5px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  margin: 16px 0 8px;
+}
+
+/* --- Evidence panel -------------------------------------------------------- */
+
+.lp-panel {
+  margin-top: 20px;
+  background: var(--lp-dark);
+  border-radius: 20px;
+  padding: 34px 36px;
+  display: grid;
+  grid-template-columns: 1fr 1.1fr;
+  gap: 48px;
+  align-items: center;
+}
+.lp-on-dark {
+  color: var(--lp-dark-dim);
+}
+.lp-panel h3 {
+  color: #fff;
+  font-size: 26px;
+  font-weight: 800;
+  letter-spacing: -0.025em;
+  margin: 10px 0 12px;
+}
+.lp-panel p {
+  color: var(--lp-dark-body);
+  font-size: 15.5px;
+  line-height: 1.6;
+  margin: 0;
+}
+.lp-bars {
+  display: grid;
+  gap: 16px;
+}
+/* The third column is fixed. With `auto`, each pill's own label length changed
+   its row's bar track — 61px, 50px and 102px — and three bars at three
+   different scales defeat the comparison this panel exists to make. */
+.lp-barrow {
+  display: grid;
+  grid-template-columns: 104px minmax(0, 1fr) 172px;
+  gap: 16px;
+  align-items: center;
+}
+.lp-barname {
+  color: #fff;
   font-size: 14.5px;
-  line-height: 1.65;
-  color: var(--ink2);
-  padding-left: 16px;
-  border-left: 2px solid var(--line);
-  max-width: 74ch;
+  font-weight: 600;
 }
-.lp-limits li strong {
+.lp-bar {
+  display: flex;
+  gap: 3px;
+  height: 24px;
+}
+.lp-bar span {
+  flex: 1;
+  border-radius: 3px;
+  background: rgba(255, 255, 255, 0.12);
+}
+.lp-bar span.on {
+  background: var(--lp-mark);
+}
+.lp-bar span.half {
+  background: repeating-linear-gradient(
+    135deg,
+    var(--lp-mark) 0 4px,
+    rgba(255, 255, 255, 0.12) 4px 8px
+  );
+}
+.lp-chip {
+  justify-self: start;
+  border-radius: 999px;
+  padding: 5px 12px;
+  font-size: 12px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+.lp-chip.good {
+  background: var(--good-s);
+  color: var(--good);
+}
+.lp-chip.warn {
+  background: var(--warn-s);
+  color: var(--warn);
+}
+.lp-chip.bad {
+  background: var(--bad-s);
+  color: var(--bad);
+}
+
+/* --- Comparison ------------------------------------------------------------ */
+
+.lp-compare {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 22px;
+  overflow: hidden;
+  box-shadow: var(--shadow);
+}
+.lp-comparehead {
+  padding: 38px 40px 30px;
+  border-bottom: 1px solid var(--lp-hair);
+}
+.lp-comparehead h2 {
+  font-size: 34px;
+  font-weight: 800;
+  line-height: 1.15;
+  letter-spacing: -0.03em;
+  margin: 10px 0 0;
+  text-wrap: pretty;
+}
+.lp-comparebody {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+}
+.lp-col {
+  padding: 30px 40px 36px;
+}
+.lp-col:first-child {
+  border-right: 1px solid var(--lp-hair);
+}
+.lp-col-us {
+  background: var(--surface2);
+}
+.lp-collabel {
+  font-size: 13px;
+  font-weight: 800;
+  color: var(--ink3);
+  margin-bottom: 18px;
+}
+.lp-collabel.accent {
+  color: var(--accent-dark);
+}
+.lp-crow {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 14px;
+  padding: 10px 0;
+  font-size: 15px;
+  line-height: 1.55;
+  color: var(--ink2);
+}
+.lp-cmark {
+  color: var(--ink3);
+}
+.lp-cmark.on {
+  color: var(--good);
+  font-weight: 700;
+}
+
+/* --- States ---------------------------------------------------------------- */
+
+.lp-states {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  align-content: start;
+}
+.lp-state {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  padding: 13px 16px;
+}
+.lp-statename {
+  font-size: 15.5px;
+  font-weight: 700;
+}
+.lp-stateprog {
+  font-size: 12.5px;
+  color: var(--ink3);
+  margin-top: 2px;
+}
+.lp-state .lp-chip {
+  font-size: 11px;
+  padding: 4px 9px;
+}
+.lp-state-add {
+  grid-column: 1 / -1;
+  justify-content: center;
+  border: 1px dashed var(--accent-mid);
+  background: transparent;
+  font-family: var(--mono);
+  font-size: 12px;
+  color: var(--ink3);
+}
+.lp-callout {
+  margin-top: 20px;
+  background: var(--warn-s);
+  border: 1px solid oklch(0.85 0.08 72);
+  border-radius: 12px;
+  padding: 11px 16px;
+  font-size: 14px;
+  font-weight: 600;
+  color: oklch(0.44 0.13 72);
+}
+.lp-fine {
+  font-size: 13.5px;
+  line-height: 1.6;
+  color: var(--ink3);
+  margin: 14px 0 0;
+}
+
+/* --- Limits ---------------------------------------------------------------- */
+
+.lp-limits {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 22px;
+  padding: 40px 44px 44px;
+  box-shadow: var(--shadow);
+}
+.lp-limits h2 {
+  font-size: 32px;
+  font-weight: 800;
+  letter-spacing: -0.03em;
+  margin: 10px 0 0;
+}
+.lp-limitgrid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 22px 44px;
+  margin-top: 26px;
+}
+.lp-limitgrid p {
+  font-size: 15.5px;
+  line-height: 1.6;
+  margin: 0;
+  text-wrap: pretty;
+}
+.lp-limitgrid strong {
   color: var(--ink);
 }
 
-.lp-end {
-  padding: 80px 24px 88px;
+/* --- Pricing --------------------------------------------------------------- */
+
+.lp-centerhead {
   text-align: center;
-}
-.lp-end .lp-lede {
+  max-width: 46em;
   margin: 0 auto;
 }
-.lp-end .btn {
-  text-decoration: none;
-  margin-top: 24px;
-  font-size: 15px;
-  padding: 11px 22px;
+.lp-centerhead p {
+  font-size: 15.5px;
+  line-height: 1.6;
+  margin: 14px auto 0;
+  max-width: 42em;
+}
+.lp-tiers {
+  align-items: start;
+}
+.lp-tier {
+  padding: 30px 28px 32px;
+}
+.lp-tier.featured {
+  border: 2px solid var(--accent);
+  box-shadow: 0 8px 30px oklch(0.55 0.19 285 / 0.12);
+}
+.lp-tierhead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.lp-tier h3 {
+  font-size: 18.5px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  margin: 0;
+}
+.lp-expect {
+  background: var(--accent-soft);
+  color: var(--accent-dark);
+  border-radius: 999px;
+  padding: 4px 10px;
+  font-size: 11.5px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+.lp-tiersub {
+  font-size: 14.5px;
+  line-height: 1.55;
+  margin: 8px 0 0;
+}
+.lp-price {
+  font-size: 42px;
+  font-weight: 800;
+  letter-spacing: -0.04em;
+  margin-top: 18px;
+}
+.lp-pricenote {
+  font-size: 13.5px;
+  color: var(--ink3);
+  margin-top: 4px;
+}
+.lp-slot {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 18px;
+}
+.lp-slotbox {
+  display: grid;
+  place-items: center;
+  width: 116px;
+  height: 52px;
+  border: 2px dashed var(--accent-mid);
+  border-radius: 12px;
+  font-family: var(--mono);
+  font-size: 12.5px;
+  color: var(--accent-dark);
+}
+.lp-slotbox.neutral {
+  border-color: var(--line);
+  color: var(--ink3);
+}
+.lp-hair {
+  height: 1px;
+  background: var(--lp-hair);
+  margin: 24px 0;
+}
+.lp-tier ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 10px;
+  font-size: 14.5px;
+  color: var(--ink2);
+}
+.lp-placeholder {
+  text-align: center;
+  font-family: var(--mono);
+  font-size: 11.5px;
+  color: var(--ink3);
+  margin: 22px 0 0;
+}
+
+/* --- FAQ ------------------------------------------------------------------- */
+
+.lp-faq {
+  display: grid;
+}
+.lp-qa {
+  padding: 22px 0;
+  border-top: 1px solid var(--lp-hair);
+}
+.lp-qa:last-child {
+  border-bottom: 1px solid var(--lp-hair);
+}
+.lp-qa h3 {
+  font-size: 18px;
+  font-weight: 700;
+  letter-spacing: -0.015em;
+  margin: 0 0 8px;
+}
+.lp-qa p {
+  font-size: 15.5px;
+  line-height: 1.6;
+  margin: 0;
+  text-wrap: pretty;
+}
+
+/* --- Final CTA + footer ---------------------------------------------------- */
+
+.lp-final {
+  background: var(--lp-dark);
+  border-radius: 26px;
+  padding: 72px 60px;
+  text-align: center;
+}
+.lp-final h2 {
+  color: #fff;
+  font-size: 46px;
+  font-weight: 800;
+  line-height: 1.08;
+  letter-spacing: -0.035em;
+  margin: 0;
+  text-wrap: balance;
+}
+.lp-final p {
+  color: var(--lp-dark-body);
+  font-size: 16px;
+  margin: 14px 0 0;
+}
+.lp-finalrow {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 22px;
+  margin-top: 30px;
+}
+.lp-finalfine {
+  font-size: 13.5px;
+  color: var(--lp-dark-dim);
+}
+.lp-finalfine .mono {
+  color: var(--lp-dark-body);
 }
 
 .lp-foot {
-  margin-top: auto;
-  border-top: 1px solid var(--line);
-  padding: 22px 0;
-  font-size: 13px;
-  color: var(--ink2);
+  margin-top: 96px;
+  padding: 48px 24px 56px;
 }
-.lp-foot .lp-wrap {
+.lp-footin {
   display: flex;
   flex-wrap: wrap;
-  gap: 10px 24px;
   justify-content: space-between;
+  align-items: center;
+  gap: 18px 32px;
+  padding-top: 32px;
+  border-top: 1px solid var(--line);
+}
+.lp-foot .lp-mark {
+  width: 26px;
+  height: 26px;
+  flex: 0 0 26px;
+  border-radius: 8px;
+  font-size: 13px;
+}
+.lp-foot .lp-word {
+  font-size: 17px;
+}
+.lp-footlinks {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 20px;
+  font-size: 14px;
+  font-weight: 500;
+}
+.lp-footlinks a {
+  color: var(--ink2);
+}
+.lp-footnote {
+  font-size: 13.5px;
+  color: var(--ink3);
 }
 
-@media (max-width: 780px) {
-  .lp-cardrow {
+/* --- Responsive ------------------------------------------------------------
+   The handoff was verified 900px and up and explicitly not designed below it.
+   These reuse the app's existing 900/860/640 breakpoints rather than inventing
+   new ones, and take the collapse order the handoff specified. */
+
+@media (max-width: 1080px) {
+  .lp-hero {
+    padding-left: 40px;
+  }
+  .lp-strip {
+    padding: 24px 40px 30px;
+  }
+  .lp-split,
+  .lp-job {
+    gap: 40px;
+  }
+}
+
+@media (max-width: 900px) {
+  .lp-head {
+    grid-template-columns: auto 1fr;
+    row-gap: 14px;
+    padding: 18px 22px;
+  }
+  .lp-lockup {
+    justify-self: start;
+    order: -1;
+  }
+  .lp-headright {
+    order: -1;
+  }
+  .lp-nav {
+    grid-column: 1 / -1;
+    overflow-x: auto;
+  }
+  /* The screenshot goes full-bleed BELOW the copy rather than beside it. */
+  .lp-hero {
+    grid-template-columns: 1fr;
+    gap: 30px;
+    padding: 34px 24px 0;
+  }
+  .lp-shot {
+    min-height: 300px;
+    border-right: 1px solid var(--line);
+    border-radius: 16px;
+    margin-right: 0;
+  }
+  .lp-strip {
+    padding: 22px 24px 26px;
+    gap: 14px 24px;
+  }
+  .lp-3up {
+    grid-template-columns: 1fr 1fr;
+  }
+  .lp-split,
+  .lp-job {
+    grid-template-columns: 1fr;
+    gap: 28px;
+  }
+  .lp-panel {
+    grid-template-columns: 1fr;
+    gap: 28px;
+    padding: 28px 26px;
+  }
+  .lp-comparebody {
     grid-template-columns: 1fr;
   }
-  /* The two in-page anchors are a convenience on a long desktop page and pure
-     clutter next to the one control that matters on a phone. */
-  .lp-barnav a:not(.btn) {
-    display: none;
+  .lp-col:first-child {
+    border-right: 0;
+    border-bottom: 1px solid var(--lp-hair);
   }
-  .lp-hero {
-    padding-top: 48px;
+  .lp-limitgrid {
+    grid-template-columns: 1fr;
+  }
+  .lp-headrow {
+    flex-direction: column;
+    align-items: start;
+    gap: 16px;
+  }
+}
+
+@media (max-width: 640px) {
+  .lp {
+    padding: 10px 10px 0;
+  }
+  .lp-card {
+    border-radius: 20px;
+  }
+  .lp-section {
+    padding-top: 64px;
+  }
+  .lp-h2,
+  .lp-split h2,
+  .lp-centerhead h2,
+  .lp-job h2 {
+    font-size: 30px;
+  }
+  .lp-comparehead h2,
+  .lp-limits h2 {
+    font-size: 27px;
+  }
+  .lp-final {
+    padding: 48px 24px;
+  }
+  .lp-final h2 {
+    font-size: 32px;
+  }
+  .lp-3up,
+  .lp-states {
+    grid-template-columns: 1fr;
+  }
+  /* The 104px name column becomes a stacked label — at this width the three
+     bars still line up with each other, which is the whole point. */
+  .lp-barrow {
+    grid-template-columns: 1fr auto;
+    gap: 8px 12px;
+  }
+  .lp-barname {
+    grid-column: 1 / -1;
+  }
+  .lp-bar {
+    grid-column: 1;
+  }
+  .lp-limits,
+  .lp-comparehead,
+  .lp-col {
+    padding-left: 22px;
+    padding-right: 22px;
+  }
+  .lp-limits {
+    padding-top: 28px;
+    padding-bottom: 30px;
+  }
+  .lp-footin {
+    flex-direction: column;
+    align-items: start;
   }
 }
 

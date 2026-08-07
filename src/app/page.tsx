@@ -1,21 +1,23 @@
+import Image from "next/image";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getSession } from "@/lib/auth";
 import { currentHostKind } from "@/lib/tenant-server";
 import { rootDomain } from "@/lib/tenant-config";
+import { landingStates, LandingState } from "@/lib/landing";
 
 // "/" means two different things depending on the address it arrives on.
 //
 // On a school's own subdomain, and on any untenanted deployment, it is what it
 // has always been: send each role to their home. On the apex it is the public
-// front of the product, because there is no school there to send anyone to.
+// marketing page, because there is no school there to send anyone to.
 //
 // WHAT THIS PAGE MAY CLAIM. Everything here is load-bearing for a school
-// deciding whether to run their reimbursements through us, so the limits are
-// on the page rather than in the small print: we never hold anyone's money, we
-// never submit on their behalf, the model drafts and a person approves, and a
-// rule we have not yet watched survive a real invoice cycle says so. A landing
-// page that oversells this product gets a microschool's funding rejected.
+// deciding whether to run their reimbursements through us, so the limits are on
+// the page rather than in the small print, and the state table is DERIVED from
+// src/lib/rules.ts rather than written out. A landing page that oversells this
+// product gets a microschool's funding rejected, which is a worse outcome than
+// a landing page that undersells it.
 
 export const dynamic = "force-dynamic";
 
@@ -24,6 +26,16 @@ export const metadata = {
   description:
     "Attendance, evidence, and ESA reimbursement paperwork for microschools and homeschool co-ops. Correctly, on time, in any state.",
 };
+
+/**
+ * Pricing is designed and built but the number is not set.
+ *
+ * The handoff put this behind a flag on purpose. `[ $ / child ]` on a live
+ * marketing domain tells a prospect the company has not decided what it costs;
+ * flip this to true once the price is real and delete the placeholder note in
+ * the markup at the same time.
+ */
+const SHOW_PRICING = true;
 
 export default async function Home({
   searchParams,
@@ -41,187 +53,564 @@ export default async function Home({
   }
 
   const { signin } = await searchParams;
-  const root = rootDomain();
+  const root = rootDomain() || "schoolcohort.com";
+  const states = landingStates();
+  const verifiedCount = states.filter((s) => !s.unverified).length;
 
   return (
     <div className="lp">
-      <header className="lp-bar">
-        <div className="lp-wrap lp-barin">
-          <div className="lockup">
-            <div className="brand-mark">C</div>
-            <div className="wordmark">Cohort</div>
-          </div>
-          <nav className="lp-barnav" aria-label="Site">
+      <div className="lp-card">
+        <header className="lp-head">
+          <nav className="lp-nav" aria-label="Sections">
             <a href="#how">How it works</a>
-            <a href="#limits">What it won&apos;t do</a>
-            <Link className="btn sec sm" href="/signup">
-              Start your school
-            </Link>
+            <span className="lp-dot" aria-hidden />
+            <a href="#features">What it does</a>
+            <span className="lp-dot" aria-hidden />
+            <a href="#states">States</a>
+            {SHOW_PRICING && (
+              <>
+                <span className="lp-dot" aria-hidden />
+                <a href="#pricing">Pricing</a>
+              </>
+            )}
           </nav>
-        </div>
-      </header>
 
-      <main>
+          <div className="lp-lockup">
+            <span className="lp-mark" aria-hidden>
+              C
+            </span>
+            <span className="lp-word">Cohort</span>
+          </div>
+
+          <div className="lp-headright">
+            <Link className="lp-textlink" href="/login">
+              Sign in
+            </Link>
+            <Link className="lp-pill" href="/signup">
+              Start your school
+              <span className="lp-well" aria-hidden>
+                ↗
+              </span>
+            </Link>
+          </div>
+        </header>
+
         {/* Someone typed the bare domain looking for their school. They cannot
             sign in here — the session cookie is host-only, so an account only
-            exists at its own address — and the honest answer is to tell them
-            where to look rather than show a form that would not work. */}
+            exists at its own address — and the honest answer is to say where to
+            look rather than show a form that would not work. */}
         {signin && (
-          <section className="lp-wrap">
-            <div className="card lp-find" role="status">
-              <div className="eyebrow">Looking for your school?</div>
+          <div className="lp-find" role="status">
+            <strong>Looking for your school?</strong> Each school signs in at its own address, not
+            this one — something like <span className="mono">cedar-grove.{root}</span>. It&apos;s in
+            the invitation your school sent you. We can&apos;t look a family&apos;s school up from
+            here, on purpose.
+          </div>
+        )}
+
+        <section className="lp-hero">
+          <div className="lp-herocopy">
+            <span className="lp-badge">
+              <span className="lp-badgedot" aria-hidden>
+                ✦
+              </span>
+              Microschool operations + ESA reimbursement
+            </span>
+
+            <h1>The system that gets a microschool paid.</h1>
+
+            <p className="lp-lede">
+              Take attendance. Cohort turns it into the reimbursement packet your state actually
+              accepts — with the evidence attached, in the format the reviewer expects, before the
+              deadline.
+            </p>
+
+            <div className="lp-ctarow">
+              <Link className="lp-pill lp-pill-lg" href="/signup">
+                Start your school
+                <span className="lp-well" aria-hidden>
+                  ↗
+                </span>
+              </Link>
+              <a className="lp-play" href="#how">
+                <span className="lp-playdot" aria-hidden>
+                  ▶
+                </span>
+                See a packet get built
+              </a>
+            </div>
+          </div>
+
+          {/* No right padding on purpose: the screenshot bleeds off the card.
+              Sized by height with a horizontal crop so there is never vertical
+              slack under it, at any width. */}
+          <div className="lp-shot">
+            <Image
+              src="/hero-dashboard.png"
+              alt="The Cohort teacher dashboard, showing six students and their evidence scores"
+              width={1906}
+              height={853}
+              priority
+            />
+          </div>
+        </section>
+
+        {/* The handoff's label here read "Built with microschools running ESA
+            cycles in". No microschool is running a cycle on Cohort yet, so that
+            sentence would have been the page's one outright false claim — and
+            on the strip directly under the headline. What IS true is how many
+            programs the rules table covers, so the strip says that instead. */}
+        <div className="lp-strip">
+          <span className="lp-striplabel">
+            Reimbursement rules configured for {states.length} states
+          </span>
+          <div className="lp-stripstates">
+            {states.slice(0, 5).map((s) => (
+              <span key={s.code}>{s.name}</span>
+            ))}
+            <span className="lp-stripmore">and {states.length - 5} more</span>
+          </div>
+        </div>
+      </div>
+
+      <main>
+        <section className="lp-wrap lp-split lp-job">
+          <div>
+            <div className="lp-eyebrow">The actual job</div>
+            <h2>A microschool with six students is running a claims operation.</h2>
+          </div>
+          <ul className="lp-joblist">
+            <li>
+              <span className="lp-bullet" aria-hidden />
+              <div>
+                <h3>Miss a cycle and payroll is late</h3>
+                <p>
+                  Everything else in the school depends on this one thing working. It&apos;s the
+                  part nobody trained you for and the part with a deadline.
+                </p>
+              </div>
+            </li>
+            <li>
+              <span className="lp-bullet" aria-hidden />
+              <div>
+                <h3>Every state words it differently</h3>
+                <p>
+                  Each program wants a different attendance denominator, a different receipt, a
+                  different attestation. The rules change between cycles, and nobody sends you a
+                  diff.
+                </p>
+              </div>
+            </li>
+            <li>
+              <span className="lp-bullet" aria-hidden />
+              <div>
+                <h3>Evidence, not enthusiasm</h3>
+                <p>
+                  Rejections are almost never about the teaching. They&apos;re about a missing day,
+                  an unsigned line, a work sample nobody kept.
+                </p>
+              </div>
+            </li>
+          </ul>
+        </section>
+
+        <section className="lp-wrap lp-section" id="how">
+          <div className="lp-eyebrow">How it works</div>
+          <h2 className="lp-h2">Three things, in this order</h2>
+
+          <div className="lp-3up">
+            {[
+              [
+                "Run your school",
+                "Attendance, assignments, grading, portfolios, conferences, messages home. Ordinary daily work — the kind you'd be doing in a spreadsheet anyway.",
+              ],
+              [
+                "Cohort assembles the packet",
+                "Attendance counted against your school's own instructional calendar, work samples attached, narrative drafted, all on your letterhead.",
+              ],
+              [
+                "You read it and submit it",
+                "Nothing goes anywhere until a person approves it. When a packet comes back rejected, Cohort records the reviewer's exact wording.",
+              ],
+            ].map(([title, body], i) => (
+              <article className="lp-step" key={title}>
+                <span className="lp-stepn" aria-hidden>
+                  {i + 1}
+                </span>
+                <h3>{title}</h3>
+                <p>{body}</p>
+              </article>
+            ))}
+          </div>
+
+          {/* The evidence bar, borrowed from the app's own component. The third
+              column is a fixed width on purpose: with `auto`, each pill's label
+              length changed its row's bar track, and three bars at three
+              different scales defeat the comparison the panel exists to make. */}
+          <div className="lp-panel">
+            <div>
+              <div className="lp-eyebrow lp-on-dark">The evidence bar</div>
+              <h3>You can see a rejection coming</h3>
               <p>
-                Each school signs in at its own address, not this one — something like{" "}
-                <span className="mono">cedar-grove.{root}</span>. It&apos;s in the invitation your
-                school sent you, and in any email Cohort has sent you since.
-              </p>
-              <p className="small muted">
-                Can&apos;t find it? Ask whoever runs your school — they can resend the invitation
-                from their end. We can&apos;t look up a family&apos;s school from here, on purpose.
+                Every student carries a live evidence score. Thin packets get flagged weeks before
+                the window opens, while there&apos;s still time to fix them.
               </p>
             </div>
+            <div className="lp-bars">
+              {[
+                ["Cole Draper", 2, 0, "Not enough evidence", "bad"],
+                ["Maya Reyes", 3, 1, "Likely to be questioned", "warn"],
+                ["Eli Booker", 5, 0, "Invoice-ready", "good"],
+              ].map(([name, full, partial, label, tone]) => (
+                <div className="lp-barrow" key={name as string}>
+                  <span className="lp-barname">{name}</span>
+                  <span className="lp-bar" aria-hidden>
+                    {Array.from({ length: 5 }, (_, i) => (
+                      <span
+                        key={i}
+                        className={
+                          i < (full as number)
+                            ? "on"
+                            : i < (full as number) + (partial as number)
+                              ? "half"
+                              : ""
+                        }
+                      />
+                    ))}
+                  </span>
+                  <span className={`lp-chip ${tone}`}>{label}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        </section>
+
+        <section className="lp-wrap lp-section" id="features">
+          <div className="lp-headrow">
+            <div>
+              <div className="lp-eyebrow">What it does</div>
+              <h2 className="lp-h2">One system, because it&apos;s all one job</h2>
+            </div>
+            <p>
+              The LMS isn&apos;t a separate feature area from the invoicing. Teaching generates the
+              proof, and the proof gets the school paid.
+            </p>
+          </div>
+
+          <div className="lp-3up">
+            {[
+              [
+                "✓",
+                "Attendance",
+                "One tap per student, counted against your own instructional calendar. It's the single biggest input to every invoice.",
+                true,
+              ],
+              [
+                "✎",
+                "Assignments & grading",
+                "Quizzes, worksheets, rubrics, a grading queue. Graded work with real feedback is the strongest evidence a state accepts.",
+                false,
+              ],
+              [
+                "▤",
+                "Portfolios & observations",
+                "Work samples and written observations, filed against the student they belong to, ready to attach when the window opens.",
+                false,
+              ],
+              [
+                "◈",
+                "ESA invoices & packets",
+                "Built from the term's real data, on your letterhead, in your state's format. Print or save as PDF and submit it yourself.",
+                false,
+              ],
+              [
+                "◐",
+                "Cash flow & tuition",
+                "What's in flight, what's paid, what's still unbuilt — plus the disbursement lag your state actually runs on.",
+                false,
+              ],
+              [
+                "♡",
+                "Family portal",
+                "Parents get their own view of progress, messages and conferences — and they're the ones who create their child's login.",
+                false,
+              ],
+            ].map(([glyph, title, body, primary]) => (
+              <article className="lp-feat" key={title as string}>
+                <span className={`lp-tile ${primary ? "mark" : ""}`} aria-hidden>
+                  {glyph}
+                </span>
+                <h3>{title}</h3>
+                <p>{body}</p>
+              </article>
+            ))}
+          </div>
+        </section>
+
+        <section className="lp-wrap lp-section">
+          <div className="lp-compare">
+            <div className="lp-comparehead">
+              <div className="lp-eyebrow">Built for six students, not six hundred</div>
+              <h2>Big-school software solves a problem you don&apos;t have</h2>
+            </div>
+            <div className="lp-comparebody">
+              <div className="lp-col">
+                <div className="lp-collabel">A district SIS</div>
+                {[
+                  "Priced and scoped for hundreds of seats",
+                  "Assumes a registrar, a bookkeeper and an IT admin",
+                  "Knows nothing about ESA reimbursement",
+                  "Weeks of setup before the first day counts",
+                ].map((t) => (
+                  <div className="lp-crow" key={t}>
+                    <span className="lp-cmark" aria-hidden>
+                      —
+                    </span>
+                    <span>{t}</span>
+                  </div>
+                ))}
+              </div>
+              <div className="lp-col lp-col-us">
+                <div className="lp-collabel accent">Cohort</div>
+                {[
+                  "Priced per child, because that's how you're funded",
+                  "Assumes one person does all of it, usually while teaching",
+                  "Reimbursement is the point, not an integration",
+                  "Your own address and your first roster in about a minute",
+                ].map((t) => (
+                  <div className="lp-crow" key={t}>
+                    <span className="lp-cmark on" aria-hidden>
+                      ✓
+                    </span>
+                    <span>{t}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section className="lp-wrap lp-split lp-section" id="states">
+          <div>
+            <div className="lp-eyebrow">State rules</div>
+            <h2>It knows your state&apos;s rules — and admits which ones it hasn&apos;t proven</h2>
+            <p className="lp-body">
+              A confidently wrong rule gets a school&apos;s funding clawed back. So any rule Cohort
+              has inferred but not yet watched survive a real invoice cycle carries a visible flag,
+              and you treat it as a starting point rather than as advice.
+            </p>
+            <div className="lp-callout">⚑ Unverified rules are marked, everywhere they appear</div>
+            <p className="lp-fine">
+              {states.length} programs configured, {verifiedCount} confirmed against a real invoice
+              cycle. Any other state works too — the teaching and evidence side is the same
+              everywhere.
+            </p>
+          </div>
+
+          {/* Driven from src/lib/rules.ts, never written out. The handoff is
+              explicit that this table must not be able to claim more coverage
+              than the code has verified — and every rail is still verify:true,
+              so every row carries the flag. */}
+          <div className="lp-states">
+            {states.map((s: LandingState) => (
+              <div className="lp-state" key={s.code}>
+                <div>
+                  <div className="lp-statename">{s.name}</div>
+                  <div className="lp-stateprog">{s.program}</div>
+                </div>
+                <span className={`lp-chip ${s.unverified ? "warn" : "good"}`}>
+                  {s.unverified ? "⚑ Rules unverified" : "Supported"}
+                </span>
+              </div>
+            ))}
+            <div className="lp-state lp-state-add">[ add states as cycles are observed ]</div>
+          </div>
+        </section>
+
+        <section className="lp-wrap lp-section">
+          <div className="lp-limits">
+            <div className="lp-eyebrow">What Cohort will not do</div>
+            <h2>The limits, up front</h2>
+            <div className="lp-limitgrid">
+              {[
+                [
+                  "It never holds your money.",
+                  "Reimbursements go from the state or the ESA vendor to you. Cohort is never in that path and never has a balance of yours.",
+                ],
+                [
+                  "It never submits for you.",
+                  "AI drafts; a person approves; nothing is auto-filed. A system that could submit on its own could submit something wrong on its own.",
+                ],
+                [
+                  "It flags what it hasn't verified.",
+                  "A rule Cohort inferred but has not yet seen hold up against a real invoice carries a visible mark.",
+                ],
+                [
+                  "Children's accounts come from parents.",
+                  "A school cannot create a student login. A parent does, with consent recorded — and child records are deleted on a schedule you set.",
+                ],
+              ].map(([lead, rest]) => (
+                <p key={lead}>
+                  <strong>{lead}</strong> {rest}
+                </p>
+              ))}
+            </div>
+          </div>
+        </section>
+
+        {SHOW_PRICING && (
+          <section className="lp-wrap lp-section" id="pricing">
+            <div className="lp-centerhead">
+              <div className="lp-eyebrow">Pricing</div>
+              <h2 className="lp-h2">Per child, because that&apos;s how you&apos;re funded</h2>
+              <p>
+                Free to set up, and free while you&apos;re getting your first roster in. You only
+                pay once children are enrolled.
+              </p>
+            </div>
+
+            <div className="lp-3up lp-tiers">
+              <article className="lp-tier">
+                <h3>Setting up</h3>
+                <p className="lp-tiersub">Your address, your calendar, your first roster.</p>
+                <div className="lp-price">Free</div>
+                <div className="lp-pricenote">No card, no expiry</div>
+                <div className="lp-hair" />
+                <ul>
+                  <li>Full product, one school</li>
+                  <li>Attendance and grading</li>
+                  <li>Packets you can preview</li>
+                </ul>
+              </article>
+
+              <article className="lp-tier featured">
+                <div className="lp-tierhead">
+                  <h3>Per child</h3>
+                  <span className="lp-expect">Expected</span>
+                </div>
+                <p className="lp-tiersub">Everything, for every enrolled student.</p>
+                <div className="lp-slot">
+                  <span className="lp-slotbox">[ $ / child ]</span>
+                  <span className="lp-pricenote">per month</span>
+                </div>
+                <div className="lp-pricenote">Billed monthly, cancel anytime</div>
+                <div className="lp-hair" />
+                <ul>
+                  <li>ESA packets in your state&apos;s format</li>
+                  <li>Evidence board and rejection tracking</li>
+                  <li>Family portal and portfolios</li>
+                  <li>Your own school address</li>
+                </ul>
+                <Link className="lp-pill lp-pill-full" href="/signup">
+                  Start your school
+                </Link>
+              </article>
+
+              <article className="lp-tier">
+                <h3>Co-op or network</h3>
+                <p className="lp-tiersub">
+                  Several schools under one roof, or one operator running a few sites.
+                </p>
+                <div className="lp-slot">
+                  <span className="lp-slotbox neutral">[ talk to us ]</span>
+                </div>
+                <div className="lp-pricenote">Volume rate per child</div>
+                <div className="lp-hair" />
+                <ul>
+                  <li>Multiple schools, one login</li>
+                  <li>Shared calendar and rules</li>
+                  <li>Onboarding help</li>
+                </ul>
+              </article>
+            </div>
+
+            <p className="lp-placeholder">
+              [ pricing not final — swap the placeholders when the number is set ]
+            </p>
           </section>
         )}
 
-        <section className="lp-wrap lp-hero">
-          <h1>The system that gets a microschool paid.</h1>
-          <p className="lp-lede">
-            Take attendance. Cohort turns it into the reimbursement packet your state actually
-            accepts — with the evidence attached, in the format the reviewer expects, before the
-            deadline.
-          </p>
-          <div className="lp-cta">
-            <Link className="btn" href="/signup">
-              Start your school
-            </Link>
-            <span className="small muted">
-              Free to set up. Your school gets its own address at{" "}
-              <span className="mono">yourschool.{root}</span>.
-            </span>
+        <section className="lp-wrap lp-split lp-section" id="faq">
+          <div>
+            <div className="lp-eyebrow">Questions</div>
+            <h2>Before you move a school onto it</h2>
+          </div>
+          <div className="lp-faq">
+            {[
+              [
+                "Do you submit my invoices to the state?",
+                "No. Cohort prepares and tracks; you submit. Nothing is ever auto-filed to a state portal, a payment rail, or a parent.",
+              ],
+              [
+                "What does the AI actually do?",
+                "It drafts narratives from work you've already recorded. A person reads and approves every one before it leaves the building.",
+              ],
+              [
+                "My state isn't listed. Can I still use it?",
+                "Yes — the school, teaching and evidence side works anywhere. Packet formatting is state-specific, and states get added as real invoice cycles are observed.",
+              ],
+              [
+                "What happens to student data?",
+                "It's yours. Parents create their children's accounts with consent recorded, records are deleted on a retention schedule you set, and a data processing agreement is available.",
+              ],
+              [
+                "How long does setup take?",
+                "Pick a name and a state and you have your own address in about a minute. Attendance can start the same day; evidence accumulates from there.",
+              ],
+              [
+                "I already have a spreadsheet that works.",
+                "Then you already do step one. The difference is that Cohort keeps the evidence attached to the day it came from, so the packet is built before the window opens rather than the weekend after it closes.",
+              ],
+            ].map(([q, a]) => (
+              <div className="lp-qa" key={q}>
+                <h3>{q}</h3>
+                <p>{a}</p>
+              </div>
+            ))}
           </div>
         </section>
 
-        <section className="lp-wrap lp-why">
-          <div className="lp-cardrow">
-            <div className="card2 lp-point">
-              <div className="eyebrow">The actual job</div>
-              <h2>Reimbursement is the business</h2>
-              <p>
-                A microschool with six students and an ESA program behind them is running a claims
-                operation. Miss a cycle and payroll is late. Everything else in the school depends
-                on this one thing working.
-              </p>
-            </div>
-            <div className="card2 lp-point">
-              <div className="eyebrow">Why it&apos;s hard</div>
-              <h2>Every state words it differently</h2>
-              <p>
-                Arizona, Florida, Iowa, Utah and Arkansas each want a different attendance
-                denominator, a different receipt, a different attestation. The rules change between
-                cycles, and nobody sends you a diff.
-              </p>
-            </div>
-            <div className="card2 lp-point">
-              <div className="eyebrow">Where it breaks</div>
-              <h2>Evidence, not enthusiasm</h2>
-              <p>
-                Rejections are almost never about the teaching. They&apos;re about a missing day, an
-                unsigned line, a work sample nobody kept. Cohort keeps the evidence as you go, so
-                the packet is already built when the window opens.
-              </p>
+        <section className="lp-wrap lp-section" id="start">
+          <div className="lp-final">
+            <h2>Start your school on Cohort</h2>
+            <p>You&apos;ll pick a name and a state, and get your own address in about a minute.</p>
+            <div className="lp-finalrow">
+              {/* The one place the mark colour carries a primary action. */}
+              <Link className="lp-markbtn" href="/signup">
+                Start your school
+                <span aria-hidden>↗</span>
+              </Link>
+              <span className="lp-finalfine">
+                Free to set up. Your school gets its own address at{" "}
+                <span className="mono">yourschool.{root}</span>
+              </span>
             </div>
           </div>
-        </section>
-
-        <section className="lp-wrap lp-how" id="how">
-          <div className="eyebrow">How it works</div>
-          <h2>Three things, in this order</h2>
-          <ol className="lp-steps">
-            <li>
-              <div className="lp-stepn" aria-hidden>
-                1
-              </div>
-              <div>
-                <h3>Run your school</h3>
-                <p>
-                  Attendance, assignments, grading, portfolios, conferences, messages home. Ordinary
-                  daily work — the kind you&apos;d be doing in a spreadsheet anyway.
-                </p>
-              </div>
-            </li>
-            <li>
-              <div className="lp-stepn" aria-hidden>
-                2
-              </div>
-              <div>
-                <h3>Cohort assembles the packet</h3>
-                <p>
-                  Attendance counted against your school&apos;s own instructional calendar, work
-                  samples attached, narrative drafted, all on your letterhead. It knows your
-                  state&apos;s rules — and it tells you which of those rules it has not yet watched
-                  survive a real invoice cycle.
-                </p>
-              </div>
-            </li>
-            <li>
-              <div className="lp-stepn" aria-hidden>
-                3
-              </div>
-              <div>
-                <h3>You read it and submit it</h3>
-                <p>
-                  Nothing goes anywhere until a person approves it. When a packet comes back
-                  rejected, Cohort records the reviewer&apos;s exact wording — that&apos;s how it
-                  gets better at your state instead of guessing.
-                </p>
-              </div>
-            </li>
-          </ol>
-        </section>
-
-        <section className="lp-wrap" id="limits">
-          <div className="card lp-limits">
-            <div className="eyebrow">What Cohort will not do</div>
-            <h2>The limits, up front</h2>
-            <ul>
-              <li>
-                <strong>It never holds your money.</strong> Reimbursements go from the state or the
-                ESA vendor to you. Cohort is never in that path and never has a balance of yours.
-              </li>
-              <li>
-                <strong>It never submits for you.</strong> AI drafts; a person approves; nothing is
-                auto-filed. A system that could submit on its own could submit something wrong on
-                its own.
-              </li>
-              <li>
-                <strong>It flags what it hasn&apos;t verified.</strong> A rule Cohort inferred but
-                has not yet seen hold up against a real invoice carries a visible mark. You should
-                treat those as a starting point, not as advice.
-              </li>
-              <li>
-                <strong>Children&apos;s accounts come from parents.</strong> A school cannot create
-                a student login. A parent does, with consent recorded — and child records are
-                deleted on a schedule you set.
-              </li>
-            </ul>
-          </div>
-        </section>
-
-        <section className="lp-wrap lp-end">
-          <h2>Start your school on Cohort</h2>
-          <p className="lp-lede">
-            You&apos;ll pick a name and a state, and get your own address in about a minute.
-          </p>
-          <Link className="btn" href="/signup">
-            Start your school
-          </Link>
         </section>
       </main>
 
       <footer className="lp-foot">
-        <div className="lp-wrap">
-          <span>Cohort — microschool operations.</span>
-          <span className="muted">
+        <div className="lp-wrap lp-footin">
+          <div className="lp-lockup">
+            <span className="lp-mark" aria-hidden>
+              C
+            </span>
+            <span className="lp-word">Cohort</span>
+            <span className="lp-footnote">— microschool operations.</span>
+          </div>
+          <nav className="lp-footlinks" aria-label="Footer">
+            <a href="#how">How it works</a>
+            <a href="#states">States</a>
+            {SHOW_PRICING && <a href="#pricing">Pricing</a>}
+            <a href="#faq">FAQ</a>
+            {/* The handoff's footer ends with a Privacy link. There is no
+                /privacy route — docs/PRIVACY_POLICY.md is an attorney-review-
+                required template, and publishing it as this site's live policy
+                is not a call to make in a redesign. Restore the link the same
+                day the page exists; a public marketing site collecting signups
+                wants one, and CCPA notice-at-collection assumes it. */}
+          </nav>
+          <span className="lp-footnote">
             Already have a school? Sign in at your own address, not this one.
           </span>
         </div>
