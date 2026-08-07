@@ -3,13 +3,16 @@ import { requireTeacher } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { forecast, tuitionSplit, addDays } from "@/lib/billing";
 import { fmt } from "@/lib/dates";
-import { Pill, VerifyFlag } from "@/components/ui";
+import { Pill } from "@/components/ui";
+import { VerificationNote } from "@/components/VerificationNote";
+import { verificationCounts, railVerification } from "@/lib/observe";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Cash flow — Cohort" };
 
 export default async function CashflowPage() {
   const { school, rail } = await requireTeacher();
+  const vidx = await verificationCounts(school!.id);
   const schoolId = school!.id;
 
   const invoices = await prisma.invoice.findMany({ where: { schoolId } });
@@ -18,6 +21,9 @@ export default async function CashflowPage() {
     students.reduce((a, s) => a + tuitionSplit(s).family, 0) / 10
   );
   const f = forecast(invoices, rail ? rail.id : null, monthlyFamily);
+  // f.rail is a disbursement profile, not a Rail — verification keys off the
+  // school's actual rail id.
+  const railV = rail ? railVerification(vidx, rail.id) : null;
   const outstanding = invoices.filter((i) => i.status !== "paid");
   const nameOf = (id: string) => students.find((s) => s.id === id)?.name || "—";
 
@@ -67,11 +73,8 @@ export default async function CashflowPage() {
           payments are spread evenly across a 10-month year. Draft packets are excluded from the
           buckets on purpose — they have no submission date, so they have no arrival date.
         </p>
-        {f.rail.verify && (
-          <VerifyFlag>
-            The {f.rail.lagDays}-day lag is an unverified estimate. Replace it with what your design
-            partners actually experience — a wrong forecast is worse than no forecast.
-          </VerifyFlag>
+        {f.rail.verify && railV && (
+          <VerificationNote v={railV} what={`${rail!.label}'s ${f.rail.lagDays}-day payment lag`} />
         )}
       </div>
 

@@ -19,6 +19,11 @@ export const DISBURSEMENT: Record<string, Disbursement> = {
   classwallet: { lagDays: 45, cadence: "rolling", verify: true, note: "Rolling submissions; reimbursement follows approval." },
   stepup: { lagDays: 60, cadence: "rolling", verify: true, note: "Florida operators commonly describe a 60-day bridge." },
   odyssey: { lagDays: 30, cadence: "semester", verify: true, note: "Funds released on a semester calendar." },
+  studentfirst: { lagDays: 45, cadence: "rolling", verify: true, note: "Rolling submissions through the state platform." },
+  ace: { lagDays: 45, cadence: "rolling", verify: true, note: "Rolling submissions; reimbursement follows approval." },
+  // No marketplace in the middle, so nobody pre-screens the packet and the
+  // agency's own cycle sets the pace. Assumed slower until observed otherwise.
+  statedirect: { lagDays: 60, cadence: "rolling", verify: true, note: "Filed directly with the state agency." },
 };
 
 export function addDays(iso: string, n: number): string {

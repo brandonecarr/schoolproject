@@ -5,8 +5,22 @@ import type { ReactNode } from "react";
 
 export type Tone = "good" | "warn" | "bad" | "info";
 
-export function Pill({ tone, children }: { tone: Tone | "mark"; children: ReactNode }) {
-  return <span className={`pill ${tone}`}>{children}</span>;
+export function Pill({
+  tone,
+  children,
+  title,
+}: {
+  tone: Tone | "mark";
+  children: ReactNode;
+  /** Hover explanation. Used by the verification chip, where the label is terse
+   *  ("Observed 2/5") and the reason behind it is worth a tooltip. */
+  title?: string;
+}) {
+  return (
+    <span className={`pill ${tone}`} title={title}>
+      {children}
+    </span>
+  );
 }
 
 export function Notice({ tone, children }: { tone: Tone; children: ReactNode }) {

@@ -4,6 +4,8 @@ import { prisma } from "@/lib/db";
 import { evidenceFor } from "@/lib/evidence";
 import { readiness, PROGRAMS, RAILS, programOptions } from "@/lib/rules";
 import { FundingSelect } from "@/components/FundingSelect";
+import { VerificationChip } from "@/components/VerificationNote";
+import { verificationCounts, programVerification } from "@/lib/observe";
 import { Pill, Notice } from "@/components/ui";
 import { addStudent } from "../actions";
 
@@ -22,6 +24,8 @@ export default async function StudentsPage({
     orderBy: { createdAt: "asc" },
   });
   const rows = await Promise.all(students.map(async (s) => ({ s, e: await evidenceFor(s.id) })));
+  // One grouped query for the whole table, not one per student.
+  const vidx = await verificationCounts(school!.id);
   // Grouped by how the money actually arrives — that, not the state, is what
   // changes the paperwork. Within a group, alphabetical by state.
   const opts = programOptions().map((p) => ({ ...p, railLabel: RAILS[p.rail]?.label ?? p.rail }));
@@ -119,7 +123,16 @@ export default async function StudentsPage({
                     <div className="small muted">{s.familyName} family</div>
                   </td>
                   <td>{s.grade}</td>
-                  <td className="small">{s.esaProgram ? PROGRAMS[s.esaProgram]?.label ?? s.esaProgram : "Private pay"}</td>
+                  <td className="small">
+                    {s.esaProgram ? (PROGRAMS[s.esaProgram]?.label ?? s.esaProgram) : "Private pay"}
+                    {/* Per-program, not per-rail: two states can share an
+                        administrator while only one of them has been proven. */}
+                    {s.esaProgram && (
+                      <div style={{ marginTop: 3 }}>
+                        <VerificationChip v={programVerification(vidx, s.esaProgram)} />
+                      </div>
+                    )}
+                  </td>
                   <td>
                     <Pill tone={r.tone}>{e.score}</Pill>
                   </td>

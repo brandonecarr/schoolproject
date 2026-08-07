@@ -25,6 +25,18 @@ export const CONFIRM_PAID_CYCLES = 5;
 
 export type VerifyLevel = "unverified" | "observed" | "confirmed";
 
+export type EvidenceCounts = { paid: number; approved: number; rejected: number };
+
+export const NO_EVIDENCE: EvidenceCounts = { paid: 0, approved: 0, rejected: 0 };
+
+export function countOutcomes(obs: Observation[]): EvidenceCounts {
+  return {
+    paid: obs.filter((o) => o.outcome === "paid").length,
+    approved: obs.filter((o) => o.outcome === "approved").length,
+    rejected: obs.filter((o) => o.outcome === "rejected").length,
+  };
+}
+
 export type RailVerification = {
   level: VerifyLevel;
   label: string;
@@ -35,63 +47,92 @@ export type RailVerification = {
   rejected: number;
   /** Outcomes that actually resolved — approvals don't count, money does. */
   decided: number;
-  /** Share of decided cycles that were paid without a rejection on the way. */
   progress: number; // 0..1 toward confirmed
+  /** This school's own record, which may lag the platform's. */
+  school: EvidenceCounts;
+  /** Every school's, including this one. */
+  platform: EvidenceCounts;
 };
 
 /**
- * Approval is not payment. A state can approve an invoice and still not pay it,
- * and a school only learns the rules were right when the money lands — so the
- * ladder below is keyed on payments, and approvals are reported but never
- * counted as proof.
+ * How confident we are that our stored rules for a rail or program are right.
+ *
+ * Scoped to the PLATFORM, not to one school, because the thing being verified is
+ * the rules — whether Arizona pays $7,400 and what ClassWallet rejects for is
+ * true or false independently of who is asking. A school that has never invoiced
+ * still benefits from forty cycles other schools have been through.
+ *
+ * The school's own record is carried alongside and reported separately, because
+ * it answers a different and also useful question: "has this worked for ME yet".
+ *
+ * Approval is not payment. A state can approve an invoice and never pay it, so
+ * the ladder is keyed on money landing; approvals are counted and shown but
+ * never treated as proof.
+ *
+ * PRIVACY: only counts cross the school boundary here. Verbatim rejection text
+ * stays with the school that recorded it — a portal message can name a child,
+ * and an aggregate is not a licence to share one school's paperwork with
+ * another. See tallyReasons, which is always called with one school's rows.
  */
-export function verificationFor(obs: Observation[]): RailVerification {
-  const paid = obs.filter((o) => o.outcome === "paid").length;
-  const approved = obs.filter((o) => o.outcome === "approved").length;
-  const rejected = obs.filter((o) => o.outcome === "rejected").length;
+export function verificationFromCounts(
+  school: EvidenceCounts,
+  platform: EvidenceCounts = school
+): RailVerification {
+  const paid = platform.paid;
+  const rejected = platform.rejected;
   const decided = paid + rejected;
   const progress = Math.min(1, paid / CONFIRM_PAID_CYCLES);
+  const elsewhere = paid > 0 && school.paid === 0;
+  // "on this rail" reads wrong once other schools are in the count.
+  const scope = elsewhere ? " by other schools" : "";
+
+  const common = {
+    paid,
+    approved: platform.approved,
+    rejected,
+    decided,
+    progress,
+    school,
+    platform,
+  };
 
   if (paid === 0) {
     return {
+      ...common,
       level: "unverified",
       label: "Unverified",
       tone: "bad",
       detail:
         decided === 0
-          ? "No invoice has completed a cycle on this rail yet. Every rule shown is a starting guess."
+          ? "No invoice has completed a cycle here yet. Every rule shown is a starting guess."
           : `${rejected} rejection${rejected === 1 ? "" : "s"} recorded and nothing paid yet — the rules here are still a guess.`,
-      paid,
-      approved,
-      rejected,
-      decided,
-      progress,
     };
   }
   if (paid < CONFIRM_PAID_CYCLES) {
     return {
+      ...common,
       level: "observed",
       label: `Observed ${paid}/${CONFIRM_PAID_CYCLES}`,
       tone: "warn",
-      detail: `${paid} invoice${paid === 1 ? "" : "s"} paid on this rail. Enough to know it works, not enough to call the rules confirmed.`,
-      paid,
-      approved,
-      rejected,
-      decided,
-      progress,
+      detail:
+        `${paid} invoice${paid === 1 ? "" : "s"} paid${scope}. Enough to know it works, not enough to call the rules confirmed.` +
+        (elsewhere ? " Your school has not completed a cycle here yet." : ""),
     };
   }
   return {
+    ...common,
     level: "confirmed",
     label: "Confirmed",
     tone: "good",
-    detail: `${paid} invoices paid on this rail. These rules have been through real cycles.`,
-    paid,
-    approved,
-    rejected,
-    decided,
-    progress,
+    detail:
+      `${paid} invoices paid${scope}. These rules have been through real cycles.` +
+      (elsewhere ? " Your school has not completed one here yet." : ""),
   };
+}
+
+/** Single-scope convenience: verification from one school's observations. */
+export function verificationFor(obs: Observation[]): RailVerification {
+  return verificationFromCounts(countOutcomes(obs));
 }
 
 // --- Rejection taxonomy -----------------------------------------------------

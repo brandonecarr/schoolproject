@@ -7,7 +7,7 @@ import { fmt } from "@/lib/dates";
 import { Pill, Notice, VerifyFlag } from "@/components/ui";
 import type { Tone } from "@/components/ui";
 import { RailKnowledge } from "@/components/RailKnowledge";
-import { observationsForRail } from "@/lib/observe";
+import { observationsForRail, verificationCounts, railVerification } from "@/lib/observe";
 import {
   saveNarrative,
   setInvoiceStatus,
@@ -73,6 +73,9 @@ export default async function InvoicePacketPage({
   // Everything this school has actually watched this rail do — the counterweight
   // to the predictions in rules.ts.
   const obs = rail ? await observationsForRail(school!.id, rail.id) : [];
+  // Level from platform-wide evidence; the reason tallies above stay this
+  // school's, since they carry verbatim portal text.
+  const railV = rail ? railVerification(await verificationCounts(school!.id), rail.id) : null;
   const r = readiness(inv.evidenceScore);
   const graded = e.submissions.filter((x) => x.status === "graded");
   const daysToCash =
@@ -278,7 +281,7 @@ export default async function InvoicePacketPage({
         </div>
       </div>
 
-      {rail && <RailKnowledge rail={rail} obs={obs} />}
+      {rail && railV && <RailKnowledge rail={rail} obs={obs} v={railV} />}
     </>
   );
 }

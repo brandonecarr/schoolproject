@@ -4,6 +4,9 @@ import {
   tallyReasons,
   taxonomyQuality,
   CONFIRM_PAID_CYCLES,
+  verificationFromCounts,
+  countOutcomes,
+  NO_EVIDENCE,
   type Observation,
 } from "@/lib/observations";
 
@@ -159,5 +162,65 @@ describe("taxonomyQuality — how good the guess in rules.ts turned out to be", 
     expect(q.unseen).toEqual(PREDICTED);
     expect(q.hit).toEqual([]);
     expect(q.novel).toEqual([]);
+  });
+});
+
+describe("verificationFromCounts — rules are verified platform-wide, schools are not", () => {
+  const c = (paid: number, rejected = 0, approved = 0) => ({ paid, rejected, approved });
+
+  it("counts other schools' payments toward whether the RULES are right", () => {
+    // The thing being verified is whether Arizona pays $7,400 and what
+    // ClassWallet rejects for. That is true or false regardless of who asks.
+    const v = verificationFromCounts(c(0), c(CONFIRM_PAID_CYCLES));
+    expect(v.level).toBe("confirmed");
+  });
+
+  it("still says plainly that this school has not been through a cycle", () => {
+    const v = verificationFromCounts(c(0), c(8));
+    expect(v.detail).toContain("by other schools");
+    expect(v.detail).toContain("Your school has not completed one here yet");
+    expect(v.school.paid).toBe(0);
+    expect(v.platform.paid).toBe(8);
+  });
+
+  it("drops the 'other schools' wording once this school has its own payment", () => {
+    const v = verificationFromCounts(c(3), c(8));
+    expect(v.detail).not.toContain("other schools");
+    expect(v.detail).not.toContain("Your school has not");
+  });
+
+  it("defaults platform to the school when no aggregate is supplied", () => {
+    const v = verificationFromCounts(c(2));
+    expect(v.platform).toEqual(v.school);
+    expect(v.level).toBe("observed");
+  });
+
+  it("reports both records so a teacher can tell them apart", () => {
+    const v = verificationFromCounts(c(1, 2), c(9, 5));
+    expect(v.school).toEqual({ paid: 1, rejected: 2, approved: 0 });
+    expect(v.platform).toEqual({ paid: 9, rejected: 5, approved: 0 });
+    expect(v.paid).toBe(9); // headline figure is the platform's
+  });
+
+  it("never lets rejections alone confirm anything, at any scope", () => {
+    expect(verificationFromCounts(c(0, 50), c(0, 400)).level).toBe("unverified");
+  });
+});
+
+describe("countOutcomes", () => {
+  it("tallies the three outcomes and ignores anything else", () => {
+    expect(
+      countOutcomes([
+        ob({ outcome: "paid" }),
+        ob({ outcome: "paid" }),
+        ob({ outcome: "approved" }),
+        ob({ outcome: "rejected" }),
+        ob({ outcome: "something-else" }),
+      ])
+    ).toEqual({ paid: 2, approved: 1, rejected: 1 });
+  });
+
+  it("returns zeroes for no observations", () => {
+    expect(countOutcomes([])).toEqual(NO_EVIDENCE);
   });
 });

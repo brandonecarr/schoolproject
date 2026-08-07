@@ -2,7 +2,9 @@ import Link from "next/link";
 import { requireTeacher } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { fmt } from "@/lib/dates";
-import { Pill, Notice, VerifyFlag } from "@/components/ui";
+import { Pill, Notice } from "@/components/ui";
+import { VerificationNote } from "@/components/VerificationNote";
+import { verificationCounts, railVerification } from "@/lib/observe";
 import type { Tone } from "@/components/ui";
 import { reimbursementMetrics, formatPct } from "@/lib/metrics";
 import { buildInvoices } from "../actions";
@@ -24,6 +26,9 @@ export default async function InvoicesPage({
   searchParams: Promise<{ built?: string; skipped?: string }>;
 }) {
   const { school, rail } = await requireTeacher();
+  // Evidence behind the rail's rules — one grouped query, not one per invoice.
+  const vidx = await verificationCounts(school!.id);
+  const railV = rail ? railVerification(vidx, rail.id) : null;
   const schoolId = school!.id;
   const sp = await searchParams;
 
@@ -62,12 +67,7 @@ export default async function InvoicesPage({
       {rail && (
         <div className="notice info">
           <strong>{rail.label} requires:</strong> {rail.requires.map((r) => r.label).join(" · ")}
-          {rail.verify && (
-            <VerifyFlag>
-              These requirements are unverified placeholders. Confirm each one against a real
-              submission before a customer relies on it.
-            </VerifyFlag>
-          )}
+          {rail.verify && <VerificationNote v={railV!} what={`${rail.label}'s requirements`} />}
         </div>
       )}
 

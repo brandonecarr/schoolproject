@@ -8,6 +8,7 @@ import { getSession, logAudit } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { evidenceFor } from "@/lib/evidence";
 import { RAILS } from "@/lib/rules";
+import { verificationCounts, railVerification } from "@/lib/observe";
 import { fmt, today } from "@/lib/dates";
 
 export const dynamic = "force-dynamic";
@@ -31,6 +32,7 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
 
   const s = await prisma.student.findUnique({ where: { id: inv.studentId } });
   const rail = (inv.railId ? RAILS[inv.railId] : null) ?? sessionRail;
+  const railV = rail ? railVerification(await verificationCounts(school!.id), rail.id) : null;
   const e = await evidenceFor(inv.studentId, inv.periodStart, inv.periodEnd);
   const graded = e.submissions.filter((x) => x.status === "graded");
 
@@ -134,7 +136,15 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
 
   <div class="foot">
     Prepared by ${esc(user.name)} on ${esc(fmt(today()))} from attendance, coursework, and assessment records maintained contemporaneously in Cohort.
-    ${rail && rail.verify ? "<br>Format requirements for this program have not been verified against a live submission." : ""}
+    ${
+      // Derived, so it disappears once this rail has real paid cycles behind it.
+      // NOTE: this sentence prints on a document that goes to the state. It
+      // reads as a disclaimer of accuracy on a funding request — worth deciding
+      // whether it belongs here at all, or only on the school's working copy.
+      railV && railV.level === "unverified"
+        ? "<br>Format requirements for this program have not been verified against a live submission."
+        : ""
+    }
   </div>
   </body></html>`;
 

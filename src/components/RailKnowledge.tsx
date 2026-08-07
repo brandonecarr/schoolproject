@@ -9,10 +9,14 @@
 
 import { Pill, VerifyFlag } from "@/components/ui";
 import type { Rail } from "@/lib/rules";
-import { verificationFor, taxonomyQuality, type Observation } from "@/lib/observations";
+import { taxonomyQuality, type Observation, type RailVerification } from "@/lib/observations";
 
-export function RailKnowledge({ rail, obs }: { rail: Rail; obs: Observation[] }) {
-  const v = verificationFor(obs);
+/**
+ * `v` is platform-scoped — whether our stored rules are right does not depend on
+ * who is asking. `obs` is this school's rows only, because the rejection tallies
+ * below quote portal text verbatim and that never crosses a school boundary.
+ */
+export function RailKnowledge({ rail, obs, v }: { rail: Rail; obs: Observation[]; v: RailVerification }) {
   const q = taxonomyQuality(obs, rail.rejectionReasons);
 
   return (
@@ -37,8 +41,8 @@ export function RailKnowledge({ rail, obs }: { rail: Rail; obs: Observation[] })
             Rejections we did not predict
           </div>
           <p className="small muted" style={{ margin: "6px 0 8px" }}>
-            These came back from {rail.label} and were not on our list. They are the most valuable
-            thing on this page.
+            These came back from {rail.label} to your school and were not on our list. They are the
+            most valuable thing on this page.
           </p>
           <div className="rollbook">
             {q.novel.map((t) => (
