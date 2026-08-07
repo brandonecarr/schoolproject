@@ -10,7 +10,7 @@ import { prisma } from "@/lib/db";
 import { sourceById } from "@/lib/sources";
 import { interpretChange } from "@/lib/interpret";
 import { patchProgramLine, proposalBody, branchName, isPatchable } from "@/lib/propose";
-import { openRulesPr, prConfigured } from "@/lib/github";
+import { openRulesPr, prConfigured, fetchRulesSource } from "@/lib/github";
 import { readFile } from "node:fs/promises";
 import path from "node:path";
 
@@ -27,15 +27,23 @@ export type InterpretResult = {
   error?: string;
 };
 
-/** Read the current PROGRAMS line for a state out of rules.ts on disk. */
+/**
+ * The current PROGRAMS line for a state.
+ *
+ * GitHub first, so the patch is generated against exactly the content the pull
+ * request will be applied to. Falling back to disk keeps `npm run interpret`
+ * working in development, where there may be no token.
+ */
 async function currentProgramLine(state: string): Promise<string | null> {
-  try {
-    const src = await readFile(path.join(process.cwd(), "src/lib/rules.ts"), "utf8");
-    const line = src.split("\n").find((l) => new RegExp(`^\\s*${state}:\\s*\\{`).test(l));
-    return line ?? null;
-  } catch {
-    return null;
+  let src = await fetchRulesSource();
+  if (src === null) {
+    try {
+      src = await readFile(path.join(process.cwd(), "src/lib/rules.ts"), "utf8");
+    } catch {
+      return null;
+    }
   }
+  return src.split("\n").find((l) => new RegExp(`^\\s*${state}:\\s*\\{`).test(l)) ?? null;
 }
 
 async function interpretOne(sourceId: string, opts: { openPr: boolean }): Promise<InterpretResult> {

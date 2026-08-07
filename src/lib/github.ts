@@ -39,6 +39,33 @@ export function prConfigured(): boolean {
 }
 
 /**
+ * Read src/lib/rules.ts as it exists on the base branch right now.
+ *
+ * Preferred over reading the file from disk, for two reasons. The deployed
+ * bundle's copy is whatever was built, so it can be older than main and produce
+ * a patch against a line that no longer exists — openRulesPr would then refuse
+ * it, correctly but confusingly. And relying on a source file being present at
+ * a runtime path in a serverless bundle depends on Next's file tracing, which
+ * happens to include it today and is not a contract.
+ *
+ * Returns null when GitHub isn't configured or reachable; the caller falls back
+ * to the local file, which is what `npm run interpret` uses in development.
+ */
+export async function fetchRulesSource(): Promise<string | null> {
+  const r = repo();
+  if (!process.env.GITHUB_TOKEN || !r) return null;
+  try {
+    const res = await gh(`/repos/${r.owner}/${r.name}/contents/src/lib/rules.ts?ref=${r.base}`);
+    if (!res.ok) return null;
+    const file = (await res.json()) as { content?: string };
+    if (!file.content) return null;
+    return Buffer.from(file.content, "base64").toString("utf8");
+  } catch {
+    return null;
+  }
+}
+
+/**
  * Create a branch off base, replace one line of src/lib/rules.ts, and open a PR.
  *
  * `expectedLine` is the exact line we generated the patch against. If the file
