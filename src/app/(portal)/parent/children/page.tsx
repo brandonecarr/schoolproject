@@ -36,6 +36,15 @@ export default async function ParentChildrenPage({
     })
   );
 
+  // Whoever actually releases reports at this school, rather than a hardcoded
+  // name — a two-teacher microschool should not see someone else's.
+  const releaser = await prisma.user.findFirst({
+    where: { schoolId: user.schoolId, role: { in: ["owner", "teacher"] } },
+    orderBy: { createdAt: "asc" },
+    select: { name: true },
+  });
+  const teacherFirst = releaser?.name.split(" ")[0] ?? "Your teacher";
+
   return (
     <>
       <div className="spread" style={{ alignItems: "flex-end", marginBottom: 6 }}>
@@ -82,59 +91,73 @@ export default async function ParentChildrenPage({
             </div>
           </div>
 
-          <div className="sep" style={{ margin: "16px 0" }} />
-          <div className="eyebrow">Graded work</div>
-          <div style={{ marginTop: 8 }}>
-            {graded.length ? (
-              graded.map((s) => (
-                <div key={s.id} className="gradedrow">
-                  <span style={{ flex: 1 }}>{s.assignmentTitle}</span>
-                  <span className="scorepill">
-                    {s.score}/{s.points}
-                  </span>
-                </div>
-              ))
-            ) : (
-              <div className="gradedrow muted">Nothing graded yet</div>
-            )}
-          </div>
-          {graded
-            .filter((s) => s.feedback)
-            .slice(0, 2)
-            .map((s) => (
-              <p key={s.id} className="small" style={{ margin: "10px 0 0" }}>
-                <strong>{s.assignmentTitle}:</strong> {s.feedback}
-              </p>
-            ))}
+          {/* Two columns, per the handoff: the work itself on the left, what
+              it adds up to on the right. One stacked column made a parent
+              scroll past every graded item to reach the standards summary,
+              which is the part that answers "how is she doing". */}
+          <div className="progresssplit">
+            <div>
+              <div className="eyebrow">Graded work</div>
+              <div style={{ marginTop: 8 }}>
+                {graded.length ? (
+                  graded.map((s) => (
+                    <div key={s.id} className="gradedrow">
+                      <div className="top">
+                        <span className="ttl">{s.assignmentTitle}</span>
+                        <span className="scorepill">
+                          {s.score}/{s.points}
+                        </span>
+                      </div>
+                      <div className="crs">{s.courseName}</div>
+                      {s.feedback && <p className="fb">{s.feedback}</p>}
+                    </div>
+                  ))
+                ) : (
+                  <div className="gradedrow muted">Nothing graded yet</div>
+                )}
+              </div>
 
-          {mastery.summary.assessed > 0 && (
-            <>
               <div className="sep" style={{ margin: "16px 0" }} />
-              <StandardsSummary
-                outcomes={mastery.outcomes}
-                rollups={mastery.rollups}
-                summary={mastery.summary}
-                heading="Standards progress"
-                audience="family"
-                limit={6}
-                showEmpty={false}
-              />
-            </>
-          )}
+              <div className="eyebrow">Still to do</div>
+              <div style={{ marginTop: 8 }}>
+                {open.length ? (
+                  open.map((s) => (
+                    <div key={s.id} className="gradedrow">
+                      <div className="top">
+                        <span className="ttl">{s.assignmentTitle}</span>
+                        <span className="scorepill">due {fmt(s.dueDate)}</span>
+                      </div>
+                    </div>
+                  ))
+                ) : (
+                  <div className="gradedrow muted">All caught up</div>
+                )}
+              </div>
+            </div>
 
-          <div className="sep" style={{ margin: "16px 0" }} />
-          <div className="eyebrow">Still to do</div>
-          <div className="rollbook" style={{ marginTop: 8 }}>
-            {open.length ? (
-              open.map((s) => (
-                <div key={s.id} className="gradedrow">
-                  <span style={{ flex: 1 }}>{s.assignmentTitle}</span>
-                  <span className="scorepill">due {fmt(s.dueDate)}</span>
-                </div>
-              ))
-            ) : (
-              <div className="line muted">All caught up</div>
-            )}
+            <div>
+              {mastery.summary.assessed > 0 && (
+                <StandardsSummary
+                  outcomes={mastery.outcomes}
+                  rollups={mastery.rollups}
+                  summary={mastery.summary}
+                  heading={`Skills ${k.name.split(" ")[0]} has shown`}
+                  audience="family"
+                  limit={6}
+                  showEmpty={false}
+                />
+              )}
+              <div className="reportnote">
+                <div className="eyebrow">Progress report</div>
+                <p className="cardbody" style={{ marginTop: 6 }}>
+                  {teacherFirst} drafts it, reviews every line, then releases it to you. Nothing is
+                  sent automatically.
+                </p>
+                <Link className="btn tint sm" href="/parent/reports" style={{ marginTop: 12 }}>
+                  Read the latest report
+                </Link>
+              </div>
+            </div>
           </div>
 
           <div className="sep" style={{ margin: "16px 0" }} />

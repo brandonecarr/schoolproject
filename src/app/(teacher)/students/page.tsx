@@ -6,7 +6,7 @@ import { readiness, PROGRAMS, RAILS, programOptions } from "@/lib/rules";
 import { FundingSelect } from "@/components/FundingSelect";
 import { VerificationChip } from "@/components/VerificationNote";
 import { verificationCounts, programVerification } from "@/lib/observe";
-import { Pill, Notice, Avatar, Bar } from "@/components/ui";
+import { Pill, Notice, Avatar, Bar, PageHead } from "@/components/ui";
 import { addStudent } from "../actions";
 
 export const dynamic = "force-dynamic";
@@ -24,6 +24,13 @@ export default async function StudentsPage({
     orderBy: { createdAt: "asc" },
   });
   const rows = await Promise.all(students.map(async (s) => ({ s, e: await evidenceFor(s.id) })));
+
+  const onEsa = students.filter((x) => x.esaProgram).length;
+  // Name the actual programme when the roster is on one, rather than a generic
+  // "ESA" — a teacher in Arizona thinks "AZ ESA", not "an ESA".
+  const programs = [...new Set(students.map((x) => x.esaProgram).filter(Boolean))] as string[];
+  const esaLabel =
+    programs.length === 1 ? (PROGRAMS[programs[0]]?.label ?? programs[0]) : "an ESA";
   // One grouped query for the whole table, not one per student.
   const vidx = await verificationCounts(school!.id);
   // Grouped by how the money actually arrives — that, not the state, is what
@@ -51,15 +58,28 @@ export default async function StudentsPage({
         </Notice>
       )}
       {sp.deleted && <Notice tone="good">Student and all associated data permanently deleted.</Notice>}
-      <div className="topbar">
-        <div>
-          <div className="eyebrow">Roster</div>
-          <h1>Students</h1>
-        </div>
-        <Link className="btn sec" href="/students/import">
-          Import roster (CSV)
-        </Link>
-      </div>
+      {/* The eyebrow is derived, not decorative: how many are enrolled and how
+          many of those the school actually bills for are two different numbers,
+          and the gap between them is the school's private-pay exposure. */}
+      <PageHead
+        eyebrow={
+          <>
+            {students.length} enrolled
+            {onEsa > 0 ? ` · ${onEsa} on ${esaLabel}` : " · none on an ESA"}
+          </>
+        }
+        title="Students"
+        actions={
+          <>
+            <Link className="btn sec" href="/students/import">
+              Import CSV
+            </Link>
+            <Link className="btn" href="/invites">
+              Invite a family
+            </Link>
+          </>
+        }
+      />
 
       <details className="card" open={students.length === 0}>
         <summary style={{ cursor: "pointer", fontWeight: 600 }}>Enroll a student</summary>

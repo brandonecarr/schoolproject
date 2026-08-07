@@ -3567,12 +3567,17 @@ a:hover {
 .chart {
   display: flex;
   align-items: flex-end;
-  gap: 14px;
+  justify-content: flex-start;
+  gap: 28px;
   height: 220px;
   padding-top: 8px;
 }
+/* Capped width. The handoff draws eight narrow monthly columns; our forecast
+   produces three buckets, and letting three columns divide the full card width
+   turns a chart into three solid blocks. A bar's job is to be compared against
+   its neighbours, not to fill space. */
 .chart .col {
-  flex: 1;
+  flex: 0 1 96px;
   display: flex;
   flex-direction: column;
   justify-content: flex-end;
@@ -4106,6 +4111,31 @@ a:hover {
 }
 .b-none {
   background: var(--line);
+}
+
+
+/* --- Parent progress: work on the left, what it adds up to on the right ---- */
+
+.progresssplit {
+  display: grid;
+  grid-template-columns: 1.2fr 1fr;
+  gap: 24px;
+  align-items: start;
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid var(--line);
+}
+.reportnote {
+  background: var(--surface2);
+  border-radius: var(--radius-sm);
+  padding: 16px;
+  margin-top: 16px;
+}
+
+@media (max-width: 1180px) {
+  .progresssplit {
+    grid-template-columns: 1fr;
+  }
 }
 
 /* --- Accessibility (8.1) -------------------------------------------------- */

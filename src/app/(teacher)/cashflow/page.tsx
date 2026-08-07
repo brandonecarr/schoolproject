@@ -63,20 +63,28 @@ export default async function CashflowPage() {
               <div key={b.key} className="col">
                 <div className="val">{total > 0 ? `$${total.toLocaleString()}` : "—"}</div>
                 <div style={{ width: "100%", display: "flex", flexDirection: "column", justifyContent: "flex-end" }}>
-                  <div
-                    className="barc"
-                    style={{ height: h(b.family), background: "var(--good-f)", borderRadius: "8px 8px 0 0" }}
-                    title={`Families $${b.family.toLocaleString()}`}
-                  />
-                  <div
-                    className="barc"
-                    style={{
-                      height: h(b.esa),
-                      background: "var(--accent)",
-                      borderRadius: b.family > 0 ? "0 0 3px 3px" : "8px 8px 3px 3px",
-                    }}
-                    title={`ESA $${b.esa.toLocaleString()}`}
-                  />
+                  {b.family > 0 && (
+                    <div
+                      className="barc"
+                      style={{
+                        height: h(b.family),
+                        background: "var(--good-f)",
+                        borderRadius: b.esa > 0 ? "8px 8px 0 0" : "8px 8px 3px 3px",
+                      }}
+                      title={`Families $${b.family.toLocaleString()}`}
+                    />
+                  )}
+                  {b.esa > 0 && (
+                    <div
+                      className="barc"
+                      style={{
+                        height: h(b.esa),
+                        background: "var(--accent)",
+                        borderRadius: b.family > 0 ? "0 0 3px 3px" : "8px 8px 3px 3px",
+                      }}
+                      title={`ESA $${b.esa.toLocaleString()}`}
+                    />
+                  )}
                 </div>
                 <div className="mon">{b.label}</div>
               </div>
