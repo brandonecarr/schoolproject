@@ -184,9 +184,23 @@ const compact = (d: string) => d.replace(/-/g, "");
  * which is the single most common iCal bug, so `end` here is inclusive and the
  * extra day is added exactly once, here.
  */
+export type IcalTimedEntry = {
+  uid: string;
+  summary: string;
+  /** Floating local time, "YYYYMMDDTHHMMSS" — no Z, no TZID. A parent-teacher
+   *  conference is "Tuesday at half three" wherever you happen to be reading
+   *  the calendar; attaching a zone would render it as something else after a
+   *  DST change or a trip. Floating is the correct iCal form for that. */
+  start: string;
+  end: string;
+  description?: string;
+};
+
 export function buildIcal(input: {
   calName: string;
   entries: IcalEntry[];
+  /** Real appointments, as opposed to the all-day entries above. */
+  timed?: IcalTimedEntry[];
   /** Stamp for DTSTAMP. Passed in rather than read from the clock so output is
    *  deterministic and testable. */
   stamp: string;
@@ -216,6 +230,21 @@ export function buildIcal(input: {
     );
     if (e.description) lines.push(`DESCRIPTION:${icalText(e.description)}`);
     if (e.transparent) lines.push("TRANSP:TRANSPARENT");
+    lines.push("END:VEVENT");
+  }
+
+  for (const e of input.timed ?? []) {
+    lines.push(
+      "BEGIN:VEVENT",
+      `UID:${e.uid}@${domain}`,
+      `DTSTAMP:${input.stamp}`,
+      `DTSTART:${e.start}`,
+      `DTEND:${e.end}`,
+      `SUMMARY:${icalText(e.summary)}`
+    );
+    if (e.description) lines.push(`DESCRIPTION:${icalText(e.description)}`);
+    // Unlike the all-day entries, this one SHOULD block the subscriber's time:
+    // it is an appointment they are expected to attend.
     lines.push("END:VEVENT");
   }
 

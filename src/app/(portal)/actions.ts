@@ -18,6 +18,9 @@ import { deleteStudentData } from "@/lib/retention";
 import { autoScoreQuiz, parseItems, parseQuizAnswers } from "@/lib/lms";
 import { recordOutcomesForSubmission } from "@/lib/mastery";
 import { notifyUsers, staffUserIdsFor } from "@/lib/notify";
+import { threadStudentIds } from "@/lib/messages";
+import { formatTime } from "@/lib/conferences";
+import { fmt } from "@/lib/dates";
 import { runMasteryPaths } from "@/lib/paths-run";
 
 // Image/PDF types a student may turn in (bytes stored in the DB, like samples).
@@ -486,4 +489,90 @@ export async function setEmailAlerts(formData: FormData) {
   const back = String(formData.get("back") || "/");
   revalidatePath(back);
   redirect(`${back}?email=${on ? "on" : "off"}`);
+}
+
+// --- Conference booking ---
+// Claiming a slot is an atomic conditional update, not read-then-write. Two
+// parents opening the list at the same moment and clicking the same 3:20 is
+// not a rare edge case — it is what happens when a school emails "slots are
+// open now" to twelve families at once. updateMany with `bookedByUserId: null`
+// in the WHERE lets Postgres decide the winner, and the loser is told plainly.
+export async function bookConference(formData: FormData) {
+  const s = await requireUser();
+  await requireNotViewing(s, "/parent/conferences");
+  const { user } = s;
+  const slotId = String(formData.get("slotId"));
+  const studentId = String(formData.get("studentId"));
+
+  // Your own child only.
+  const mine = await threadStudentIds(user);
+  if (!mine.includes(studentId)) redirect("/parent/conferences?error=notyours");
+
+  const slot = await prisma.conferenceSlot.findFirst({
+    where: { id: slotId, schoolId: user.schoolId },
+  });
+  if (!slot) redirect("/parent/conferences");
+
+  // One conference per child per round, so one keen family can't take the
+  // whole afternoon while a quiet one gets nothing.
+  const already = await prisma.conferenceSlot.findFirst({
+    where: { schoolId: user.schoolId, studentId, bookedByUserId: { not: null } },
+  });
+  if (already) redirect("/parent/conferences?error=already");
+
+  const claimed = await prisma.conferenceSlot.updateMany({
+    where: { id: slotId, bookedByUserId: null },
+    data: {
+      studentId,
+      bookedByUserId: user.id,
+      bookedByName: user.name,
+      bookedAt: new Date().toISOString(),
+    },
+  });
+  if (claimed.count !== 1) redirect("/parent/conferences?error=taken");
+
+  const student = await prisma.student.findUnique({ where: { id: studentId } });
+  await notifyUsers(
+    await staffUserIdsFor(user.schoolId),
+    {
+      schoolId: user.schoolId,
+      type: "message",
+      title: `Conference booked: ${student?.name ?? "a student"}`,
+      body: `${fmt(slot.date)} at ${formatTime(slot.startMin)}, booked by ${user.name}.`,
+      linkPath: "/conferences",
+    },
+    user.id
+  );
+  await logAudit(user.id, "conference_booked", `${slot.date} ${slot.startMin} for ${student?.name ?? studentId}`);
+  revalidatePath("/parent/conferences");
+  redirect("/parent/conferences?booked=1");
+}
+
+export async function cancelConference(formData: FormData) {
+  const s = await requireUser();
+  await requireNotViewing(s, "/parent/conferences");
+  const { user } = s;
+  const slotId = String(formData.get("slotId"));
+
+  // Only the person who booked it can release it.
+  const released = await prisma.conferenceSlot.updateMany({
+    where: { id: slotId, bookedByUserId: user.id },
+    data: { studentId: null, bookedByUserId: null, bookedByName: "", bookedAt: null },
+  });
+  if (released.count === 1) {
+    await notifyUsers(
+      await staffUserIdsFor(user.schoolId),
+      {
+        schoolId: user.schoolId,
+        type: "message",
+        title: "Conference slot released",
+        body: `${user.name} cancelled a conference. The slot is open again.`,
+        linkPath: "/conferences",
+      },
+      user.id
+    );
+    await logAudit(user.id, "conference_cancelled", slotId);
+  }
+  revalidatePath("/parent/conferences");
+  redirect("/parent/conferences?cancelled=1");
 }

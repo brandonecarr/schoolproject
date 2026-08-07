@@ -270,3 +270,44 @@ describe("buildIcal", () => {
     expect(lines.filter((l) => l.startsWith("SUMMARY:"))).toHaveLength(1);
   });
 });
+
+describe("buildIcal — timed events (conferences)", () => {
+  const ics = buildIcal({
+    calName: "Cedar Grove",
+    stamp: "20260807T000000Z",
+    entries: [{ uid: "t1", summary: "Autumn term", start: "2026-09-07", end: "2026-09-18" }],
+    timed: [
+      { uid: "c1", summary: "Parent-teacher conference", start: "20260915T153000", end: "20260915T155000", description: "At school" },
+    ],
+  });
+
+  it("emits a real appointment, not an all-day block", () => {
+    expect(ics).toContain("DTSTART:20260915T153000");
+    expect(ics).toContain("DTEND:20260915T155000");
+    // No VALUE=DATE on this one — that's what makes it all-day.
+    expect(ics).not.toContain("DTSTART;VALUE=DATE:20260915");
+  });
+
+  it("uses floating local time, with no zone and no Z", () => {
+    // "Tuesday at half three" is the same wherever the parent reads it. A zone
+    // would re-render it after a DST change or a trip.
+    const line = ics.split("\r\n").find((l) => l.startsWith("DTSTART:"))!;
+    expect(line).not.toContain("Z");
+    expect(line).not.toContain("TZID");
+  });
+
+  it("does NOT mark the appointment transparent — it should block time", () => {
+    const block = ics.slice(ics.indexOf("UID:c1"), ics.indexOf("END:VEVENT", ics.indexOf("UID:c1")));
+    expect(block).not.toContain("TRANSP:TRANSPARENT");
+  });
+
+  it("still emits the all-day entries alongside", () => {
+    expect(ics.match(/BEGIN:VEVENT/g)).toHaveLength(2);
+    expect(ics).toContain("DTSTART;VALUE=DATE:20260907");
+  });
+
+  it("omits the section entirely when there are none", () => {
+    const none = buildIcal({ calName: "X", stamp: "20260807T000000Z", entries: [] });
+    expect(none.match(/BEGIN:VEVENT/g)).toBeNull();
+  });
+});

@@ -62,6 +62,7 @@ export const TEACHER_NAV: NavGroup[] = [
     items: [
       { href: "/students", label: "Students", icon: "students" },
       { href: "/invites", label: "Invite families", icon: "invites" },
+      { href: "/conferences", label: "Conferences", icon: "attendance" },
       { href: "/reports", label: "Records & exports", icon: "evidence" },
     ],
   },

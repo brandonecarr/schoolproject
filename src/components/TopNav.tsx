@@ -27,6 +27,7 @@ const PARENT_PRIMARY: NavLink[] = [
 ];
 const PARENT_MORE: NavLink[] = [
   { href: "/parent/calendar", label: "Calendar" },
+  { href: "/parent/conferences", label: "Conferences" },
   { href: "/parent/children", label: "Children" },
   { href: "/parent/reports", label: "Reports" },
   { href: "/parent/tuition", label: "Tuition" },

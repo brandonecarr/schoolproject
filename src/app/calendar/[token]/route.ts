@@ -21,6 +21,7 @@
 import { prisma } from "@/lib/db";
 import { buildIcal, type IcalEntry, type CalEvent } from "@/lib/calendar";
 import { threadStudentIds, isStaff as isStaffRole } from "@/lib/messages";
+import { icalLocalStamp } from "@/lib/conferences";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -99,10 +100,24 @@ export async function GET(_request: Request, { params }: { params: Promise<{ tok
     }
   }
 
+  // The subscriber's own conference, as a real timed event rather than an
+  // all-day one — this is the single entry in the feed where the *time* is the
+  // whole point.
+  const conferences = await prisma.conferenceSlot.findMany({
+    where: { schoolId: school.id, ...(staff ? {} : { bookedByUserId: user.id }) },
+  });
+
   const ics = buildIcal({
     calName: school.name,
     entries,
     stamp: new Date().toISOString().replace(/[-:]/g, "").replace(/\.\d{3}/, ""),
+    timed: conferences.map((c) => ({
+      uid: `conf-${c.id}`,
+      summary: staff ? `Conference · ${c.bookedByName || "unbooked"}` : "Parent-teacher conference",
+      start: icalLocalStamp(c.date, c.startMin),
+      end: icalLocalStamp(c.date, c.endMin),
+      description: c.location || undefined,
+    })),
   });
 
   return new Response(ics, {

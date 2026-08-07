@@ -6,6 +6,7 @@
 
 import { prisma } from "@/lib/db";
 import { threadStudentIds } from "@/lib/messages";
+import { formatSpan } from "@/lib/conferences";
 import { today, daysAgo, daysAhead } from "@/lib/dates";
 import type { FamilyCalItem } from "@/components/FamilyCalendar";
 import type { UserModel as User } from "@/generated/prisma/models";
@@ -65,6 +66,23 @@ export async function familyCalendarFor(
         href: user.role === "student" ? "/student/work" : "/parent/feed",
       });
     }
+  }
+
+  // A booked conference is the family's own appointment — it belongs on their
+  // calendar more than anything else here does.
+  const conferences = await prisma.conferenceSlot.findMany({
+    where: { schoolId: user.schoolId, bookedByUserId: user.id, date: { gte: from, lte: to } },
+  });
+  for (const c of conferences) {
+    items.push({
+      key: `c-${c.id}`,
+      kind: "event",
+      title: `Conference · ${formatSpan(c)}`,
+      startDate: c.date,
+      endDate: c.date,
+      note: c.location || undefined,
+      href: user.role === "student" ? undefined : "/parent/conferences",
+    });
   }
 
   return items.sort((a, b) => a.startDate.localeCompare(b.startDate) || a.title.localeCompare(b.title));

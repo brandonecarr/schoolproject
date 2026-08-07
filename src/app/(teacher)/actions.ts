@@ -27,6 +27,7 @@ import { notifyUsers, parentUserIdsFor, studentUserIdFor, familyUserIdsByRole } 
 import { excerpt } from "@/lib/announcements";
 import { clamp01, isAnnotatable } from "@/lib/annotate";
 import { parsePins, togglePin } from "@/lib/nav";
+import { parseTime, generateSlots, withoutClashes } from "@/lib/conferences";
 import { runMasteryPaths } from "@/lib/paths-run";
 import { bandFor, describeBand, isSelfReferential } from "@/lib/paths";
 import { deleteStudentData } from "@/lib/retention";
@@ -1769,4 +1770,75 @@ export async function toggleNavPin(formData: FormData) {
   // Every page shows the sidebar, so the layout has to re-render everywhere.
   revalidatePath("/", "layout");
   redirect(String(formData.get("back") || "/dashboard"));
+}
+
+// --- Parent-teacher conferences ---
+export async function publishConferenceSlots(formData: FormData) {
+  const { user, school } = await requireTeacher();
+  const date = String(formData.get("date") || "").trim();
+  const start = parseTime(String(formData.get("start") || ""));
+  const end = parseTime(String(formData.get("end") || ""));
+  const durationMin = Number(formData.get("duration")) || 0;
+  const gapMin = Number(formData.get("gap")) || 0;
+  const location = String(formData.get("location") || "").trim().slice(0, 120);
+
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || start === null || end === null) {
+    redirect("/conferences?error=when");
+  }
+
+  const candidates = generateSlots({ startMin: start, endMin: end, durationMin, gapMin });
+  if (candidates.length === 0) redirect("/conferences?error=none");
+
+  // Skip anything colliding with slots already published for that day —
+  // publishing the same afternoon twice is an easy mis-click, and the result
+  // is two 3:20s that two different families each book.
+  const existing = await prisma.conferenceSlot.findMany({
+    where: { schoolId: school!.id, date },
+    select: { startMin: true, endMin: true },
+  });
+  const fresh = withoutClashes(candidates, existing);
+  if (fresh.length === 0) redirect("/conferences?error=clash");
+
+  await prisma.conferenceSlot.createMany({
+    data: fresh.map((s) => ({
+      schoolId: school!.id,
+      date,
+      startMin: s.startMin,
+      endMin: s.endMin,
+      location,
+    })),
+  });
+  await logAudit(user.id, "conference_slots_published", `${date}: ${fresh.length} slots`);
+  revalidatePath("/conferences");
+  redirect(`/conferences?added=${fresh.length}&skipped=${candidates.length - fresh.length}`);
+}
+
+export async function deleteConferenceSlot(formData: FormData) {
+  const { user, school } = await requireTeacher();
+  const id = String(formData.get("id"));
+  const slot = await prisma.conferenceSlot.findFirst({ where: { id, schoolId: school!.id } });
+  if (!slot) redirect("/conferences");
+  // Removing a slot a family has already claimed would cancel their
+  // appointment silently. Make the teacher unbook it first, deliberately.
+  if (slot.bookedByUserId) redirect("/conferences?error=booked");
+  await prisma.conferenceSlot.delete({ where: { id } });
+  await logAudit(user.id, "conference_slot_deleted", `${slot.date} ${slot.startMin}`);
+  revalidatePath("/conferences");
+  redirect("/conferences");
+}
+
+// The teacher's note after the conference happened. This is the bit that turns
+// a calendar entry into evidence, so it shows on the student's printed record.
+export async function saveConferenceNote(formData: FormData) {
+  const { user, school } = await requireTeacher();
+  const id = String(formData.get("id"));
+  const slot = await prisma.conferenceSlot.findFirst({ where: { id, schoolId: school!.id } });
+  if (!slot) redirect("/conferences");
+  await prisma.conferenceSlot.update({
+    where: { id },
+    data: { note: String(formData.get("note") || "").trim().slice(0, 4000) },
+  });
+  await logAudit(user.id, "conference_note_saved", id);
+  revalidatePath("/conferences");
+  redirect("/conferences?saved=1");
 }

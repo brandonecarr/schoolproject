@@ -761,3 +761,41 @@ model PortfolioEntry {
 
   @@index([studentId, position])
 }
+
+// A parent-teacher conference slot.
+//
+// Times are stored as a date string plus MINUTES FROM MIDNIGHT, not as
+// timestamps. A conference is inherently a local-time appointment — "Tuesday at
+// half three" — and storing an instant would mean picking a timezone, getting
+// it wrong across DST, and rendering something different from what the teacher
+// typed. Same reasoning as the rest of the domain's date-only fields.
+//
+// The slot is the unit: the teacher publishes empty ones and a family claims a
+// single slot. Claiming is an atomic conditional update (see bookConference) so
+// two parents clicking at the same moment cannot both win.
+model ConferenceSlot {
+  id       String @id @default(cuid())
+  schoolId String
+  date     String // YYYY-MM-DD
+  startMin Int // minutes from midnight, e.g. 930 = 3:30pm
+  endMin   Int
+  location String @default("")
+
+  /** Null until a family claims it. */
+  studentId      String?
+  bookedByUserId String?
+  bookedByName   String  @default("")
+  bookedAt       String? // ISO
+
+  /** Written afterwards. A documented conference with a note is exactly the
+   *  family-engagement evidence some ESA programs like to see, so it surfaces
+   *  on the student's printed record rather than living only here. */
+  note       String @default("")
+  noteFormat String @default("markdown")
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([schoolId, date])
+  @@index([studentId])
+}
