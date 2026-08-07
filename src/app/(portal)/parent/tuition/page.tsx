@@ -42,7 +42,7 @@ export default async function ParentTuitionPage() {
           <div className="spread">
             <h2>{k.name}</h2>
             <span className="small muted">
-              {k.esaProgram ? PROGRAMS[k.esaProgram].label : "Private pay"} · ${l.annual.toLocaleString()}/yr
+              {k.esaProgram ? PROGRAMS[k.esaProgram]?.label ?? k.esaProgram : "Private pay"} · ${l.annual.toLocaleString()}/yr
             </span>
           </div>
 

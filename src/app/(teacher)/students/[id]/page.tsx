@@ -57,7 +57,7 @@ export default async function StudentPage({
       <div className="topbar">
         <div>
           <div className="eyebrow">
-            Grade {s.grade} · {s.esaProgram ? PROGRAMS[s.esaProgram].label : "Private pay"}
+            Grade {s.grade} · {s.esaProgram ? PROGRAMS[s.esaProgram]?.label ?? s.esaProgram : "Private pay"}
           </div>
           <h1>{s.name}</h1>
         </div>

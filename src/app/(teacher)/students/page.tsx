@@ -125,7 +125,7 @@ export default async function StudentsPage({
                     <div className="small muted">{s.familyName} family</div>
                   </td>
                   <td>{s.grade}</td>
-                  <td className="small">{s.esaProgram ? PROGRAMS[s.esaProgram].label : "Private pay"}</td>
+                  <td className="small">{s.esaProgram ? PROGRAMS[s.esaProgram]?.label ?? s.esaProgram : "Private pay"}</td>
                   <td>
                     <Pill tone={r.tone}>{e.score}</Pill>
                   </td>

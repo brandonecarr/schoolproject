@@ -111,7 +111,7 @@ export default async function Dashboard() {
                     {s.name}
                   </Link>
                   <div className="small muted">
-                    Grade {s.grade} · {s.esaProgram ? PROGRAMS[s.esaProgram].label : "Private pay"}
+                    Grade {s.grade} · {s.esaProgram ? PROGRAMS[s.esaProgram]?.label ?? s.esaProgram : "Private pay"}
                   </div>
                 </div>
                 <div className="bar">
