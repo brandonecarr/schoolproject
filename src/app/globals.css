@@ -866,74 +866,69 @@ input[type="date"]::-webkit-calendar-picker-indicator {
 }
 
 /* split-hero auth layout */
+/* --- Sign in ---------------------------------------------------------------
+   A centred column on the tinted canvas, per the handoff. The old two-column
+   treatment gave half the viewport to a marketing panel that a returning
+   teacher — which is nearly everyone who sees this page — reads once. */
+
 .auth {
   min-height: 100vh;
   display: grid;
-  grid-template-columns: 1.05fr 1fr;
+  place-items: center;
+  padding: 48px 24px;
+  background: var(--bg);
 }
-.auth-brand {
-  position: relative;
-  overflow: hidden;
-  color: #fff;
-  padding: 56px 52px;
-  display: flex;
-  flex-direction: column;
-  justify-content: space-between;
-  gap: 40px;
-  background: linear-gradient(155deg, var(--blue) 0%, var(--blue-deep) 100%);
+.authcol {
+  width: 100%;
+  max-width: 420px;
 }
-.auth-brand::after {
-  content: "";
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-  background: radial-gradient(600px 300px at 90% 0%, rgba(200, 230, 75, 0.14), transparent 60%),
-    repeating-linear-gradient(180deg, transparent 0 39px, rgba(255, 255, 255, 0.05) 39px 40px);
-  opacity: 0.9;
-}
-.auth-brand > * {
-  position: relative;
-  z-index: 1;
-}
-.auth-brand .lockup {
+.auth .lockup {
   display: flex;
   align-items: center;
   gap: 12px;
+  justify-content: center;
+  margin-bottom: 30px;
 }
-.auth-brand h1 {
-  color: #fff;
-  font-size: 40px;
-  line-height: 1.08;
-  max-width: 14ch;
+.auth .brand-mark {
+  width: 38px;
+  height: 38px;
+  flex: 0 0 38px;
+  border-radius: 11px;
+  font-size: 18px;
 }
-.auth-brand p {
-  color: #b9c6de;
-  font-size: 16px;
-  max-width: 42ch;
-  margin: 14px 0 0;
+.auth .wordmark {
+  font-family: var(--head);
+  font-weight: 700;
+  font-size: 19px;
+  letter-spacing: -0.02em;
 }
-.auth-marks {
-  display: flex;
-  gap: 6px;
-  height: 12px;
-  max-width: 260px;
+.auth .tagline {
+  font-size: 12.5px;
+  color: var(--ink3);
+  margin-top: 1px;
 }
-.auth-marks span {
-  flex: 1;
-  border-radius: 4px;
-  background: rgba(255, 255, 255, 0.14);
+.auth h1 {
+  font-size: 27px;
+  text-align: center;
 }
-.auth-marks span.lit {
-  background: var(--mark);
+.authsub {
+  text-align: center;
+  color: var(--ink2);
+  font-size: 14.5px;
+  margin: 6px 0 20px;
 }
-.auth-form-side {
-  display: grid;
-  place-items: center;
-  padding: 40px 24px;
+.authcard {
+  padding: 22px;
 }
-.auth-form-side .inner {
-  width: 100%;
-  max-width: 400px;
+.authcard label {
+  display: block;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--ink2);
+  margin: 12px 0 5px;
+}
+.authcard label:first-of-type {
+  margin-top: 0;
 }
 @media (max-width: 860px) {
   .auth {
@@ -2832,6 +2827,47 @@ a:hover {
   flex: 1;
   min-width: 200px;
   background: var(--surface2);
+}
+
+
+/* --- Filter chips ---------------------------------------------------------- */
+
+.chips {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin: 4px 0 14px;
+}
+.chip {
+  padding: 7px 14px;
+  border-radius: 100px;
+  border: 1px solid var(--line);
+  background: var(--surface);
+  color: var(--ink2);
+  font-size: 12.5px;
+  font-weight: 600;
+  text-decoration: none;
+  white-space: nowrap;
+}
+.chip:hover {
+  border-color: var(--accent);
+  text-decoration: none;
+}
+.chip.on {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+}
+
+/* Assignment type marker, at the size the handoff draws it. */
+.typechip {
+  display: inline-block;
+  padding: 3px 9px;
+  border-radius: 20px;
+  background: var(--accent-soft);
+  color: var(--accent-dark);
+  font-size: 11px;
+  font-weight: 700;
 }
 
 /* --- Accessibility (8.1) -------------------------------------------------- */

@@ -92,7 +92,7 @@ export default async function AssignmentsPage({
       )}
 
       <div className="sep" />
-      <div className="card" style={{ padding: "16px 10px" }}>
+      <div className="card2 nopad">
         <table>
           <thead>
             <tr>
