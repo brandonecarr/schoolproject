@@ -5,6 +5,7 @@ import { readiness, PROGRAMS } from "@/lib/rules";
 import { periodStart, today, fmt } from "@/lib/dates";
 import { EvidenceBar } from "@/components/EvidenceBar";
 import { Pill } from "@/components/ui";
+import { stateLabel, stateTone, teacherPrompt } from "@/lib/engagement";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Evidence board — Cohort" };
@@ -44,10 +45,22 @@ export default async function EvidenceBoardPage() {
                 </div>
               </div>
               <div className="row">
+                {/* Engagement sits beside readiness rather than inside the
+                    score. It answers a different question — "is this child
+                    slipping?" — and folding it into the billing score would
+                    block a school from invoicing over a pastoral concern. */}
+                {e.engagement && e.engagement.state !== "unknown" && (
+                  <Pill tone={stateTone(e.engagement.state)}>{stateLabel(e.engagement.state)}</Pill>
+                )}
                 <Pill tone={r.tone}>{r.label}</Pill>
                 <span className="mono">{e.score}/100</span>
               </div>
             </div>
+            {e.engagement && teacherPrompt(e.engagement) && (
+              <p className="small muted" style={{ margin: "10px 0 0" }}>
+                {teacherPrompt(e.engagement)}
+              </p>
+            )}
             <div style={{ marginTop: 14 }}>
               <EvidenceBar parts={e.parts} />
             </div>

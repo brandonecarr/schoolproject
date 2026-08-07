@@ -8,6 +8,7 @@ import { readiness, PROGRAMS } from "@/lib/rules";
 import { fmt, today } from "@/lib/dates";
 import { EvidenceBar } from "@/components/EvidenceBar";
 import { Pill, Notice } from "@/components/ui";
+import { stateLabel, stateTone, teacherPrompt, kindLabel } from "@/lib/engagement";
 import { ConfirmSubmit } from "@/components/ConfirmSubmit";
 import { StandardsSummary } from "@/components/StandardsSummary";
 import { masteryForStudent } from "@/lib/mastery";
@@ -179,6 +180,32 @@ export default async function StudentPage({
           <p className="small" style={{ marginTop: 8 }}>
             {e.presentDays} present of {e.attendance.length} logged days
           </p>
+
+          {e.engagement && e.engagement.overall.expected > 0 && (
+            <>
+              <div className="sep" style={{ margin: "16px 0" }} />
+              <div className="row spread">
+                <div className="eyebrow">Engagement</div>
+                {e.engagement.state !== "unknown" && (
+                  <Pill tone={stateTone(e.engagement.state)}>{stateLabel(e.engagement.state)}</Pill>
+                )}
+              </div>
+              <p className="small" style={{ marginTop: 8 }}>
+                Work on {e.engagement.overall.active} of {e.engagement.overall.expected} expected days
+                {e.engagement.lastActive && <> &middot; last active {fmt(e.engagement.lastActive)}</>}
+              </p>
+              {teacherPrompt(e.engagement) && (
+                <p className="small muted" style={{ marginTop: 6 }}>
+                  {teacherPrompt(e.engagement)}
+                </p>
+              )}
+              {e.engagement.kinds.length > 0 && (
+                <p className="small muted" style={{ marginTop: 6 }}>
+                  This period they {e.engagement.kinds.map(kindLabel).join(", ")}.
+                </p>
+              )}
+            </>
+          )}
 
           {gradeChanges.length > 0 && (
             <>

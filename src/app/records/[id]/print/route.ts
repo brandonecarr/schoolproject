@@ -18,6 +18,7 @@ import { PROGRAMS } from "@/lib/rules";
 import { letterFor } from "@/lib/gradebook";
 import { fmt, periodStart, today } from "@/lib/dates";
 import { STATUS_META } from "@/lib/outcomes";
+import { factualSummary } from "@/lib/engagement";
 
 export const dynamic = "force-dynamic";
 
@@ -194,8 +195,18 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
       : ""
   }
 
-  <h2>Attendance</h2>
+  <h2>Attendance and engagement</h2>
   <p style="margin:0">Present <strong>${e.presentDays}</strong> of <strong>${e.attendance.length}</strong> logged instructional days during the reporting period.</p>
+  ${
+    /* The factual count only. A reviewer reads "present 14 of 14" as seat time;
+       this line is the stronger claim, that instruction actually produced work.
+       The interpretive state ("worth a check-in") is teacher-only and must
+       never appear on a document a family or a state reviewer reads — see the
+       header of lib/engagement.ts. */
+    e.engagement && factualSummary(e.engagement)
+      ? `<p style="margin:4px 0 0">${esc(factualSummary(e.engagement)!)} during the same period. Days the student was absent or excused are excluded from that count.</p>`
+      : ""
+  }
 
   <h2>Coursework and assessment</h2>
   <table><thead><tr><th>Course</th><th>Assignment</th><th style="width:78px">Due</th><th style="width:80px" class="num">Score</th><th>Instructor feedback</th></tr></thead>
