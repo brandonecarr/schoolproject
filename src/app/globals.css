@@ -279,7 +279,8 @@ h3 {
   display: flex;
   align-items: flex-start;
   min-height: 100vh;
-  padding: 0 14px;
+  /* Gutter on the right only — the rail sits flush against the left edge. */
+  padding: 0 14px 0 0;
   gap: 0;
   background: var(--bg);
 }
@@ -422,7 +423,10 @@ h3 {
      rail scrolled the footer would ride up over the nav (it did). */
   overflow: hidden;
   border: 1px solid var(--side-line);
-  border-radius: calc(var(--radius) + 4px);
+  /* Left corners square: the rail is flush to the viewport edge, and a rounded
+     corner there would show the page background through the curve. */
+  border-radius: 0 calc(var(--radius) + 4px) calc(var(--radius) + 4px) 0;
+  border-left: 0;
   z-index: 6;
   box-shadow: 0 6px 28px oklch(0.3 0.04 285 / 0.1);
 }
@@ -1766,13 +1770,17 @@ input[type="date"]::-webkit-calendar-picker-indicator {
 .navgroup-wrap {
   margin-top: 2px;
 }
+/* Group headers read as siblings of the items beneath them, not as tiny
+   all-caps labels. Same size, weight and padding as a nav link — what
+   separates them is the caret and a slightly stronger colour, which is enough
+   hierarchy without shouting. */
 .navgroup-btn {
-  font-size: 11px;
-  font-weight: 700;
-  letter-spacing: 0.09em;
-  text-transform: uppercase;
+  font-size: 13.5px;
+  font-weight: 600;
+  letter-spacing: 0;
+  text-transform: none;
   color: var(--side-dim);
-  padding: 8px 11px;
+  padding: 9px 11px;
 }
 .navgroup-btn.open {
   color: var(--side-ink);
@@ -1787,14 +1795,11 @@ input[type="date"]::-webkit-calendar-picker-indicator {
   background: var(--accent);
 }
 .navgroup-btn .caret {
-  font-size: 9px;
-  opacity: 0.7;
-  width: 9px;
-}
-.navcount {
   font-size: 10px;
-  opacity: 0.55;
-  font-variant-numeric: tabular-nums;
+  opacity: 0.6;
+  width: 17px;
+  text-align: center;
+  flex: 0 0 17px;
 }
 .navgroup-items {
   display: flex;

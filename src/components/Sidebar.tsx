@@ -161,7 +161,6 @@ export function Sidebar({
                   {isOpen ? "▾" : "▸"}
                 </span>
                 <span style={{ flex: 1 }}>{section.group}</span>
-                <span className="navcount">{section.items.length}</span>
               </button>
               {isOpen && (
                 <div className="navgroup-items">
