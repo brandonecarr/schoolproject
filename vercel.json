@@ -8,6 +8,10 @@
     {
       "path": "/api/cron/watch-sources",
       "schedule": "30 9 * * *"
+    },
+    {
+      "path": "/api/cron/interpret-changes",
+      "schedule": "0 10 * * *"
     }
   ]
 }

@@ -543,3 +543,47 @@ model SourceSnapshot {
 
   @@index([sourceId, fetchedAt])
 }
+
+// A proposed change to src/lib/rules.ts, drafted by the Tier-2 interpreter from
+// an observed source change. NEVER applied automatically — the whole point of
+// this table is that it sits between "a page moved" and "a school bills against
+// a different number", with a human in the gap.
+//
+// One row per interpreted snapshot, including the ones judged immaterial: a
+// recorded "no, that was a footer tweak" is what stops us re-spending a model
+// call on the same diff, and is itself evidence when a rule turns out to have
+// changed and we missed it.
+model RuleProposal {
+  id         String @id @default(cuid())
+  sourceId   String
+  snapshotId String @unique // the change that triggered this — also the idempotency key
+
+  /** Did the model judge this a real rule change? Most are false. */
+  material   Boolean @default(false)
+  confidence String  @default("low") // high | medium | low
+  summary    String  @default("")
+  /** Field-level claims as JSON: [{field, before, after, quote}]. Constrained
+   *  to a whitelist — see PATCHABLE in src/lib/propose.ts. */
+  changesJson String @default("[]")
+  /** Verbatim passages from the page that support the claim. Without these a
+   *  proposal is an assertion; with them a reviewer can check it in seconds. */
+  programCode String?
+  railId      String?
+
+  /** The mechanically generated edit to rules.ts. Not model-written. */
+  patch String @default("")
+
+  status  String  @default("open") // open | pr_opened | accepted | rejected | superseded
+  prUrl   String  @default("")
+  /** Why a human rejected it — trains our judgement about the source, and is
+   *  the signal that a source is producing noise and should be re-pointed. */
+  decidedBy   String?
+  decidedAt   String?
+  decisionNote String @default("")
+
+  model     String   @default("")
+  createdAt DateTime @default(now())
+
+  @@index([status, createdAt])
+  @@index([sourceId])
+}

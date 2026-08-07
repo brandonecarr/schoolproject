@@ -1477,3 +1477,34 @@ export async function assignWorksheet(formData: FormData) {
   revalidatePath("/assignments");
   redirect(`/assignments?created=${students.length}`);
 }
+
+// Record a human's decision on a proposed rule change.
+//
+// Deliberately does NOT edit src/lib/rules.ts. "Applied it" means the reviewer
+// says they made the change (or merged the PR) — the app never writes its own
+// rules file from a web page, however many humans nodded along the way. The
+// record exists so a source that keeps producing rejected proposals can be
+// spotted and re-pointed.
+export async function decideProposal(formData: FormData) {
+  const { user } = await requireTeacher();
+  const id = String(formData.get("id"));
+  const decision = String(formData.get("decision"));
+  if (decision !== "accepted" && decision !== "rejected") redirect("/proposals");
+  const note = String(formData.get("note") || "").trim().slice(0, 500);
+
+  const p = await prisma.ruleProposal.findUnique({ where: { id } });
+  if (!p) redirect("/proposals");
+
+  await prisma.ruleProposal.update({
+    where: { id },
+    data: {
+      status: decision,
+      decidedBy: user.id,
+      decidedAt: new Date().toISOString(),
+      decisionNote: note,
+    },
+  });
+  await logAudit(user.id, "rule_proposal_decided", `${id} → ${decision}${note ? `: ${note}` : ""}`);
+  revalidatePath("/proposals");
+  redirect("/proposals");
+}

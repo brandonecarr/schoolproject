@@ -60,6 +60,7 @@ const NAV: { group: string; items: { href: string; label: string; icon: string }
     items: [
       { href: "/settings", label: "Settings", icon: "settings" },
       { href: "/sources", label: "Rule sources", icon: "evidence" },
+      { href: "/proposals", label: "Rule proposals", icon: "evidence" },
       { href: "/audit", label: "Audit log", icon: "audit" },
     ],
   },
