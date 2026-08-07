@@ -13,6 +13,7 @@ import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/db";
 import { railForState, type Rail } from "@/lib/rules";
+import { currentHostKind } from "@/lib/tenant-server";
 // Prisma 7's generator names row types `<Model>Model`; alias to the plain names.
 import type { UserModel as User, SchoolModel as School } from "@/generated/prisma/models";
 
@@ -98,6 +99,26 @@ export async function getSession(): Promise<Session | null> {
       school = { ...s, railLabel: rail ? rail.label : "No ESA program" };
     }
   }
+
+  // TENANT GATE. When the request arrives on a school's own address, the
+  // session must belong to that school.
+  //
+  // The browser already makes this hard to violate: the cookie is set without a
+  // Domain attribute, so it is host-only and cedar-grove.<root> and
+  // oak-hill.<root> have separate jars. That is a property of how the cookie
+  // happens to be set, in another file, and nothing would fail if someone added
+  // a domain to widen it. This is the check that would.
+  //
+  // It also covers the case the cookie jar cannot: a session that was valid
+  // here and no longer is, because the account moved school or the school's
+  // slug changed. Re-checked on every request rather than at sign-in.
+  const kind = await currentHostKind();
+  if (kind.kind === "tenant" && school?.slug !== kind.slug) return null;
+  // On the apex there is no school, so there is no app to be signed into. The
+  // proxy already routes app paths away from there; this makes it true even if
+  // a route slips the matcher.
+  if (kind.kind === "apex") return null;
+
   return { user, school, rail, actor };
 }
 

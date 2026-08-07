@@ -134,3 +134,46 @@ export function slugFromHost(host: string | null | undefined, rootDomain: string
 export function tenantOrigin(slug: string, rootDomain: string, protocol = "https"): string {
   return `${protocol}://${slug}.${rootDomain}`;
 }
+
+/**
+ * What kind of address is this request arriving on?
+ *
+ * slugFromHost answers "which tenant" and collapses everything else to null,
+ * which is the right shape for a lookup and the wrong shape for routing: the
+ * apex, a Vercel preview URL and mail.<root> all come back null, and they need
+ * three different answers.
+ *
+ *   apex     the marketing site and signup. No school, and no app.
+ *   tenant   a school's own address. The app, bound to that school.
+ *   invalid  under our root domain but not a school we would ever hand out —
+ *            mail.<root>, a.b.<root>, -bad.<root>. Someone is probing, or a
+ *            wildcard DNS record is catching a typo.
+ *   unknown  not under the root domain at all: localhost, a preview
+ *            deployment, an IP, or ROOT_DOMAIN simply not configured yet.
+ *
+ * That last one is the important one. Subdomain tenancy needs DNS, a wildcard
+ * certificate and an env var, and none of that exists on a laptop or on a
+ * per-branch preview URL. Rather than break those, an address we cannot place
+ * runs UNTENANTED — exactly the single-school behaviour this app had before
+ * tenancy existed. The strict behaviour switches on the moment ROOT_DOMAIN is
+ * set and the request actually arrives on that domain.
+ */
+export type HostKind =
+  | { kind: "apex" }
+  | { kind: "tenant"; slug: string }
+  | { kind: "invalid" }
+  | { kind: "unknown" };
+
+export function classifyHost(
+  host: string | null | undefined,
+  rootDomain: string | null | undefined
+): HostKind {
+  const h = String(host ?? "").toLowerCase().trim().split(":")[0];
+  const root = String(rootDomain ?? "").toLowerCase().trim().split(":")[0];
+  if (!h || !root) return { kind: "unknown" };
+  if (h === root || h === `www.${root}`) return { kind: "apex" };
+  if (!h.endsWith(`.${root}`)) return { kind: "unknown" };
+
+  const slug = slugFromHost(h, root);
+  return slug ? { kind: "tenant", slug } : { kind: "invalid" };
+}

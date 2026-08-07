@@ -4,31 +4,41 @@ import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/db";
 import { verifyPassword, newSessionId, logAudit, SESSION_COOKIE } from "@/lib/auth";
+import { currentSlug } from "@/lib/tenant-server";
 
 export async function login(formData: FormData) {
   const email = String(formData.get("email") || "").trim().toLowerCase();
   const password = String(formData.get("password") || "");
 
-  // Email is unique per school now, so an address can match more than one
-  // account. Until the subdomain middleware lands (9.3) there is no tenant on
-  // this request to scope by, so match on the credentials and only proceed
-  // when exactly one account is satisfied. Signing someone into an arbitrary
-  // one of several schools would be worse than asking.
-  const candidates = await prisma.user.findMany({ where: { email } });
+  // WHICH SCHOOL IS THIS SIGN-IN FOR?
+  //
+  // Email is unique per school, not globally, so an address can name more than
+  // one account. The address in the browser answers it: on cedar-grove.<root>
+  // only Cedar Grove accounts exist. That is also what stops a Cedar Grove
+  // parent's credentials working on another school's subdomain — the lookup
+  // never leaves this school.
+  const slug = await currentSlug();
+  let candidates;
+  if (slug) {
+    const school = await prisma.school.findUnique({ where: { slug }, select: { id: true } });
+    candidates = school ? await prisma.user.findMany({ where: { schoolId: school.id, email } }) : [];
+  } else {
+    // Untenanted: localhost, a preview URL, or tenancy not switched on. No
+    // address to scope by, so match on the credentials and only proceed when
+    // exactly one account is satisfied — signing someone into an arbitrary one
+    // of several schools would be worse than asking.
+    candidates = await prisma.user.findMany({ where: { email } });
+  }
   const matches = candidates.filter((u) => verifyPassword(password, u.password));
 
   if (matches.length === 0) {
     await logAudit(null, "login_failed", email);
-    redirect("/login?e=" + encodeURIComponent("That email and password don't match an account."));
+    redirect("/login?e=bad");
   }
   if (matches.length > 1) {
-    // Same address and password at two schools. Rare, but the only honest
-    // answer is to send them to the school's own address rather than guess.
+    // Only reachable untenanted: the same address and password at two schools.
     await logAudit(null, "login_ambiguous", email);
-    redirect(
-      "/login?e=" +
-        encodeURIComponent("That sign-in works at more than one school — open your school's own address.")
-    );
+    redirect("/login?e=ambiguous");
   }
   const user = matches[0];
 

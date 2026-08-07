@@ -16,9 +16,7 @@ export default async function SignupPage({
     <div style={{ minHeight: "100vh", display: "grid", placeItems: "center", padding: 24 }}>
       <div style={{ width: "100%", maxWidth: 440 }}>
         <div className="row" style={{ gap: 10, marginBottom: 20 }}>
-          <div className="brand-mark" style={{ background: "var(--mark)", color: "var(--blue)" }}>
-            C
-          </div>
+          <div className="brand-mark">C</div>
           <div style={{ fontFamily: "var(--serif)", fontSize: 24, fontWeight: 600 }}>Cohort</div>
         </div>
         <h1 style={{ marginBottom: 6 }}>Start your school on Cohort</h1>

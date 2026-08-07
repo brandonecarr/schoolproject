@@ -9,6 +9,8 @@ import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/db";
 import { availableSlug } from "@/lib/tenant";
+import { originFor } from "@/lib/tenant-server";
+import { newTokenValue, tokenExpiryMinutes } from "@/lib/tokens";
 import { hashPassword, newSessionId } from "@/lib/password";
 import { SESSION_COOKIE, logAudit } from "@/lib/auth";
 
@@ -40,9 +42,38 @@ export async function signup(formData: FormData) {
     data: { schoolId: school.id, role: "owner", name, email, password: hashPassword(password) },
   });
 
+  await logAudit(owner.id, "school_created", `${schoolName} (${state})`);
+
+  // SIGNING IN ON THE RIGHT HOST.
+  //
+  // Signup happens on the apex; the school lives on its own subdomain. The
+  // session cookie is host-only, so one set here would simply not exist over
+  // there — the founder would finish creating a school and immediately be
+  // asked to sign in to it.
+  //
+  // So hand off: a single-use token, good for two minutes, redeemed by /enter
+  // on the school's own address, which is where the cookie is set. The token is
+  // in a URL and therefore lands in history and any logs along the way, which
+  // is exactly why it dies on first use and why two minutes is the whole
+  // budget for a redirect the browser follows on its own.
+  const origin = originFor(slug);
+  if (origin) {
+    const handoff = newTokenValue();
+    await prisma.token.create({
+      data: {
+        token: handoff,
+        type: "signin_handoff",
+        schoolId: school.id,
+        userId: owner.id,
+        expiresAt: tokenExpiryMinutes(2),
+      },
+    });
+    redirect(`${origin}/enter?t=${encodeURIComponent(handoff)}`);
+  }
+
+  // Untenanted deployment: one origin, so sign in here.
   const sid = newSessionId();
   await prisma.session.create({ data: { id: sid, userId: owner.id } });
-  await logAudit(owner.id, "school_created", `${schoolName} (${state})`);
   const jar = await cookies();
   jar.set(SESSION_COOKIE, sid, { httpOnly: true, path: "/", sameSite: "lax", maxAge: 604800 });
   redirect("/dashboard");

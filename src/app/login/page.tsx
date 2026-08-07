@@ -5,12 +5,25 @@ import { login } from "./actions";
 export const metadata: Metadata = { title: "Sign in — Cohort" };
 export const dynamic = "force-dynamic";
 
+const LOGIN_ERRORS: Record<string, string> = {
+  bad: "That email and password don't match an account.",
+  ambiguous:
+    "That sign-in works at more than one school \u2014 open your school's own address and try there.",
+  expired: "That sign-in link has expired. Sign in with your email and password.",
+};
+
 export default async function LoginPage({
   searchParams,
 }: {
   searchParams: Promise<{ e?: string; reset?: string }>;
 }) {
   const { e: error, reset } = await searchParams;
+  // Codes, not sentences. This value comes off the query string, so rendering
+  // it verbatim would let anyone hand out a link to a real sign-in page
+  // carrying any message they liked — "your account is locked, call this
+  // number" on our own domain. React escapes the markup; it cannot escape the
+  // words. An unrecognised code shows nothing.
+  const message = error ? LOGIN_ERRORS[error] : undefined;
 
   return (
     <div className="auth">
@@ -31,7 +44,7 @@ export default async function LoginPage({
         <h1>Welcome back</h1>
         <p className="authsub">Sign in to your school.</p>
 
-        {error && <div className="notice bad">{error}</div>}
+        {message && <div className="notice bad">{message}</div>}
         {reset && <div className="notice good">Password updated. Sign in with your new password.</div>}
 
         <form action={login} className="card2 authcard">

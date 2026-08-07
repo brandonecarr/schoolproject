@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { prisma } from "@/lib/db";
 import { tokenUsable } from "@/lib/tokens";
+import { redirectTokenToTenant } from "@/lib/tenant-server";
 import { acceptInvite } from "../actions";
 
 export const metadata: Metadata = { title: "Accept invite — Cohort" };
@@ -11,9 +12,7 @@ function Shell({ children }: { children: React.ReactNode }) {
     <div style={{ minHeight: "100vh", display: "grid", placeItems: "center", padding: 24 }}>
       <div style={{ width: "100%", maxWidth: 420 }}>
         <div className="row" style={{ gap: 10, marginBottom: 20 }}>
-          <div className="brand-mark" style={{ background: "var(--mark)", color: "var(--blue)" }}>
-            C
-          </div>
+          <div className="brand-mark">C</div>
           <div style={{ fontFamily: "var(--serif)", fontSize: 24, fontWeight: 600 }}>Cohort</div>
         </div>
         {children}
@@ -33,6 +32,9 @@ export default async function InvitePage({
   const { error } = await searchParams;
 
   const t = await prisma.token.findUnique({ where: { token } });
+  // Sent before this school had its own address, or opened from an
+  // inbox that rewrote the link. The token knows where it belongs.
+  if (t) await redirectTokenToTenant(t.schoolId, `/invite/${token}`);
   if (!t || t.type !== "parent_invite" || !tokenUsable(t)) {
     return (
       <Shell>
