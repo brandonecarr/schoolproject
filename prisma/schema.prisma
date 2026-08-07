@@ -38,6 +38,21 @@ model School {
   // cosmetic: it sets the denominator of "present N of M instructional days" on
   // every ESA invoice, and plenty of microschools deliberately run four days.
   schoolDays String @default("1,2,3,4,5")
+
+  // --- Identity on the documents that leave the building --------------------
+  // A reimbursement packet is read by a state reviewer who has never heard of
+  // us. It should arrive on the SCHOOL's letterhead, not the vendor's; a packet
+  // headed "Cohort" reads as though a software company is making the claim,
+  // when the school is the one attesting to it.
+  //
+  // The logo is a FileRec with a null studentId (not child data — see the
+  // retention purge, which is scoped away from these on purpose).
+  logoFileId  String?
+  // Hex, e.g. "#1F3A6E". Empty means "use the Cohort default". Never trusted
+  // raw: see lib/branding.ts, which rejects anything that isn't a hex colour
+  // and picks a foreground that actually meets contrast against it.
+  accentColor String @default("")
+
   createdAt DateTime @default(now())
 }
 

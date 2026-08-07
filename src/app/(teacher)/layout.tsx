@@ -7,12 +7,14 @@ import { Sidebar } from "@/components/Sidebar";
 import { unreadForStaff } from "@/lib/messages";
 import { unreadCountFor } from "@/lib/notify";
 import { parsePins } from "@/lib/nav";
+import { brandForSchool } from "@/lib/packet-read";
 
 export default async function TeacherLayout({ children }: { children: React.ReactNode }) {
   const { user, school } = await requireTeacher();
-  const [messagesUnread, notificationsUnread] = await Promise.all([
+  const [messagesUnread, notificationsUnread, brand] = await Promise.all([
     school ? unreadForStaff(school.id) : Promise.resolve(0),
     unreadCountFor(user.id),
+    school ? brandForSchool(school.id) : Promise.resolve(null),
   ]);
   return (
     <div className="shell">
@@ -23,6 +25,7 @@ export default async function TeacherLayout({ children }: { children: React.Reac
         schoolName={school?.name ?? ""}
         schoolState={school?.state ?? ""}
         railLabel={school?.railLabel ?? ""}
+        logoSrc={brand?.logo ?? null}
         userName={user.name}
         pins={parsePins(user.pinnedNav)}
         messagesUnread={messagesUnread}

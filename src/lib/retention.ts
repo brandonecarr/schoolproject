@@ -32,7 +32,16 @@ export async function purgeSchool(school: { id: string; retentionDays: number })
     prisma.attendance.deleteMany({ where: { schoolId: school.id, date: { lt: cutoffDate } } }),
     prisma.observation.deleteMany({ where: { schoolId: school.id, date: { lt: cutoffDate } } }),
     prisma.submission.deleteMany({ where: { schoolId: school.id, createdAt: { lt: cutoff } } }),
-    prisma.fileRec.deleteMany({ where: { schoolId: school.id, capturedAt: { lt: cutoffIso } } }),
+    // studentId is required here, not incidental. A FileRec with a null
+    // studentId is explicitly NOT child data — it's a teacher-attached
+    // assignment resource, or the school's own logo. Purging those on the
+    // child-retention clock deletes a school's letterhead after two years and
+    // takes assignment resources with it, neither of which this window governs.
+    // Child files are exactly the ones carrying a studentId, and a family's
+    // right-to-deletion request removes them by that same key below.
+    prisma.fileRec.deleteMany({
+      where: { schoolId: school.id, studentId: { not: null }, capturedAt: { lt: cutoffIso } },
+    }),
   ]);
 
   const result: PurgeResult = {

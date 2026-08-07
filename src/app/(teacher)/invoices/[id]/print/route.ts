@@ -6,6 +6,8 @@
 import { NextResponse } from "next/server";
 import { getSession, logAudit } from "@/lib/auth";
 import { prisma } from "@/lib/db";
+import { packetCss, letterhead, packetFoot, printBar } from "@/lib/packet";
+import { brandForSchool } from "@/lib/packet-read";
 import { evidenceFor } from "@/lib/evidence";
 import { RAILS } from "@/lib/rules";
 import { verificationCounts, railVerification } from "@/lib/observe";
@@ -52,35 +54,21 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
     pinsByFile.set(p.fileId, list);
   }
 
-  const printCss = `
-  *{box-sizing:border-box}
-  body{margin:0;padding:44px;font-family:ui-serif,Georgia,"Times New Roman",serif;color:#141C26;font-size:12pt;line-height:1.55;background:#fff;max-width:840px}
-  h1{font-size:20pt;margin:0 0 2px}
-  h2{font-size:11pt;text-transform:uppercase;letter-spacing:.14em;margin:26px 0 8px;color:#5C6672;font-family:-apple-system,Segoe UI,Roboto,sans-serif}
-  .head{border-bottom:2px solid #141C26;padding-bottom:14px;margin-bottom:6px;display:flex;justify-content:space-between;align-items:flex-end;gap:20px}
-  .meta{font-family:-apple-system,Segoe UI,Roboto,sans-serif;font-size:10pt;color:#5C6672;text-align:right;line-height:1.7}
-  table{width:100%;border-collapse:collapse;margin-top:4px}
-  th{text-align:left;font-family:-apple-system,Segoe UI,Roboto,sans-serif;font-size:8.5pt;letter-spacing:.1em;text-transform:uppercase;color:#5C6672;padding:0 8px 6px;border-bottom:1px solid #DCDFD8}
-  td{padding:7px 8px;border-bottom:1px solid #EDEFE9;font-size:11pt}
-  .narrative{border-left:3px solid #141C26;padding:2px 0 2px 16px;margin:6px 0 0}
+  const brand = await brandForSchool(school!.id);
+  const printCss = `${packetCss(brand)}
   .samples{display:flex;gap:10px;flex-wrap:wrap;margin-top:8px}
   .samples figure{margin:0;width:170px}
   .samples img{width:100%;border:1px solid #DCDFD8;border-radius:4px}
   .samples figcaption{font-family:-apple-system,sans-serif;font-size:8.5pt;color:#5C6672;margin-top:4px}
-  .foot{margin-top:34px;padding-top:12px;border-top:1px solid #DCDFD8;font-family:-apple-system,sans-serif;font-size:9pt;color:#5C6672}
-  .bar{position:fixed;top:0;left:0;right:0;background:#1F3A6E;color:#fff;padding:10px 18px;font-family:-apple-system,sans-serif;font-size:13px;display:flex;gap:14px;align-items:center;justify-content:space-between}
-  .bar button,.bar a{font:inherit;padding:6px 14px;border-radius:7px;border:0;cursor:pointer;text-decoration:none}
-  .bar button{background:#C8E64B;color:#2F3908;font-weight:700}
-  .bar a{background:rgba(255,255,255,.15);color:#fff}
-  body{padding-top:96px}
-  @media print{.bar{display:none}body{padding:0}@page{margin:18mm}}
   `;
 
   const html = `<!doctype html><html lang="en"><head><meta charset="utf-8"><title>ESA packet — ${esc(s ? s.name : "")}</title><style>${printCss}</style></head><body>
-  <div class="bar">
-    <span>Save as PDF, then upload it to ${esc(rail ? rail.label : "your state portal")}. Nothing is sent from here.</span>
-    <span><a href="/invoices/${esc(inv.id)}">Back</a> <button onclick="window.print()">Print / Save as PDF</button></span>
-  </div>
+  ${printBar(
+    `Save as PDF, then upload it to ${rail ? rail.label : "your state portal"}. Nothing is sent from here.`,
+    `/invoices/${inv.id}`
+  )}
+
+  ${letterhead(brand)}
 
   <div class="head">
     <div>
@@ -88,8 +76,6 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
       <div style="font-family:-apple-system,sans-serif;font-size:10pt;color:#5C6672">Grade ${esc(s ? s.grade : "")} &middot; ${esc(rail ? rail.label : "")} reimbursement packet</div>
     </div>
     <div class="meta">
-      <strong style="color:#141C26">${esc(school!.name)}</strong><br>
-      ${esc(school!.address || "")}<br>
       Service period ${esc(fmt(inv.periodStart))} – ${esc(fmt(inv.periodEnd))}<br>
       Amount claimed: <strong style="color:#141C26">$${Number(inv.amount).toLocaleString()}</strong>
     </div>
@@ -163,8 +149,8 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
       : ""
   }
 
-  <div class="foot">
-    Prepared by ${esc(user.name)} on ${esc(fmt(today()))} from attendance, coursework, and assessment records maintained contemporaneously in Cohort.
+  ${packetFoot(
+    `Prepared by ${esc(user.name)} on ${esc(fmt(today()))} from attendance, coursework, and assessment records maintained contemporaneously by ${esc(school!.name)}.
     ${
       // Derived, so it disappears once this rail has real paid cycles behind it.
       // NOTE: this sentence prints on a document that goes to the state. It
@@ -173,8 +159,8 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
       railV && railV.level === "unverified"
         ? "<br>Format requirements for this program have not been verified against a live submission."
         : ""
-    }
-  </div>
+    }`
+  )}
   </body></html>`;
 
   await logAudit(user.id, "packet_printed", inv.id);

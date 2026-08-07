@@ -9,6 +9,7 @@ import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/db";
 import { requireTeacher, logAudit } from "@/lib/auth";
+import { parseAccent } from "@/lib/branding";
 import { evidenceFor } from "@/lib/evidence";
 import { purposeNarrative, progressNarrative } from "@/lib/ai";
 import { PROGRAMS } from "@/lib/rules";
@@ -1841,4 +1842,86 @@ export async function saveConferenceNote(formData: FormData) {
   await logAudit(user.id, "conference_note_saved", id);
   revalidatePath("/conferences");
   redirect("/conferences?saved=1");
+}
+
+// --- School branding (8.5) ---
+//
+// The packet a state reviewer reads should be the school's document. These
+// three actions are what makes it one.
+
+/** Logo formats a browser will render inline. PDF is absent (it isn't an
+ *  image) and so is SVG — an SVG is a document that can carry script, and this
+ *  file gets embedded into pages we generate. */
+const LOGO_TYPES: Record<string, string> = {
+  "image/png": "png",
+  "image/jpeg": "jpg",
+  "image/webp": "webp",
+};
+
+export async function uploadLogo(formData: FormData) {
+  const { user, school } = await requireTeacher();
+  const schoolId = school!.id;
+  const file = formData.get("file") as File | null;
+  const back = "/settings";
+
+  if (!file || file.size === 0) redirect(`${back}?logo=empty`);
+  const ext = LOGO_TYPES[file.type];
+  if (!ext) redirect(`${back}?logo=type`);
+  // Smaller cap than a work sample: this is inlined as base64 into every packet
+  // we generate, where a 5 MB logo becomes ~6.7 MB of markup on each document.
+  if (file.size > 1024 * 1024) redirect(`${back}?logo=big`);
+
+  const buf = Buffer.from(await file.arrayBuffer());
+  const created = await prisma.fileRec.create({
+    data: {
+      schoolId,
+      // Null: this is the school's own mark, not a record about a child. The
+      // retention purge is scoped away from these deliberately.
+      studentId: null,
+      label: "School logo",
+      ext,
+      mime: file.type,
+      bytes: buf.length,
+      data: buf,
+      capturedAt: new Date().toISOString(),
+    },
+  });
+
+  const previous = school!.logoFileId;
+  await prisma.school.update({ where: { id: schoolId }, data: { logoFileId: created.id } });
+  // Swap first, then delete: if this ran the other way round and the update
+  // failed, the school would be left pointing at a row that no longer exists.
+  if (previous) await prisma.fileRec.deleteMany({ where: { id: previous, schoolId } });
+
+  await logAudit(user.id, "school_logo_updated", `${buf.length} bytes`);
+  revalidatePath("/settings");
+  redirect(`${back}?logo=ok`);
+}
+
+export async function removeLogo() {
+  const { user, school } = await requireTeacher();
+  const schoolId = school!.id;
+  const previous = school!.logoFileId;
+  await prisma.school.update({ where: { id: schoolId }, data: { logoFileId: null } });
+  if (previous) await prisma.fileRec.deleteMany({ where: { id: previous, schoolId } });
+  await logAudit(user.id, "school_logo_removed", schoolId);
+  revalidatePath("/settings");
+  redirect("/settings?logo=removed");
+}
+
+export async function updateAccent(formData: FormData) {
+  const { user, school } = await requireTeacher();
+  const raw = String(formData.get("accentColor") || "");
+  // Storing the PARSED value, not the raw one. Validating on the way out would
+  // mean the database holds a string we have already decided is unsafe, and the
+  // next reader of that column has to remember why.
+  const parsed = parseAccent(raw);
+  if (raw.trim() !== "" && !parsed) redirect("/settings?logo=colour");
+  await prisma.school.update({
+    where: { id: school!.id },
+    data: { accentColor: parsed ?? "" },
+  });
+  await logAudit(user.id, "school_accent_updated", parsed ?? "(default)");
+  revalidatePath("/settings");
+  redirect("/settings?saved=1");
 }

@@ -26,6 +26,7 @@ export function Sidebar({
   schoolName,
   schoolState,
   railLabel,
+  logoSrc,
   userName,
   pins = [],
   messagesUnread = 0,
@@ -34,6 +35,8 @@ export function Sidebar({
   schoolName: string;
   schoolState: string;
   railLabel: string;
+  /** data: URI for the school's logo, or null. */
+  logoSrc?: string | null;
   userName: string;
   pins?: string[];
   messagesUnread?: number;
@@ -95,13 +98,19 @@ export function Sidebar({
 
   return (
     <nav className="side">
+      {/* The school leads here for the same reason it leads a printed packet:
+          this is their system, and Cohort is what they keep it in. Cohort sits
+          at the foot of the sidebar instead. */}
       <div className="brand">
-        <div className="brand-mark">C</div>
-        <div className="brand-name">Cohort</div>
+        {logoSrc ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img className="brand-logo" src={logoSrc} alt="" />
+        ) : (
+          <div className="brand-mark">{(schoolName.trim()[0] || "C").toUpperCase()}</div>
+        )}
+        <div className="brand-name">{schoolName || "Cohort"}</div>
       </div>
       <div className="schoolname">
-        {schoolName}
-        <br />
         {schoolState} &middot; {railLabel}
       </div>
 
@@ -159,6 +168,7 @@ export function Sidebar({
             Sign out
           </button>
         </form>
+        <div className="vendor">Cohort</div>
       </div>
     </nav>
   );

@@ -135,7 +135,11 @@ h3 {
 }
 .brand-name {
   font-family: var(--serif);
-  font-size: 20px;
+  /* Sized for a school name, not for the single word "Cohort" it used to hold.
+     "Cedar Grove Learning Collective" at 20px ran to three lines and swamped
+     the top of the sidebar. */
+  font-size: 15px;
+  line-height: 1.25;
   font-weight: 600;
   letter-spacing: -0.01em;
 }
@@ -2760,4 +2764,25 @@ a:focus-visible {
 .viewasbtn:focus-visible {
   outline: 2px solid var(--ink);
   outline-offset: 2px;
+}
+
+/* School logo in the sidebar brand slot. Same footprint as .brand-mark so the
+   header doesn't shift when a school uploads or removes one. */
+.brand-logo {
+  width: 34px;
+  height: 34px;
+  border-radius: 9px;
+  object-fit: contain;
+  background: rgba(255, 255, 255, 0.9);
+  padding: 3px;
+  flex: 0 0 auto;
+}
+/* Cohort, demoted. The school's name is the brand at the top; this is the
+   quiet attribution at the foot, matching how the printed packets read. */
+.vendor {
+  margin-top: 12px;
+  font-family: var(--serif);
+  font-size: 12px;
+  letter-spacing: 0.02em;
+  opacity: 0.45;
 }

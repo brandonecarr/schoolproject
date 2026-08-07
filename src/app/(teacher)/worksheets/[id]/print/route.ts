@@ -5,6 +5,8 @@
 import { NextResponse } from "next/server";
 import { getSession, logAudit } from "@/lib/auth";
 import { prisma } from "@/lib/db";
+import { packetCss, letterhead, packetFoot } from "@/lib/packet";
+import { brandForSchool } from "@/lib/packet-read";
 import { parseItems, quizMax, seededOrder } from "@/lib/lms";
 import { renderText } from "@/lib/markdown";
 
@@ -96,11 +98,10 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
     })
     .join("");
 
-  const printCss = `
-  *{box-sizing:border-box}
-  body{margin:0;padding:44px;font-family:ui-serif,Georgia,"Times New Roman",serif;color:#141C26;font-size:12pt;line-height:1.5;background:#fff;max-width:820px}
+  const brand = await brandForSchool(school!.id);
+  const printCss = `${packetCss(brand)}
+  body{line-height:1.5;max-width:820px}
   .name-row{display:flex;justify-content:space-between;font-family:-apple-system,Segoe UI,Roboto,sans-serif;font-size:10pt;color:#5C6672;border:1px solid #DCDFD8;border-radius:8px;padding:10px 14px;margin:0 0 20px}
-  h1{font-size:20pt;margin:0 0 2px}
   .sub{font-family:-apple-system,sans-serif;font-size:10pt;color:#5C6672;margin-bottom:4px}
   .instr{border-left:3px solid #141C26;padding-left:14px;margin:14px 0 22px;font-style:italic}
   ol.qs{padding-left:24px;margin:0}
@@ -121,13 +122,6 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
   .fill{margin-top:8px;font-family:-apple-system,sans-serif}
   .lines span{display:block;border-bottom:1px solid #C7CBC0;height:26px}
   .keytag{background:#E8F2B8;border-radius:4px;padding:1px 8px;font-family:-apple-system,sans-serif;font-size:10pt}
-  .foot{margin-top:26px;padding-top:12px;border-top:1px solid #DCDFD8;font-family:-apple-system,sans-serif;font-size:9pt;color:#5C6672}
-  .bar{position:fixed;top:0;left:0;right:0;background:#1F3A6E;color:#fff;padding:10px 18px;font-family:-apple-system,sans-serif;font-size:13px;display:flex;gap:14px;align-items:center;justify-content:space-between}
-  .bar a,.bar button{font:inherit;padding:6px 14px;border-radius:7px;border:0;cursor:pointer;text-decoration:none}
-  .bar button{background:#C8E64B;color:#2F3908;font-weight:700}
-  .bar a{background:rgba(255,255,255,.15);color:#fff}
-  body{padding-top:96px}
-  @media print{.bar{display:none}body{padding:0}@page{margin:16mm}}
   `;
 
   const html = `<!doctype html><html lang="en"><head><meta charset="utf-8"><title>${esc(ws.title)}${
@@ -144,6 +138,8 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
     </span>
   </div>
 
+  ${letterhead(brand)}
+
   <div class="name-row"><span>Name: ________________________</span><span>Date: ____________</span></div>
   <h1>${esc(ws.title)}</h1>
   <div class="sub">${esc(ws.subject || "")} · ${items.length} question${
@@ -159,7 +155,9 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
   }
   <ol class="qs">${questions || "<li>No questions.</li>"}</ol>
 
-  <div class="foot">Generated with Cohort${showKey ? " · answer key — do not distribute" : ""}.</div>
+  ${packetFoot(
+    `${esc(school!.name)}${showKey ? " · answer key — do not distribute" : ""}`
+  )}
   </body></html>`;
 
   await logAudit(user.id, showKey ? "worksheet_key_printed" : "worksheet_printed", ws.id);

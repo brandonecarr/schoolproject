@@ -10,6 +10,8 @@ import { prisma } from "@/lib/db";
 import { portfolioFor } from "@/lib/portfolio-read";
 import { renderText } from "@/lib/markdown";
 import { fmt, today } from "@/lib/dates";
+import { letterhead, letterheadCss } from "@/lib/packet";
+import { brandForSchool } from "@/lib/packet-read";
 
 export const dynamic = "force-dynamic";
 
@@ -25,11 +27,20 @@ export async function GET() {
   ]);
   if (!student) return new Response("Not found", { status: 404 });
 
+  const brand = await brandForSchool(student.schoolId);
+
   const html = `<!doctype html><html lang="en"><head><meta charset="utf-8">
   <title>${esc(student.name)} — Portfolio</title>
+  <meta name="color-scheme" content="light">
   <style>
   @page { margin: 18mm; }
-  body { font-family: Georgia, "Times New Roman", serif; color:#141C26; line-height:1.6; max-width: 760px; margin: 0 auto; }
+  /* An explicit white canvas, not the user-agent default. Without it a viewer
+     in dark mode gets this document's near-black body text on a near-black
+     background — a portfolio a family opens to read, rendered unreadable. The
+     other print routes get this from packetCss; this one sets its own. */
+  html, body { background:#fff; }
+  body { font-family: Georgia, "Times New Roman", serif; color:#141C26; line-height:1.6; max-width: 760px; margin: 0 auto; padding: 0 16px; }
+  
   h1 { font-size: 26pt; margin: 0 0 2px; }
   .sub { font-family:-apple-system,sans-serif; font-size:9.5pt; color:#5C6672; margin-bottom: 22px; }
   .piece { page-break-inside: avoid; margin: 0 0 26px; padding-bottom: 18px; border-bottom: 1px solid #DCDFD8; }
@@ -38,7 +49,9 @@ export async function GET() {
   .piece img { max-width: 340px; width:100%; border:1px solid #DCDFD8; border-radius:4px; display:block; margin: 8px 0; }
   blockquote { margin: 10px 0 0; padding-left: 12px; border-left: 3px solid #C8E64B; }
   .foot { font-family:-apple-system,sans-serif; font-size:8.5pt; color:#5C6672; margin-top: 26px; }
+  ${letterheadCss(brand)}
   </style></head><body>
+  ${letterhead(brand)}
   <h1>${esc(student.name)}</h1>
   <div class="sub">Portfolio · chosen by ${esc(student.name.split(" ")[0])} · printed ${esc(fmt(today()))}</div>
   ${

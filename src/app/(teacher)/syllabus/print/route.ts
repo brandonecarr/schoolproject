@@ -4,6 +4,8 @@
 import { NextResponse } from "next/server";
 import { getSession, logAudit } from "@/lib/auth";
 import { prisma } from "@/lib/db";
+import { packetCss, letterhead, packetFoot, printBar } from "@/lib/packet";
+import { brandForSchool } from "@/lib/packet-read";
 import { fmt, today } from "@/lib/dates";
 import { typeMeta } from "@/lib/lms";
 
@@ -58,24 +60,16 @@ export async function GET(req: Request) {
       })
       .join("");
 
-  const css = `
-  *{box-sizing:border-box}
-  body{margin:0;padding:44px;font-family:ui-serif,Georgia,"Times New Roman",serif;color:#141C26;font-size:11.5pt;line-height:1.5;background:#fff;max-width:840px}
-  h1{font-size:22pt;margin:0 0 2px}
-  h2{font-size:13pt;margin:26px 0 4px;border-bottom:1px solid #DCDFD8;padding-bottom:4px}
+  const brand = await brandForSchool(schoolId);
+  const css = `${packetCss(brand)}
+  body{font-size:11.5pt;line-height:1.5}
+  h1{font-size:22pt}
+  h2{font-size:13pt;text-transform:none;letter-spacing:0;color:#141C26;margin:26px 0 4px;border-bottom:1px solid #DCDFD8;padding-bottom:4px;font-family:ui-serif,Georgia,serif}
   h3{font-size:11.5pt;margin:16px 0 4px}
-  .sub{font-family:-apple-system,sans-serif;font-size:10pt;color:#5C6672}
   .muted{color:#5C6672}
-  table{width:100%;border-collapse:collapse;margin-top:2px}
-  td{padding:5px 8px;border-bottom:1px solid #EDEFE9;font-size:10.5pt;vertical-align:top}
-  .head{border-bottom:2px solid #141C26;padding-bottom:14px;margin-bottom:6px}
-  .foot{margin-top:32px;padding-top:12px;border-top:1px solid #DCDFD8;font-family:-apple-system,sans-serif;font-size:8.5pt;color:#5C6672}
-  .bar{position:fixed;top:0;left:0;right:0;background:#1F3A6E;color:#fff;padding:10px 18px;font-family:-apple-system,sans-serif;font-size:13px;display:flex;gap:14px;align-items:center;justify-content:space-between}
-  .bar a,.bar button{font:inherit;padding:6px 14px;border-radius:7px;border:0;cursor:pointer;text-decoration:none}
-  .bar button{background:#C8E64B;color:#2F3908;font-weight:700}
-  .bar a{background:rgba(255,255,255,.15);color:#fff}
-  body{padding-top:96px}
-  @media print{.bar{display:none}body{padding:0}@page{margin:16mm}}
+  td{padding:5px 8px;font-size:10.5pt;vertical-align:top}
+  .head{display:block}
+  @media print{@page{margin:16mm}}
   `;
 
   const schoolWide = renderModules(null);
@@ -83,14 +77,13 @@ export async function GET(req: Request) {
   const html = `<!doctype html><html lang="en"><head><meta charset="utf-8"><title>Syllabus — ${esc(
     school!.name
   )}</title><style>${css}</style></head><body>
-  <div class="bar">
-    <span>Syllabus · ${esc(school!.name)}</span>
-    <span><a href="/syllabus">Back</a> <button onclick="window.print()">Print / Save as PDF</button></span>
-  </div>
+  ${printBar(`Syllabus · ${school!.name}`, "/syllabus")}
+
+  ${letterhead(brand)}
 
   <div class="head">
-    <h1>${esc(school!.name)}</h1>
-    <div class="sub">Course of study &middot; prepared ${esc(fmt(today()))}</div>
+    <h1>Course of study</h1>
+    <div class="sub">Prepared ${esc(fmt(today()))}</div>
   </div>
 
   ${schoolWide ? `<h2>School-wide</h2>${schoolWide}` : ""}
@@ -116,9 +109,9 @@ export async function GET(req: Request) {
     })
     .join("")}
 
-  <div class="foot">Generated from the courses, modules, and assignments recorded in Cohort on ${esc(
-    fmt(today())
-  )}.</div>
+  ${packetFoot(
+    `Generated from the courses, modules, and assignments recorded by ${esc(school!.name)} on ${esc(fmt(today()))}.`
+  )}
   </body></html>`;
 
   await logAudit(user.id, "syllabus_printed", school!.name);
