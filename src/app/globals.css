@@ -875,13 +875,143 @@ input[type="date"]::-webkit-calendar-picker-indicator {
   }
 }
 
-/* split-hero auth layout */
-/* --- Sign in ---------------------------------------------------------------
-   A centred column on the tinted canvas, per the handoff. The old two-column
-   treatment gave half the viewport to a marketing panel that a returning
-   teacher — which is nearly everyone who sees this page — reads once. */
+/* --- Sign in: the split hero -----------------------------------------------
+
+   Restored at the owner's request after the redesign flattened it to a centred
+   column. The argument for flattening was that a returning teacher reads the
+   marketing panel once; the argument against is that this is the first screen
+   anyone sees and it is the only place the product gets to look like something.
+   The second argument won.
+
+   NOT a literal revert. The pre-redesign rule set is in 09bb687^ and would look
+   wrong pasted back: the token rebase collapsed --blue and --blue-deep onto the
+   same value, so its two-stop gradient would render flat, and --mark went from
+   chartreuse to the purple accent, so the motif bars would have been purple on
+   purple. The stops below are written out for that reason.
+
+   The lined-paper rule is the one thing carried over character for character —
+   a 40px repeating gradient with a 1px line, which is what makes the panel read
+   as paper rather than as a coloured rectangle. ------------------------------ */
 
 .auth {
+  min-height: 100vh;
+  display: grid;
+  grid-template-columns: 1.05fr 1fr;
+}
+
+/* Explicit OKLCH stops rather than tokens: no token exists for "deep end of a
+   hero gradient", and inventing one would put a value in the palette that
+   nothing else uses. Same hue family as --accent, walked down in lightness. */
+.auth-brand {
+  position: relative;
+  overflow: hidden;
+  color: #fff;
+  padding: 56px 52px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: 40px;
+  background: linear-gradient(155deg, oklch(0.46 0.19 285) 0%, oklch(0.26 0.11 288) 100%);
+}
+/* The paper. 39px of nothing, then a 1px rule — ruled feint, near enough. The
+   radial sits on top as a light source in the upper right so the panel isn't a
+   flat wash. */
+.auth-brand::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background:
+    radial-gradient(620px 320px at 88% -5%, oklch(0.8 0.15 300 / 0.2), transparent 62%),
+    repeating-linear-gradient(180deg, transparent 0 39px, rgba(255, 255, 255, 0.055) 39px 40px);
+}
+.auth-brand > * {
+  position: relative;
+  z-index: 1;
+}
+.auth-brand .lockup {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  justify-content: flex-start;
+  margin-bottom: 0;
+}
+.auth-brand .brand-mark {
+  width: 34px;
+  height: 34px;
+  flex: 0 0 34px;
+  border-radius: 10px;
+  font-size: 16px;
+}
+.auth-brand .wordmark {
+  font-family: var(--head);
+  font-weight: 700;
+  font-size: 20px;
+  letter-spacing: -0.02em;
+  color: #fff;
+}
+.auth-brand h1 {
+  color: #fff;
+  font-family: var(--head);
+  font-size: clamp(28px, 3.4vw, 40px);
+  line-height: 1.08;
+  letter-spacing: -0.03em;
+  max-width: 15ch;
+  text-align: left;
+}
+.auth-brand p {
+  color: oklch(0.86 0.035 292);
+  font-size: 16px;
+  line-height: 1.6;
+  max-width: 42ch;
+  margin: 14px 0 0;
+}
+
+/* The evidence-bar motif — the product's signature used as brand texture. Six
+   segments, one unlit, because the whole pitch is that the gap is visible
+   before a reviewer finds it. */
+.auth-marks {
+  display: flex;
+  gap: 6px;
+  height: 12px;
+  max-width: 260px;
+}
+.auth-marks span {
+  flex: 1;
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.16);
+}
+.auth-marks span.lit {
+  background: oklch(0.88 0.09 292);
+}
+
+.auth-form-side {
+  display: grid;
+  place-items: center;
+  padding: 40px 24px;
+  background: var(--bg);
+}
+.auth-form-side .inner {
+  width: 100%;
+  max-width: 400px;
+}
+/* Left-aligned here, centred on .authplain. Same components, different
+   composition: beside a hero the form reads as a column, alone on the canvas
+   it reads as a card. */
+.auth-form-side h1 {
+  font-size: 26px;
+  text-align: left;
+  margin-bottom: 4px;
+}
+.auth-form-side .authsub {
+  text-align: left;
+  margin: 0 0 20px;
+}
+
+/* Signup keeps the centred column it has now. That is also how it was before
+   the redesign — only sign-in was ever split — and its form is twice as tall,
+   which a hero panel would fight. */
+.authplain {
   min-height: 100vh;
   display: grid;
   place-items: center;
@@ -892,32 +1022,32 @@ input[type="date"]::-webkit-calendar-picker-indicator {
   width: 100%;
   max-width: 420px;
 }
-.auth .lockup {
+.authplain .lockup {
   display: flex;
   align-items: center;
   gap: 12px;
   justify-content: center;
   margin-bottom: 30px;
 }
-.auth .brand-mark {
+.authplain .brand-mark {
   width: 38px;
   height: 38px;
   flex: 0 0 38px;
   border-radius: 11px;
   font-size: 18px;
 }
-.auth .wordmark {
+.authplain .wordmark {
   font-family: var(--head);
   font-weight: 700;
   font-size: 19px;
   letter-spacing: -0.02em;
 }
-.auth .tagline {
+.authplain .tagline {
   font-size: 12.5px;
   color: var(--ink3);
   margin-top: 1px;
 }
-.auth h1 {
+.authplain h1 {
   font-size: 27px;
   text-align: center;
 }

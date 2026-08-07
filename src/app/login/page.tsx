@@ -8,7 +8,7 @@ export const dynamic = "force-dynamic";
 const LOGIN_ERRORS: Record<string, string> = {
   bad: "That email and password don't match an account.",
   ambiguous:
-    "That sign-in works at more than one school \u2014 open your school's own address and try there.",
+    "That sign-in works at more than one school — open your school's own address and try there.",
   expired: "That sign-in link has expired. Sign in with your email and password.",
 };
 
@@ -27,48 +27,82 @@ export default async function LoginPage({
 
   return (
     <div className="auth">
-      {/* The handoff replaces the old two-column split (dark brand panel beside
-          the form) with a centred lockup on the tinted canvas. The claim that
-          used to fill the left panel moves under the wordmark, where it still
-          says what this is to someone arriving cold, without needing half the
-          screen to do it. */}
-      <main className="authcol">
+      {/* The split hero, back by request. The claim lives on the left over
+          ruled-paper texture; the form sits on the plain canvas to its right,
+          which is where a returning teacher's eye goes first. */}
+      <aside className="auth-brand">
         <div className="lockup">
           <div className="brand-mark">C</div>
-          <div>
-            <div className="wordmark">Cohort</div>
-            <div className="tagline">Run the school. Get paid for it.</div>
-          </div>
+          <div className="wordmark">Cohort</div>
         </div>
 
-        <h1>Welcome back</h1>
-        <p className="authsub">Sign in to your school.</p>
+        <div>
+          <h1>Run the school. Get paid for it.</h1>
+          <p>
+            Attendance, coursework, grading, families, and state ESA invoicing — the system that
+            gets a microschool paid, correctly and on time.
+          </p>
+        </div>
 
-        {message && <div className="notice bad">{message}</div>}
-        {reset && <div className="notice good">Password updated. Sign in with your new password.</div>}
+        <div>
+          <div className="auth-marks" aria-hidden>
+            <span className="lit" />
+            <span className="lit" />
+            <span className="lit" />
+            <span className="lit" />
+            <span />
+            <span className="lit" />
+          </div>
+          <p style={{ fontSize: 13, marginTop: 12 }}>
+            Teaching generates the proof. The proof gets you paid.
+          </p>
+        </div>
+      </aside>
 
-        <form action={login} className="card2 authcard">
-          <label htmlFor="email">Email</label>
-          <input id="email" name="email" type="email" required autoComplete="username" />
-          <label htmlFor="password">Password</label>
-          <input id="password" name="password" type="password" required autoComplete="current-password" />
-          <button className="btn" style={{ width: "100%", marginTop: 16, justifyContent: "center" }}>
-            Sign in
-          </button>
-        </form>
+      <main className="auth-form-side">
+        <div className="inner">
+          <h1>Welcome back</h1>
+          <p className="authsub">Sign in to your school.</p>
 
-        <p className="small muted" style={{ margin: "14px 0 0", textAlign: "center" }}>
-          New here? <Link href="/signup">Create your school</Link>.
-        </p>
+          {message && <div className="notice bad">{message}</div>}
+          {reset && (
+            <div className="notice good">Password updated. Sign in with your new password.</div>
+          )}
 
-        <div className="card2 authcard" style={{ marginTop: 16, background: "var(--surface2)" }}>
-          <div className="eyebrow">Demo accounts</div>
-          <div className="small mono" style={{ marginTop: 8, lineHeight: 1.9 }}>
-            sarah@cedargrove.school &nbsp;/&nbsp; demo1234 &nbsp;<span className="muted">teacher</span>
-            <br />
-            dana@example.com &nbsp;/&nbsp; demo1234 &nbsp;<span className="muted">parent</span>
-            <br />
-            eli@cedargrove.school &nbsp;/&nbsp; demo1234 &nbsp;<span className="muted">student</span>
+          <form action={login} className="card2 authcard">
+            <label htmlFor="email">Email</label>
+            <input id="email" name="email" type="email" required autoComplete="username" />
+            <label htmlFor="password">Password</label>
+            <input
+              id="password"
+              name="password"
+              type="password"
+              required
+              autoComplete="current-password"
+            />
+            <button
+              className="btn"
+              style={{ width: "100%", marginTop: 16, justifyContent: "center" }}
+            >
+              Sign in
+            </button>
+          </form>
+
+          <p className="small muted" style={{ margin: "14px 0 0", textAlign: "center" }}>
+            New here? <Link href="/signup">Create your school</Link>.
+          </p>
+
+          <div className="card2 authcard" style={{ marginTop: 16, background: "var(--surface2)" }}>
+            <div className="eyebrow">Demo accounts</div>
+            <div className="small mono" style={{ marginTop: 8, lineHeight: 1.9 }}>
+              sarah@cedargrove.school &nbsp;/&nbsp; demo1234 &nbsp;
+              <span className="muted">teacher</span>
+              <br />
+              dana@example.com &nbsp;/&nbsp; demo1234 &nbsp;<span className="muted">parent</span>
+              <br />
+              eli@cedargrove.school &nbsp;/&nbsp; demo1234 &nbsp;
+              <span className="muted">student</span>
+            </div>
           </div>
         </div>
       </main>

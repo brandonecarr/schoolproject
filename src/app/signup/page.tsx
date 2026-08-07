@@ -26,7 +26,7 @@ export default async function SignupPage({
   const states = configuredStates();
 
   return (
-    <div className="auth">
+    <div className="authplain">
       <main className="authcol">
         <div className="lockup">
           <div className="brand-mark">C</div>
