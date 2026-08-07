@@ -61,6 +61,8 @@ const PATHS: Record<string, React.ReactNode> = {
   ),
   cashflow: <P d="M3 17l6-6 4 4 8-8M15 7h6v6" />,
   messages: <P d="M21 11.5a8.4 8.4 0 01-9 8.4 9 9 0 01-4-1L3 20l1.1-4A8.4 8.4 0 013 11.5a8.4 8.4 0 019-8.4 8.4 8.4 0 019 8.4z" />,
+  bell: <P d="M18 8a6 6 0 10-12 0c0 7-3 9-3 9h18s-3-2-3-9M13.7 21a2 2 0 01-3.4 0" />,
+  search: <P d="M11 19a8 8 0 100-16 8 8 0 000 16zM21 21l-4.35-4.35" />,
   settings: (
     <>
       <circle cx="12" cy="12" r="3" />

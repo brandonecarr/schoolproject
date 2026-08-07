@@ -93,6 +93,73 @@ export const TEACHER_NAV: NavGroup[] = [
   },
 ];
 
+/**
+ * The family navigations.
+ *
+ * These used to live inside the TopNav component, which was a horizontal bar
+ * with a "More" dropdown because nine links wrap badly across a laptop. The
+ * redesign gives parent and student a sidebar of their own, so the split
+ * disappears and every item is visible at once — which is what the dropdown was
+ * working around.
+ *
+ * FLAT, not grouped. The teacher's accordion exists because 31 items in one
+ * list is unscannable; ten is not, and grouping ten would add a click to reach
+ * things a parent opens weekly. The handoff draws these flat too.
+ */
+export const PARENT_NAV: NavGroup[] = [
+  {
+    group: "Family",
+    items: [
+      { href: "/parent", label: "Home", icon: "dashboard" },
+      { href: "/parent/notifications", label: "Alerts", icon: "messages" },
+      { href: "/parent/feed", label: "Feed", icon: "observations" },
+      { href: "/parent/children", label: "Progress", icon: "evidence" },
+      { href: "/parent/reports", label: "Reports", icon: "evidence" },
+      { href: "/parent/tuition", label: "Tuition", icon: "billing" },
+      { href: "/parent/calendar", label: "Calendar", icon: "attendance" },
+      { href: "/parent/conferences", label: "Conferences", icon: "attendance" },
+      { href: "/parent/announcements", label: "News", icon: "messages" },
+      { href: "/parent/messages", label: "Messages", icon: "messages" },
+    ],
+  },
+];
+
+export const STUDENT_NAV: NavGroup[] = [
+  {
+    group: "Student",
+    items: [
+      { href: "/student", label: "Home", icon: "dashboard" },
+      { href: "/student/work", label: "My work", icon: "assignments" },
+      { href: "/student/path", label: "My path", icon: "courses" },
+      { href: "/student/portfolio", label: "Portfolio", icon: "evidence" },
+      { href: "/student/calendar", label: "Calendar", icon: "attendance" },
+      { href: "/student/announcements", label: "News", icon: "messages" },
+      { href: "/student/notifications", label: "Alerts", icon: "messages" },
+      { href: "/student/messages", label: "Messages", icon: "messages" },
+    ],
+  },
+];
+
+/**
+ * The nav for a role. Teacher gets the grouped registry; families get a flat
+ * list, so the sidebar renders groups only when there is more than one.
+ *
+ * `childName` personalises the parent's progress link — "Ivy's progress" rather
+ * than a generic label. A parent of one child thinks about that child, not
+ * about a category; with several, the plural is the honest label.
+ */
+export function navForRole(role: string, childName?: string, childCount = 1): NavGroup[] {
+  if (role === "student") return STUDENT_NAV;
+  if (role !== "parent") return TEACHER_NAV;
+
+  const first = (childName ?? "").trim().split(/\s+/)[0];
+  const label = childCount > 1 || !first ? "Children" : `${first}'s progress`;
+  return PARENT_NAV.map((g) => ({
+    ...g,
+    items: g.items.map((i) => (i.href === "/parent/children" ? { ...i, label } : i)),
+  }));
+}
+
 /** What a teacher touches on an ordinary morning, before they change it. */
 export const DEFAULT_PINS = ["/dashboard", "/attendance", "/grading"];
 
