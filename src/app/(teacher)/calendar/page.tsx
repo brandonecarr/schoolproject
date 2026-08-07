@@ -192,7 +192,7 @@ export default async function CalendarPage({
               <th>Title</th>
               <th>Dates</th>
               <th>Visible to families</th>
-              <th></th>
+              <th><span className="sr-only">Actions</span></th>
             </tr>
           </thead>
           <tbody>

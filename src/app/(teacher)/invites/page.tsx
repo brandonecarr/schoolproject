@@ -133,7 +133,7 @@ export default async function InvitesPage({
               <th>Email</th>
               <th>Role</th>
               <th>Child has login</th>
-              <th></th>
+              <th><span className="sr-only">Actions</span></th>
             </tr>
           </thead>
           <tbody>

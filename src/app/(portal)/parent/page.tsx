@@ -137,7 +137,7 @@ export default async function ParentHomePage() {
                 <div className="eyebrow" style={{ margin: 0 }}>
                   Grade {k.grade}
                 </div>
-                <h3 style={{ margin: "2px 0 0" }}>{k.name}</h3>
+                <h2 style={{ margin: "2px 0 0" }}>{k.name}</h2>
               </div>
             </div>
             <div className="child-stats">

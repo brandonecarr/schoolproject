@@ -78,6 +78,7 @@ export function ItemsEditor({
                   value={it.kind}
                   onChange={(e) => changeKind(it.id, e.target.value as ItemKind)}
                   style={{ width: 170 }}
+                  aria-label={`Question ${qi + 1} type`}
                 >
                   {(Object.keys(ITEM_KIND_LABEL) as ItemKind[]).map((k) => (
                     <option key={k} value={k}>
@@ -91,7 +92,7 @@ export function ItemsEditor({
                   min={1}
                   onChange={(e) => setItem(it.id, { points: Number(e.target.value) || 1 })}
                   style={{ width: 90 }}
-                  aria-label="points"
+                  aria-label={`Question ${qi + 1} points`}
                 />
                 <span className="small muted" style={{ alignSelf: "center" }}>
                   pts

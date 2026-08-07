@@ -112,7 +112,7 @@ export default async function InvoicesPage({
               <th>Period</th>
               <th>Amount</th>
               <th>Status</th>
-              <th></th>
+              <th><span className="sr-only">Actions</span></th>
             </tr>
           </thead>
           <tbody>

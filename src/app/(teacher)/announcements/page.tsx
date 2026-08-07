@@ -144,7 +144,7 @@ export default async function AnnouncementsPage({
                     {audienceLabel}
                     {a.publishedAt ? ` · published ${when(a.publishedAt)}` : ""} · {a.authorName}
                   </div>
-                  <h3 style={{ margin: "4px 0 0" }}>{a.title}</h3>
+                  <h2 style={{ margin: "4px 0 0" }}>{a.title}</h2>
                 </div>
                 <div className="row" style={{ gap: 8 }}>
                   {a.pinned && <Pill tone="mark">Pinned</Pill>}

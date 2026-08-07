@@ -93,7 +93,7 @@ export default async function GradingPage({
 
       {queue.length === 0 ? (
         <div className="card">
-          <h3>Nothing waiting.</h3>
+          <h2>Nothing waiting.</h2>
           <p className="muted" style={{ margin: "8px 0 0" }}>
             When students turn work in, it lands here. Quizzes and check-offs that grade themselves
             skip the queue.
@@ -107,12 +107,12 @@ export default async function GradingPage({
               <div className="spread">
                 <div>
                   <div className="eyebrow">{st ? st.name : "—"}</div>
-                  <h3 style={{ marginTop: 4 }}>
+                  <h2 style={{ marginTop: 4 }}>
                     <span aria-hidden style={{ marginRight: 6 }}>
                       {m.icon}
                     </span>
                     {a ? a.title : "—"}
-                  </h3>
+                  </h2>
                 </div>
                 <Pill tone="info">Due {fmt(a ? a.dueDate : null)}</Pill>
               </div>

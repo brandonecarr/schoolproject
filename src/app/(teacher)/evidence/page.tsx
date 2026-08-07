@@ -38,7 +38,7 @@ export default async function EvidenceBoardPage() {
           <div key={s.id} className="card">
             <div className="spread">
               <div>
-                <h3>{s.name}</h3>
+                <h2>{s.name}</h2>
                 <div className="small muted">
                   {s.esaProgram ? PROGRAMS[s.esaProgram]?.label ?? s.esaProgram : "Private pay — no invoice needed"}
                 </div>

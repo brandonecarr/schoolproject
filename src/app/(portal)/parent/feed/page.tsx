@@ -105,7 +105,7 @@ export default async function ParentFeedPage({
               </div>
               <div className="tl-card">
                 <div className="spread" style={{ gap: 8 }}>
-                  <h3>{it.title}</h3>
+                  <h2>{it.title}</h2>
                   <span className="when">{fmt(it.date)}</span>
                 </div>
                 <div className="small muted" style={{ margin: "1px 0 0" }}>

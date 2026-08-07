@@ -76,7 +76,7 @@ export default async function BillingPage({
               <th>Family portion</th>
               <th>ESA portion</th>
               <th>Outstanding</th>
-              <th></th>
+              <th><span className="sr-only">Actions</span></th>
             </tr>
           </thead>
           <tbody>

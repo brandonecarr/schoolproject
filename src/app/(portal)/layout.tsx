@@ -14,13 +14,18 @@ export default async function PortalLayout({ children }: { children: React.React
   ]);
   return (
     <>
+      <a className="skip" href="#content">
+        Skip to content
+      </a>
       <TopNav
         role={user.role}
         userName={user.name}
         messagesUnread={messagesUnread}
         notificationsUnread={notificationsUnread}
       />
-      <div className="wrap">{children}</div>
+      <main className="wrap" id="content" tabIndex={-1}>
+        {children}
+      </main>
     </>
   );
 }

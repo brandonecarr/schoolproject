@@ -107,7 +107,7 @@ export function TopNav({
   const moreHoldsActive = more.some((l) => on(l.href) === "on");
 
   return (
-    <div className="tnav">
+    <nav className="tnav" aria-label="Main">
       <strong style={{ fontFamily: "var(--serif)", fontSize: 17 }}>Cohort</strong>
       {primary.map(item)}
 
@@ -134,6 +134,6 @@ export function TopNav({
           Sign out
         </button>
       </form>
-    </div>
+    </nav>
   );
 }

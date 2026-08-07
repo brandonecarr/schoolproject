@@ -74,7 +74,7 @@ export function WorkCard({
             <div className="eyebrow">
               {asg.courseName} · {m.label} · due {asg.fmtDue}
             </div>
-            <h3 style={{ margin: "3px 0 0" }}>{asg.title}</h3>
+            <h2 style={{ margin: "3px 0 0" }}>{asg.title}</h2>
           </div>
         </div>
         {asg.overdue && <span className="pill bad">Overdue</span>}

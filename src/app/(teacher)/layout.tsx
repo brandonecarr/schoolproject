@@ -16,6 +16,9 @@ export default async function TeacherLayout({ children }: { children: React.Reac
   ]);
   return (
     <div className="shell">
+      <a className="skip" href="#content">
+        Skip to content
+      </a>
       <Sidebar
         schoolName={school?.name ?? ""}
         schoolState={school?.state ?? ""}
@@ -25,7 +28,9 @@ export default async function TeacherLayout({ children }: { children: React.Reac
         messagesUnread={messagesUnread}
         notificationsUnread={notificationsUnread}
       />
-      <main className="main">{children}</main>
+      <main className="main" id="content" tabIndex={-1}>
+        {children}
+      </main>
     </div>
   );
 }

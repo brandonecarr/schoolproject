@@ -110,7 +110,7 @@ export default async function StudentsPage({
               <th>Grade</th>
               <th>Funding</th>
               <th>Evidence</th>
-              <th></th>
+              <th><span className="sr-only">Actions</span></th>
             </tr>
           </thead>
           <tbody>
