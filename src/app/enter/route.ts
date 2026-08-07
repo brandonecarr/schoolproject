@@ -90,7 +90,9 @@ export async function GET(request: NextRequest) {
   await prisma.session.create({ data: { id: sid, userId: user.id } });
   await logAudit(user.id, "login", `${user.role} (signup handoff)`);
 
-  const response = NextResponse.redirect(new URL("/", origin(request)));
+  // Straight to the console with the first-run notice. Handoff tokens are only
+  // minted at signup, so the person holding one is always a brand-new owner.
+  const response = NextResponse.redirect(new URL("/dashboard?welcome=1", origin(request)));
   response.cookies.set(SESSION_COOKIE, sid, {
     httpOnly: true,
     path: "/",

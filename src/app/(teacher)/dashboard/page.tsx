@@ -7,14 +7,20 @@ import { today, fmt } from "@/lib/dates";
 import { dueLabel, daysBetween } from "@/lib/due";
 import { typeMeta } from "@/lib/lms";
 import { Icon } from "@/components/icons";
-import { Bar, Card, CardHead, PageHead, Pill, StackBar, StatCard } from "@/components/ui";
+import { Bar, Card, CardHead, Notice, PageHead, Pill, StackBar, StatCard } from "@/components/ui";
+import { currentOrigin } from "@/lib/tenant-server";
 import { reimbursementMetrics, formatPct } from "@/lib/metrics";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Dashboard — Cohort" };
 
-export default async function Dashboard() {
+export default async function Dashboard({
+  searchParams,
+}: {
+  searchParams: Promise<{ welcome?: string }>;
+}) {
   const { user, school } = await requireTeacher();
+  const { welcome } = await searchParams;
   const schoolId = school!.id;
 
   const students = await prisma.student.findMany({ where: { schoolId }, orderBy: { createdAt: "asc" } });
@@ -69,8 +75,21 @@ export default async function Dashboard() {
   const totalMoney = m.paidTotal + m.inFlight + m.draftTotal;
   const share = (v: number) => (totalMoney > 0 ? (v / totalMoney) * 100 : 0);
 
+  // First arrival after signup. The address is the one thing a new owner has
+  // to take away from this screen — every family they invite reaches the
+  // school through it, and it is not something they can change later.
+  const origin = welcome ? await currentOrigin() : null;
+
   return (
     <>
+      {origin && (
+        <Notice tone="good">
+          <strong>{school!.name} is set up.</strong> Your school lives at{" "}
+          <span className="mono">{origin.replace(/^https?:\/\//, "")}</span> — that address is where
+          you and your families sign in, so send it out with your invitations. Add your students
+          next, then invite their parents.
+        </Notice>
+      )}
       <PageHead
         eyebrow={fmt(today())}
         title={`Good morning, ${user.name.split(" ")[0]}.`}

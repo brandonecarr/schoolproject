@@ -8,7 +8,7 @@
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/db";
-import { availableSlug } from "@/lib/tenant";
+import { availableSlug, isUsableSlug, slugify } from "@/lib/tenant";
 import { originFor } from "@/lib/tenant-server";
 import { newTokenValue, tokenExpiryMinutes } from "@/lib/tokens";
 import { hashPassword, newSessionId } from "@/lib/password";
@@ -29,11 +29,25 @@ export async function signup(formData: FormData) {
   // the new owner account is the first in an empty tenant and cannot collide
   // with anything — and a founder who already runs one microschool starting a
   // second is a real case this used to block outright.
-  const slug = availableSlug(
-    schoolName,
-    (await prisma.school.findMany({ select: { slug: true } })).map((s) => s.slug)
-  );
-  if (!slug) redirect("/signup?error=slug");
+
+  // THE WEB ADDRESS. Whatever the form sent is re-derived here rather than
+  // trusted: the field is a client component and could send anything, and a
+  // slug becomes a hostname. Empty means the browser ran no JavaScript, and
+  // then the school's name is a perfectly good source.
+  const asked = slugify(String(formData.get("slug") || ""));
+  if (formData.get("slug") && !asked) redirect("/signup?error=slugbad");
+
+  const taken = (await prisma.school.findMany({ select: { slug: true } })).map((s) => s.slug);
+  let slug: string | null;
+  if (asked) {
+    // Someone typed this one, so it is not ours to quietly renumber into
+    // oak-hill-2. Either they get the address they chose or they are told.
+    slug = isUsableSlug(asked) && !taken.includes(asked) ? asked : null;
+    if (!slug) redirect("/signup?error=slug");
+  } else {
+    slug = availableSlug(schoolName, taken);
+    if (!slug) redirect("/signup?error=slugbad");
+  }
 
   const school = await prisma.school.create({
     data: { name: schoolName, slug, state, esaAmount, address: "" },

@@ -171,6 +171,35 @@ describe("links that leave the app carry the school's own address", () => {
   });
 });
 
+describe("choosing the school's address at signup", () => {
+  const actions = read("src/app/signup/actions.ts");
+
+  it("re-derives whatever the form sent instead of trusting it", () => {
+    // The field is a client component and this value becomes a hostname.
+    expect(actions).toMatch(/slugify\(String\(formData\.get\("slug"\)/);
+    expect(actions).toContain("isUsableSlug(asked)");
+  });
+
+  it("refuses a taken address rather than renumbering it", () => {
+    // availableSlug would hand back oak-hill-2. That is right when we derived
+    // the name ourselves and wrong when a person typed it — they would land on
+    // an address they did not choose and never notice.
+    expect(actions).toMatch(/!taken\.includes\(asked\) \? asked : null/);
+    expect(actions).toContain('redirect("/signup?error=slug")');
+  });
+
+  it("still works with no JavaScript, by deriving from the school name", () => {
+    expect(actions).toContain("availableSlug(schoolName, taken)");
+  });
+
+  it("tells the new owner their address once they are inside", () => {
+    // It cannot be changed later and every family reaches the school through
+    // it, so it is not something to leave in the URL bar and hope.
+    expect(read("src/app/enter/route.ts")).toContain("/dashboard?welcome=1");
+    expect(read("src/app/(teacher)/dashboard/page.tsx")).toContain("currentOrigin");
+  });
+});
+
 describe("the apex serves only the public surface", () => {
   const proxy = read("src/proxy.ts");
 
