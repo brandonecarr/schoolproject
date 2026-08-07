@@ -21,8 +21,13 @@ export async function acceptInvite(formData: FormData) {
     redirect(`/invite/${token}?error=1`);
   }
   const email = (t.email || "").toLowerCase();
-  const exists = await prisma.user.findUnique({ where: { email } });
-  if (exists) redirect("/login"); // already claimed
+  // Scoped to the school that issued the invite. An address already in use at
+  // another school is a different person's account there, or the same person
+  // wearing a different hat, and neither blocks this one.
+  const exists = await prisma.user.findUnique({
+    where: { schoolId_email: { schoolId: t.schoolId, email } },
+  });
+  if (exists) redirect("/login"); // already claimed at this school
 
   const newUser = await prisma.user.create({
     data: {

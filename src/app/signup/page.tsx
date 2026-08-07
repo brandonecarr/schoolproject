@@ -8,9 +8,9 @@ export const dynamic = "force-dynamic";
 export default async function SignupPage({
   searchParams,
 }: {
-  searchParams: Promise<{ error?: string; exists?: string }>;
+  searchParams: Promise<{ error?: string }>;
 }) {
-  const { error, exists } = await searchParams;
+  const { error } = await searchParams;
 
   return (
     <div style={{ minHeight: "100vh", display: "grid", placeItems: "center", padding: 24 }}>
@@ -25,8 +25,14 @@ export default async function SignupPage({
         <p className="muted" style={{ margin: "0 0 22px" }}>
           Create your school and owner account. You can add students, families, and staff next.
         </p>
-        {error && <div className="notice bad">Please fill in every field.</div>}
-        {exists && <div className="notice warn">An account with that email already exists.</div>}
+        {error === "slug" ? (
+          <div className="notice bad">
+            We couldn&apos;t make a web address out of that school name. Try a name with a few
+            letters or numbers in it.
+          </div>
+        ) : error ? (
+          <div className="notice bad">Please fill in every field.</div>
+        ) : null}
 
         <form action={signup} className="card">
           <label htmlFor="schoolName">School name</label>

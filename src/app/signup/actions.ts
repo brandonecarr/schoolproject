@@ -8,6 +8,7 @@
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/db";
+import { availableSlug } from "@/lib/tenant";
 import { hashPassword, newSessionId } from "@/lib/password";
 import { SESSION_COOKIE, logAudit } from "@/lib/auth";
 
@@ -22,11 +23,18 @@ export async function signup(formData: FormData) {
   if (!schoolName || !state || !name || !email || !password) {
     redirect("/signup?error=1");
   }
-  const existing = await prisma.user.findUnique({ where: { email } });
-  if (existing) redirect("/signup?exists=1");
+  // No duplicate check on the address any more. Signup CREATES a school, so
+  // the new owner account is the first in an empty tenant and cannot collide
+  // with anything — and a founder who already runs one microschool starting a
+  // second is a real case this used to block outright.
+  const slug = availableSlug(
+    schoolName,
+    (await prisma.school.findMany({ select: { slug: true } })).map((s) => s.slug)
+  );
+  if (!slug) redirect("/signup?error=slug");
 
   const school = await prisma.school.create({
-    data: { name: schoolName, state, esaAmount, address: "" },
+    data: { name: schoolName, slug, state, esaAmount, address: "" },
   });
   const owner = await prisma.user.create({
     data: { schoolId: school.id, role: "owner", name, email, password: hashPassword(password) },

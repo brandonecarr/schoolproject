@@ -529,7 +529,12 @@ export async function regenerateNarrative(formData: FormData) {
 export async function createParentInvite(formData: FormData) {
   const { user, school } = await requireTeacher();
   const email = String(formData.get("email") || "").trim().toLowerCase();
-  const existing = await prisma.user.findUnique({ where: { email } });
+  // Scoped to THIS school. The same parent may already have an account at a
+  // different school — that is not a clash, and blocking it would leave the
+  // teacher stuck with no way forward.
+  const existing = await prisma.user.findUnique({
+    where: { schoolId_email: { schoolId: school!.id, email } },
+  });
   if (existing) redirect("/invites?exists=1");
   const token = newTokenValue();
   await prisma.token.create({

@@ -44,7 +44,9 @@ export async function createStudentAccount(formData: FormData) {
   if (!student) redirect("/parent");
 
   const email = String(formData.get("email") || "").trim().toLowerCase();
-  const existing = await prisma.user.findUnique({ where: { email } });
+  const existing = await prisma.user.findUnique({
+    where: { schoolId_email: { schoolId: user.schoolId, email } },
+  });
   if (existing) redirect("/parent");
 
   await prisma.user.create({
