@@ -6,36 +6,172 @@
    boldness is spent; everything else stays quiet. */
 
 :root {
-  --ground: #f2f3ef;
-  --card: #ffffff;
-  --ink: #141c26;
-  --ink-soft: #5c6672;
-  --rule: #dcdfd8;
-  --blue: #1f3a6e;
-  --blue-soft: #e4e9f2;
-  --mark: #c8e64b; /* highlighter — the signature colour */
-  --mark-deep: #6b7d18; /* darkened for AA: #8fa524 was 2.77:1 on white */
-  --good: #16705f;
-  --good-soft: #e2f0ec;
-  --warn: #7a5209; /* darkened for AA: #a8710f was 3.62:1 on --warn-soft */
-  --warn-soft: #f7eedc;
-  --bad: #9b3223;
-  --bad-soft: #f6e4e1;
-  --blue-deep: #16294f; /* darker navy for gradients/depth */
-  --serif: ui-serif, Georgia, "Iowan Old Style", "Times New Roman", serif;
-  --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-  --mono: ui-monospace, SFMono-Regular, Menlo, monospace;
+  /* ==========================================================================
+     Soft — the default token set, used by teacher and parent.
+     Colours are authored in OKLCH because that is what keeps the three role
+     accents perceptually equal in lightness and chroma while only hue moves.
+     Round-tripping them through hex would break that relationship, so the
+     contrast audit in lib/contrast.ts reads OKLCH directly rather than an
+     approximation.
+     ========================================================================== */
+  --bg: oklch(0.968 0.012 290);
+  --surface: #ffffff;
+  --surface2: oklch(0.985 0.006 290);
+  --ink: oklch(0.22 0.03 285);
+  --ink2: oklch(0.46 0.02 285);
+  /* Handoff says 0.62; that is 3.65:1 on white and fails AA at every size
+     this is used at. 0.56 is the lightest value that clears 4.5:1. */
+  --ink3: oklch(0.56 0.015 285);
+  --line: oklch(0.92 0.012 285);
+  --radius: 18px;
+  --radius-sm: 12px;
+  --shadow: 0 1px 2px oklch(0.4 0.06 285 / 0.05), 0 8px 24px oklch(0.4 0.06 285 / 0.05);
 
-  /* depth + shape system (the modern refresh) */
-  --radius: 12px;
-  --radius-lg: 16px;
-  --radius-sm: 8px;
-  --shadow-xs: 0 1px 2px rgba(20, 28, 38, 0.05);
-  --shadow-sm: 0 1px 2px rgba(20, 28, 38, 0.05), 0 2px 6px rgba(20, 28, 38, 0.05);
-  --shadow-md: 0 2px 4px rgba(20, 28, 38, 0.05), 0 8px 20px rgba(20, 28, 38, 0.08);
-  --shadow-lg: 0 8px 16px rgba(20, 28, 38, 0.08), 0 24px 48px rgba(20, 28, 38, 0.12);
-  --ring: 0 0 0 3px rgba(31, 58, 110, 0.16);
+  /* --accent is FILL ONLY. Accent-coloured text uses --accent-dark, which is
+     the only one of the two that clears 4.5:1 on --surface at body size. */
+  --accent: oklch(0.55 0.19 285);
+  --accent-dark: oklch(0.45 0.19 285);
+  --accent-soft: oklch(0.955 0.03 285);
+  --accent-mid: oklch(0.90 0.055 285);
+
+  /* The teacher's dark rail is the single strongest role signal. */
+  --side-bg: oklch(0.22 0.035 275);
+  --side-ink: oklch(0.99 0 0);
+  --side-dim: oklch(0.72 0.02 275);
+  --side-act-bg: var(--accent);
+  --side-act-ink: #ffffff;
+  --side-line: oklch(0.30 0.03 275);
+
+  /* DEVIATION FROM THE HANDOFF, measured not guessed. The published tones
+     (good 0.58, warn 0.68, bad 0.58) score 3.50, 2.52 and 3.95 against their
+     own soft backgrounds — all three fail AA for the 11.5px pill text they
+     carry, and warn fails badly. Hue and chroma are kept exactly; only
+     lightness moves, and all three land on ONE band, which is the design's own
+     stated principle. Now 4.65 / 5.02 / 5.33 on soft and 5.31 / 5.90 / 6.38 on
+     white. See tests/contrast.test.ts, which measures these from this file. */
+  --good: oklch(0.51 0.14 155);
+  --warn: oklch(0.51 0.15 72);
+  --bad: oklch(0.51 0.19 25);
+  --good-s: oklch(0.95 0.04 155);
+  --warn-s: oklch(0.95 0.05 72);
+  --bad-s: oklch(0.95 0.04 25);
+
+  --font: var(--f-jakarta), system-ui, sans-serif;
+  --head: var(--f-jakarta), system-ui, sans-serif;
+  --num: var(--f-jakarta), system-ui, sans-serif;
+
+  --card-pad: 18px;
+  --row-pad: 11px 14px;
+  --h1: 27px;
+  --gap: 16px;
+  --nav-w: 246px;
+
   --ease: cubic-bezier(0.2, 0.7, 0.3, 1);
+
+  /* ==========================================================================
+     BACK-COMPATIBILITY ALIASES.
+     The redesign covers 19 screens; the app has 66 routes. Rather than leave
+     the other 47 styled from a palette that no longer exists, the old token
+     names are kept and re-pointed at the new ones. Every existing rule in this
+     file therefore picks up the new colours untouched, and pages can be
+     converted to the new names screen by screen instead of in one unreviewable
+     sweep. Delete an alias only once nothing references it.
+     ========================================================================== */
+  --ground: var(--bg);
+  --card: var(--surface);
+  --ink-soft: var(--ink2);
+  --rule: var(--line);
+  --blue: var(--accent-dark);
+  --blue-soft: var(--accent-soft);
+  --blue-deep: var(--accent-dark);
+  --mark: var(--accent);
+  --mark-deep: var(--accent-dark);
+  --good-soft: var(--good-s);
+  --warn-soft: var(--warn-s);
+  --bad-soft: var(--bad-s);
+  --serif: var(--head);
+  --sans: var(--font);
+  --mono: var(--num);
+  --radius-lg: calc(var(--radius) + 4px);
+  --shadow-xs: 0 1px 2px oklch(0.4 0.06 285 / 0.05);
+  --shadow-sm: var(--shadow);
+  --shadow-md: var(--shadow);
+  --shadow-lg: 0 8px 16px oklch(0.4 0.06 285 / 0.08), 0 24px 48px oklch(0.4 0.06 285 / 0.12);
+  --ring: 0 0 0 3px oklch(0.55 0.19 285 / 0.22);
+}
+
+/* --- Role accents. Same lightness and chroma band; only hue moves. --------- */
+
+[data-role="parent"] {
+  --bg: oklch(0.968 0.012 175);
+  --accent: oklch(0.52 0.11 185);
+  --accent-dark: oklch(0.42 0.11 185);
+  --accent-soft: oklch(0.958 0.022 185);
+  --accent-mid: oklch(0.90 0.05 185);
+  --ink: oklch(0.22 0.02 195);
+  --ink2: oklch(0.46 0.015 195);
+  --line: oklch(0.92 0.01 190);
+  --side-bg: #ffffff;
+  --side-ink: oklch(0.24 0.02 195);
+  --side-dim: oklch(0.52 0.015 195);
+  --side-act-bg: var(--accent-soft);
+  --side-act-ink: var(--accent-dark);
+  --side-line: oklch(0.93 0.01 190);
+  --card-pad: 20px;
+  --row-pad: 14px 16px;
+  --h1: 29px;
+  --gap: 18px;
+}
+
+[data-role="student"] {
+  --bg: oklch(0.972 0.018 65);
+  --accent: oklch(0.56 0.16 42);
+  --accent-dark: oklch(0.46 0.16 42);
+  --accent-soft: oklch(0.962 0.028 60);
+  --accent-mid: oklch(0.90 0.06 60);
+  --ink: oklch(0.24 0.03 50);
+  --ink2: oklch(0.47 0.025 50);
+  --line: oklch(0.92 0.015 60);
+  --side-bg: #ffffff;
+  --side-ink: oklch(0.26 0.03 50);
+  --side-dim: oklch(0.53 0.02 50);
+  --side-act-bg: var(--accent-soft);
+  --side-act-ink: var(--accent-dark);
+  --side-line: oklch(0.93 0.015 60);
+  --gap: 18px;
+  --nav-w: 236px;
+}
+
+/* --- Ledger. Geometry, shadow, canvas and type only; keeps the role accent.
+       Must come AFTER the role blocks: same specificity, later wins. -------- */
+
+[data-style="ledger"] {
+  --bg: oklch(0.985 0.002 285);
+  --surface: #ffffff;
+  --surface2: oklch(0.978 0.002 285);
+  --line: oklch(0.905 0.004 285);
+  --radius: 9px;
+  --radius-sm: 7px;
+  --shadow: none;
+  --shadow-xs: none;
+  --shadow-sm: none;
+  --shadow-md: none;
+  --font: var(--f-plex), system-ui, sans-serif;
+  --head: var(--f-grotesk), system-ui, sans-serif;
+  --num: var(--f-plex-mono), ui-monospace, monospace;
+  --side-bg: oklch(0.975 0.003 285);
+  --side-ink: oklch(0.24 0.01 285);
+  --side-dim: oklch(0.52 0.008 285);
+  --side-act-bg: #ffffff;
+  --side-act-ink: var(--accent-dark);
+  --side-line: oklch(0.90 0.004 285);
+  --card-pad: 16px;
+  --row-pad: 10px 14px;
+}
+
+[data-style="ledger"][data-role="student"] {
+  --h1: 30px;
+  --card-pad: 18px;
 }
 * {
   box-sizing: border-box;
