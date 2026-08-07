@@ -19,6 +19,30 @@ import type { UserModel as User, SchoolModel as School } from "@/generated/prism
 
 export const SESSION_COOKIE = "cohort_sid";
 
+/**
+ * How the session cookie is set, in one place, because four routes set it and
+ * they have to agree.
+ *
+ * NO `domain`. That is the whole tenant boundary at the browser level: without
+ * a Domain attribute a cookie is host-only, so cedar-grove.schoolcohort.com and
+ * oak-hill.schoolcohort.com have separate jars and neither can read the other's
+ * session. Adding `domain: ".schoolcohort.com"` — which is the obvious way to
+ * "fix" being logged out when you move between them — would merge every school
+ * into one jar. Don't. getSession refuses a mismatched session anyway, and
+ * tests/tenant-host.test.ts fails the build if a domain appears here.
+ *
+ * `secure` is on outside development, so the cookie never rides a plain-HTTP
+ * request. It is conditional only because localhost is served over http and a
+ * secure cookie there would simply never be stored.
+ */
+export const SESSION_COOKIE_OPTIONS = {
+  httpOnly: true,
+  path: "/",
+  sameSite: "lax",
+  secure: process.env.NODE_ENV === "production",
+  maxAge: 604800, // 7 days
+} as const;
+
 /** Owner or teacher. Defined here because getSession needs it before the
  *  messages module is reachable. */
 export const isStaffRole = (role: string) => role === "owner" || role === "teacher";

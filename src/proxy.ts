@@ -37,10 +37,28 @@ const APEX_PATHS = [
 const onList = (path: string, list: string[]) =>
   list.some((p) => path === p || (p !== "/" && path.startsWith(p + "/")));
 
+/**
+ * Keep a school's own address out of search results.
+ *
+ * robots.txt asks a crawler not to fetch; this tells it not to index what it
+ * has. Both are needed — a Disallowed URL can still be listed from an inbound
+ * link, and what would be listed is the school's NAME on its sign-in page. A
+ * directory of "schools using Cohort", assembled by Google out of our
+ * subdomains, is a customer list we published without deciding to.
+ *
+ * The apex is the exception: it is the one page that wants to be found.
+ */
+function noindex(): NextResponse {
+  const res = NextResponse.next();
+  res.headers.set("x-robots-tag", "noindex, nofollow");
+  return res;
+}
+
 export function proxy(request: NextRequest) {
   const root = rootDomain();
-  // Tenancy off: one school per deployment, nothing to route.
-  if (!root) return NextResponse.next();
+  // Tenancy off: one school per deployment, nothing to route. Still not for
+  // search — untenanted means a preview URL or a laptop.
+  if (!root) return noindex();
 
   const url = request.nextUrl;
   const host = request.headers.get("x-forwarded-host") || request.headers.get("host");
@@ -57,7 +75,7 @@ export function proxy(request: NextRequest) {
 
   // Preview deployments, localhost, an IP. We cannot tell which school this is
   // for, so behave exactly as the untenanted app always has.
-  if (kind.kind === "unknown") return NextResponse.next();
+  if (kind.kind === "unknown") return noindex();
 
   if (kind.kind === "apex") {
     if (onList(url.pathname, APEX_PATHS)) return NextResponse.next();
@@ -74,7 +92,7 @@ export function proxy(request: NextRequest) {
   if (url.pathname === "/signup" || url.pathname.startsWith("/signup/")) {
     return NextResponse.redirect(new URL("/signup", apex));
   }
-  return NextResponse.next();
+  return noindex();
 }
 
 export const config = {

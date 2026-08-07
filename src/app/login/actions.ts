@@ -3,7 +3,7 @@
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/db";
-import { verifyPassword, newSessionId, logAudit, SESSION_COOKIE } from "@/lib/auth";
+import { verifyPassword, newSessionId, logAudit, SESSION_COOKIE, SESSION_COOKIE_OPTIONS } from "@/lib/auth";
 import { currentSlug } from "@/lib/tenant-server";
 
 export async function login(formData: FormData) {
@@ -47,12 +47,7 @@ export async function login(formData: FormData) {
   await logAudit(user.id, "login", user.role);
 
   const jar = await cookies();
-  jar.set(SESSION_COOKIE, sid, {
-    httpOnly: true,
-    path: "/",
-    sameSite: "lax",
-    maxAge: 604800, // 7 days
-  });
+  jar.set(SESSION_COOKIE, sid, SESSION_COOKIE_OPTIONS);
 
   redirect("/");
 }

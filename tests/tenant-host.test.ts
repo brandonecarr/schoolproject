@@ -13,6 +13,11 @@ import { classifyHost } from "@/lib/tenant";
 const ROOT = "cohort.school";
 const read = (p: string) => readFileSync(join(process.cwd(), p), "utf8");
 
+/** Source with comments removed, for assertions that must not be satisfied —
+ *  or tripped — by prose. This file's own header explains why several of these
+ *  comments deliberately quote the pattern they forbid. */
+const code = (src: string) => src.replace(/\/\*[\s\S]*?\*\//g, " ").replace(/^\s*\/\/.*$/gm, " ");
+
 describe("classifyHost", () => {
   it("names the school on its own subdomain", () => {
     expect(classifyHost("cedar-grove.cohort.school", ROOT)).toEqual({
@@ -95,6 +100,7 @@ describe("the session cookie stays host-only", () => {
   // host and nowhere else. Adding `domain:` to widen it — usually to "fix"
   // something on the apex — would silently share one jar across every school.
   const setters = [
+    "src/lib/auth.ts", // where the options now live
     "src/app/login/actions.ts",
     "src/app/signup/actions.ts",
     "src/app/enter/route.ts",
@@ -103,13 +109,30 @@ describe("the session cookie stays host-only", () => {
   ];
 
   it.each(setters)("%s sets no cookie domain", (path) => {
-    const src = read(path);
-    expect(src).not.toMatch(/domain\s*:/i);
+    // Comments stripped first. The options block is documented with the exact
+    // wrong line — `domain: ".schoolcohort.com"` — so that the next person
+    // reading it knows what not to add, and a naive grep flags that prose as
+    // the very thing it is warning against.
+    expect(code(read(path))).not.toMatch(/domain\s*:/i);
   });
 
   it("finds the cookie writes it claims to be checking", () => {
     const hits = setters.filter((p) => read(p).includes("SESSION_COOKIE"));
-    expect(hits.length).toBeGreaterThanOrEqual(4);
+    expect(hits.length).toBeGreaterThanOrEqual(5);
+  });
+
+  it("is set once, so the four routes cannot drift apart", () => {
+    // Four routes create sessions. When each spelled the options out inline,
+    // "add secure" was a four-file change and three-quarters of a fix was a
+    // plausible outcome.
+    const auth = read("src/lib/auth.ts");
+    expect(auth).toContain("SESSION_COOKIE_OPTIONS");
+    expect(auth).toMatch(/secure: process\.env\.NODE_ENV === "production"/);
+    expect(auth).toContain("httpOnly: true");
+    for (const p of setters.slice(1)) {
+      if (!read(p).includes("SESSION_COOKIE_OPTIONS")) continue;
+      expect(read(p), p).not.toMatch(/httpOnly:/);
+    }
   });
 });
 
@@ -131,9 +154,11 @@ describe("the signup handoff", () => {
 
   it("builds its redirects from the Host, not request.url", () => {
     // request.url reports the server's own origin in dev, which would bounce a
-    // brand-new owner off their subdomain and onto the apex.
+    // brand-new owner off their subdomain and onto the apex. Measured, not
+    // assumed: the dev server returned http://localhost:3000 for a request
+    // whose Host was the subdomain.
     expect(enter).not.toMatch(/new URL\([^)]*,\s*request\.url\s*\)/);
-    expect(enter).toContain('request.headers.get("host")');
+    expect(enter).toContain("currentOrigin()");
   });
 
   it("expires in minutes", () => {
@@ -218,7 +243,20 @@ describe("the apex serves only the public surface", () => {
     }
   });
 
-  it("does nothing at all when tenancy is switched off", () => {
-    expect(proxy).toMatch(/if \(!root\) return NextResponse\.next\(\)/);
+  it("routes nothing at all when tenancy is switched off", () => {
+    // The untenanted branch returns before any redirect logic — a laptop and a
+    // preview deployment must behave exactly as the single-school app did.
+    expect(proxy).toMatch(/if \(!root\) return noindex\(\)/);
+    expect(proxy.indexOf("if (!root)")).toBeLessThan(proxy.indexOf("NextResponse.redirect"));
+  });
+
+  it("keeps a school's own address out of search results", () => {
+    // A crawler can only reach a sign-in page, but that page carries the
+    // school's NAME — and a directory of "schools using Cohort" assembled out
+    // of our subdomains is a customer list published by accident.
+    expect(proxy).toContain('res.headers.set("x-robots-tag", "noindex, nofollow")');
+    // The apex is the one host that wants to be found, so it must NOT get it.
+    const apexBranch = proxy.slice(proxy.indexOf('kind.kind === "apex"'));
+    expect(apexBranch).toContain("NextResponse.next()");
   });
 });

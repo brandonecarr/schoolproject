@@ -8,7 +8,7 @@ import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/db";
 import { hashPassword, newSessionId } from "@/lib/password";
-import { SESSION_COOKIE, logAudit } from "@/lib/auth";
+import { SESSION_COOKIE, SESSION_COOKIE_OPTIONS, logAudit } from "@/lib/auth";
 import { tokenUsable } from "@/lib/tokens";
 
 export async function acceptInvite(formData: FormData) {
@@ -46,6 +46,6 @@ export async function acceptInvite(formData: FormData) {
   await prisma.session.create({ data: { id: sid, userId: newUser.id } });
   await logAudit(newUser.id, "invite_accepted", email);
   const jar = await cookies();
-  jar.set(SESSION_COOKIE, sid, { httpOnly: true, path: "/", sameSite: "lax", maxAge: 604800 });
+  jar.set(SESSION_COOKIE, sid, SESSION_COOKIE_OPTIONS);
   redirect("/parent");
 }

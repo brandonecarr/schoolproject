@@ -12,7 +12,7 @@ import { availableSlug, isUsableSlug, slugify } from "@/lib/tenant";
 import { originFor } from "@/lib/tenant-server";
 import { newTokenValue, tokenExpiryMinutes } from "@/lib/tokens";
 import { hashPassword, newSessionId } from "@/lib/password";
-import { SESSION_COOKIE, logAudit } from "@/lib/auth";
+import { SESSION_COOKIE, SESSION_COOKIE_OPTIONS, logAudit } from "@/lib/auth";
 
 export async function signup(formData: FormData) {
   const schoolName = String(formData.get("schoolName") || "").trim();
@@ -89,6 +89,6 @@ export async function signup(formData: FormData) {
   const sid = newSessionId();
   await prisma.session.create({ data: { id: sid, userId: owner.id } });
   const jar = await cookies();
-  jar.set(SESSION_COOKIE, sid, { httpOnly: true, path: "/", sameSite: "lax", maxAge: 604800 });
+  jar.set(SESSION_COOKIE, sid, SESSION_COOKIE_OPTIONS);
   redirect("/dashboard");
 }

@@ -53,8 +53,28 @@ export async function currentSlug(): Promise<string | null> {
 export async function currentOrigin(): Promise<string> {
   const h = await headers();
   const host = await currentHost();
-  const proto = h.get("x-forwarded-proto") || (host.startsWith("localhost") ? "http" : "https");
-  return `${proto}://${host}`;
+  return `${protocolFor(host, h.get("x-forwarded-proto"))}://${host}`;
+}
+
+/**
+ * http or https, from the proxy header when there is one and the hostname when
+ * there isn't.
+ *
+ * The hostname test is not `startsWith("localhost")`: with tenancy switched on
+ * locally the host is cedar-grove.localhost:3000, which does not start with it
+ * and would be handed an https origin that nothing is listening on. Every
+ * loopback shape has to count.
+ */
+function protocolFor(host: string, forwarded: string | null): string {
+  if (forwarded) return forwarded.split(",")[0].trim();
+  const name = host.split(":")[0].toLowerCase();
+  const local =
+    name === "localhost" ||
+    name.endsWith(".localhost") ||
+    name === "127.0.0.1" ||
+    name === "[::1]" ||
+    name === "0.0.0.0";
+  return local ? "http" : "https";
 }
 
 // Re-exported so callers have one tenancy import. The implementation lives in

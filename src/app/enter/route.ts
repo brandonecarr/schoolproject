@@ -21,47 +21,29 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { prisma } from "@/lib/db";
 import { tokenUsable } from "@/lib/tokens";
-import { newSessionId, SESSION_COOKIE, logAudit } from "@/lib/auth";
-import { currentHostKind } from "@/lib/tenant-server";
+import { newSessionId, SESSION_COOKIE, SESSION_COOKIE_OPTIONS, logAudit } from "@/lib/auth";
+import { currentHostKind, currentOrigin } from "@/lib/tenant-server";
 
 export const dynamic = "force-dynamic";
-
-/**
- * Where this request actually arrived, as an origin.
- *
- * Not request.url: in dev that reports the server's own origin rather than the
- * Host the browser sent, so redirecting relative to it bounces the founder from
- * their school's subdomain back to the apex — where the tenant gate refuses the
- * cookie that was just set. Measured, not assumed; the dev server returned
- * http://localhost:3000 for a request whose Host was the subdomain.
- */
-function origin(request: NextRequest): string {
-  const host = request.headers.get("x-forwarded-host") || request.headers.get("host");
-  if (!host) return new URL(request.url).origin;
-  // Vercel sets x-forwarded-proto; locally there is no proxy and the scheme in
-  // request.url is right even when its host is not.
-  const proto = request.headers.get("x-forwarded-proto") || new URL(request.url).protocol.replace(":", "");
-  return `${proto}://${host}`;
-}
 
 /** Every failure lands here. No detail about which check failed: the person
  *  holding a bad token learns nothing, and the person holding a good one is
  *  already signed in. */
-function refuse(request: NextRequest) {
-  return NextResponse.redirect(new URL("/login?e=expired", origin(request)));
+async function refuse() {
+  return NextResponse.redirect(new URL("/login?e=expired", await currentOrigin()));
 }
 
 export async function GET(request: NextRequest) {
   const value = request.nextUrl.searchParams.get("t") || "";
-  if (!value) return refuse(request);
+  if (!value) return refuse();
 
   const token = await prisma.token.findUnique({ where: { token: value } });
   if (!token || token.type !== "signin_handoff" || !token.userId || !tokenUsable(token)) {
-    return refuse(request);
+    return refuse();
   }
 
   const user = await prisma.user.findUnique({ where: { id: token.userId } });
-  if (!user || user.schoolId !== token.schoolId) return refuse(request);
+  if (!user || user.schoolId !== token.schoolId) return refuse();
 
   // The handoff exists to land the cookie on the school's own host, so with
   // tenancy on this must BE that host — not merely "not some other school's".
@@ -73,7 +55,7 @@ export async function GET(request: NextRequest) {
       where: { id: token.schoolId },
       select: { slug: true },
     });
-    if (kind.kind !== "tenant" || school?.slug !== kind.slug) return refuse(request);
+    if (kind.kind !== "tenant" || school?.slug !== kind.slug) return refuse();
   }
 
   // Burn it first. If anything below fails the token is still spent, which is
@@ -84,7 +66,7 @@ export async function GET(request: NextRequest) {
     data: { usedAt: new Date().toISOString() },
   });
   // Two tabs racing on the same link. Exactly one wins.
-  if (burned.count !== 1) return refuse(request);
+  if (burned.count !== 1) return refuse();
 
   const sid = newSessionId();
   await prisma.session.create({ data: { id: sid, userId: user.id } });
@@ -92,12 +74,7 @@ export async function GET(request: NextRequest) {
 
   // Straight to the console with the first-run notice. Handoff tokens are only
   // minted at signup, so the person holding one is always a brand-new owner.
-  const response = NextResponse.redirect(new URL("/dashboard?welcome=1", origin(request)));
-  response.cookies.set(SESSION_COOKIE, sid, {
-    httpOnly: true,
-    path: "/",
-    sameSite: "lax",
-    maxAge: 604800, // 7 days
-  });
+  const response = NextResponse.redirect(new URL("/dashboard?welcome=1", await currentOrigin()));
+  response.cookies.set(SESSION_COOKIE, sid, SESSION_COOKIE_OPTIONS);
   return response;
 }
