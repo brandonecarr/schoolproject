@@ -70,6 +70,8 @@ export default async function SourcesPage() {
   const failing = rows.filter((r) => r.meta.tone === "bad").length;
   const pending = rows.filter((r) => r.st?.pendingReview).length;
   const neverChanged = rows.filter((r) => r.status === "ok" && !r.st?.lastChangedAt).length;
+  // Presence only — never the value, and never rendered as one.
+  const interpreterReady = Boolean(process.env.ANTHROPIC_API_KEY);
 
   return (
     <>
@@ -101,6 +103,19 @@ export default async function SourcesPage() {
           <div className="l">Never changed</div>
         </div>
       </div>
+
+      {/* A watcher whose interpreter can't run detects changes perfectly and
+          tells nobody — the flags just accumulate. That is the same silent
+          failure this page exists to catch, one layer further along, and it is
+          invisible unless something says so out loud. */}
+      {pending > 0 && !interpreterReady && (
+        <Notice tone="bad">
+          {pending} change{pending === 1 ? " is" : "s are"} waiting to be interpreted, but{" "}
+          <code>ANTHROPIC_API_KEY</code> is not set on this deployment — so nothing will read them.
+          They are not lost: the flags stay set until a model does look. Set the key and they will
+          be picked up on the next run.
+        </Notice>
+      )}
 
       {failing > 0 && (
         <Notice tone="warn">
