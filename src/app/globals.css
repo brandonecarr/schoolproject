@@ -4603,6 +4603,12 @@ a:focus-visible {
   display: grid;
   place-items: center;
 }
+/* The real brand mark (shield PNG) that replaced the lettermark tile on the
+   public pages. Dimensions come from the Image element. */
+.lp-markimg {
+  display: block;
+  flex: 0 0 auto;
+}
 .lp-word {
   font-family: var(--head);
   font-size: 20px;

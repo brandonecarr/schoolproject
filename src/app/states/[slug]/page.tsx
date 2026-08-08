@@ -10,6 +10,7 @@
 // Every claim is derived from src/lib/rules.ts via states.ts. The copy below
 // is a frame around that data; it asserts nothing state-specific itself.
 
+import Image from "next/image";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { currentHostKind } from "@/lib/tenant-server";
@@ -44,9 +45,7 @@ export default async function StatePage({ params }: { params: Promise<{ slug: st
       <div className="lp-card">
         <header className="lp-head">
           <Link className="lp-lockup" href="/">
-            <span className="lp-mark" aria-hidden>
-              C
-            </span>
+            <Image src="/logo-mark.png" alt="" width={28} height={37} className="lp-markimg" priority />
             <span className="lp-word">Cohort</span>
           </Link>
           <div className="lp-headright">

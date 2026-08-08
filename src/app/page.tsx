@@ -75,9 +75,7 @@ export default async function Home({
           </nav>
 
           <div className="lp-lockup">
-            <span className="lp-mark" aria-hidden>
-              C
-            </span>
+            <Image src="/logo-mark.png" alt="" width={28} height={37} className="lp-markimg" priority />
             <span className="lp-word">Cohort</span>
           </div>
 
@@ -601,9 +599,7 @@ export default async function Home({
       <footer className="lp-foot">
         <div className="lp-wrap lp-footin">
           <div className="lp-lockup">
-            <span className="lp-mark" aria-hidden>
-              C
-            </span>
+            <Image src="/logo-mark.png" alt="" width={24} height={31} className="lp-markimg" />
             <span className="lp-word">Cohort</span>
             <span className="lp-footnote">— microschool operations.</span>
           </div>

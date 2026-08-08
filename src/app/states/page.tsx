@@ -5,6 +5,7 @@
 // derived from src/lib/rules.ts via states.ts, and the ⚑ flag travels with any
 // rail that has not survived a real invoice cycle.
 
+import Image from "next/image";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { currentHostKind } from "@/lib/tenant-server";
@@ -30,9 +31,7 @@ export default async function StatesIndex() {
       <div className="lp-card">
         <header className="lp-head">
           <Link className="lp-lockup" href="/">
-            <span className="lp-mark" aria-hidden>
-              C
-            </span>
+            <Image src="/logo-mark.png" alt="" width={28} height={37} className="lp-markimg" priority />
             <span className="lp-word">Cohort</span>
           </Link>
           <div className="lp-headright">
