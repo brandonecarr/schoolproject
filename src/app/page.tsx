@@ -402,7 +402,10 @@ export default async function Home({
             <p className="lp-fine">
               {states.length} programs configured, {verifiedCount} confirmed against a real invoice
               cycle. Any other state works too — the teaching and evidence side is the same
-              everywhere.
+              everywhere.{" "}
+              <Link className="lp-textlink" href="/states">
+                Read the state-by-state guide →
+              </Link>
             </p>
           </div>
 

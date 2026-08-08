@@ -14,7 +14,7 @@
 
 import { NextResponse } from "next/server";
 import { currentHostKind } from "@/lib/tenant-server";
-import { multiTenant } from "@/lib/tenant-config";
+import { multiTenant, rootDomain, tenantProtocol } from "@/lib/tenant-config";
 
 export const dynamic = "force-dynamic";
 
@@ -33,12 +33,14 @@ export async function GET() {
     "User-agent: *",
     "Allow: /$",
     "Allow: /signup",
+    "Allow: /states",
     // Everything else on the apex is a redirect back to "/" or a tokenised
     // link, and neither is worth a crawl budget.
     "Disallow: /invite/",
     "Disallow: /reset/",
     "Disallow: /enter",
     "Disallow: /api/",
+    `Sitemap: ${tenantProtocol()}://${rootDomain()}/sitemap.xml`,
     "",
   ].join("\n");
 

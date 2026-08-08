@@ -25,6 +25,7 @@ import { rootDomain, tenantProtocol } from "@/lib/tenant-config";
 const APEX_PATHS = [
   "/", // landing + signup entry
   "/signup",
+  "/states", // public per-state program pages — the part of the apex built to be found
   "/logout",
   "/api", // cron and webhooks are called at the production domain
   // Tokenised links. Old emails point at whatever origin sent them, and the

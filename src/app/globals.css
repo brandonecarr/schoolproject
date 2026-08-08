@@ -5118,6 +5118,13 @@ a:focus-visible {
   font-size: 11px;
   padding: 4px 9px;
 }
+/* The index at /states renders each state row as a link to its page. */
+a.lp-state {
+  color: inherit;
+}
+a.lp-state:hover {
+  border-color: var(--accent-mid);
+}
 .lp-state-add {
   grid-column: 1 / -1;
   justify-content: center;
