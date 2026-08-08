@@ -97,6 +97,10 @@ model User {
   // that they find out) and OFF for staff, who live in the app all day and would
   // just be emailing themselves about their own school.
   emailAlerts     Boolean  @default(true)
+  /// Platform operator: may open /admin, which reads across schools. Granted
+  /// only by scripts/grant-admin.mjs — no UI can set it, so a compromised
+  /// teacher account cannot escalate itself.
+  platformAdmin   Boolean  @default(false)
   schoolId        String
   role            String // owner | teacher | parent | student
   name            String
@@ -877,4 +881,21 @@ model ConferenceSlot {
 
   @@index([schoolId, date])
   @@index([studentId])
+}
+
+// A prospect from the marketing surface — the walkthrough button, a manual
+// entry after a call, wherever. PLATFORM TABLE: no schoolId on purpose,
+// because a lead precedes tenancy; only /admin (platformAdmin) ever reads it.
+model Lead {
+  id        String   @id @default(cuid())
+  name      String   @default("")
+  email     String
+  /// Where it came from: walkthrough | manual | find | ...
+  source    String   @default("manual")
+  note      String   @default("")
+  /// new | contacted | scheduled | won | lost
+  status    String   @default("new")
+  createdAt DateTime @default(now())
+
+  @@index([status])
 }

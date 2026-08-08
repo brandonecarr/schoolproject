@@ -200,3 +200,16 @@ export async function requireNotViewing(session: Session, back = "/"): Promise<v
 export async function requireTeacher(): Promise<Session> {
   return requireRole("owner", "teacher");
 }
+
+/**
+ * The platform-operator gate for /admin — the one surface that reads across
+ * schools. The flag is set only by scripts/grant-admin.mjs, never by any UI
+ * or action, so the set of people who can pass this gate is exactly the set
+ * someone with database access chose. Impersonation ("view as") never passes:
+ * an admin viewing a parent must not carry admin powers into that view.
+ */
+export async function requirePlatformAdmin(): Promise<Session> {
+  const session = await requireUser();
+  if (session.actor || !session.user.platformAdmin) redirect("/");
+  return session;
+}
