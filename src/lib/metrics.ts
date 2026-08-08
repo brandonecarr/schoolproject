@@ -86,3 +86,50 @@ export function reimbursementMetrics(invoices: InvoiceMetricInput[]): Reimbursem
 export function formatPct(rate: number | null): string {
   return rate == null ? "—" : `${Math.round(rate * 100)}%`;
 }
+
+// --- Stalled packets --------------------------------------------------------
+//
+// A packet in `submitted` is money on a clock nobody can see: the administrator
+// has it, no decision is recorded, and the only person who will chase it is the
+// founder — if something tells them to. This is that something.
+//
+// THE THRESHOLD IS OURS, NOT A PROGRAM RULE. No administrator publishes a
+// decision SLA; 21 days is a judgment call about when silence stops being
+// normal and starts being worth a phone call. One named constant so it can
+// become per-rail the day observed cycles say the rails differ.
+//
+// A stall can also mean the decision HAPPENED and was never recorded here —
+// the teacher saw "approved" in the portal and moved on. Either way the right
+// next step is the same: look, then record what you find, which is also what
+// keeps the rail's observed history true.
+
+export const STALL_DAYS = 21;
+
+/** Whole days a submitted packet has been waiting, or null if it never was. */
+export function waitingDays(submittedAt: string | null | undefined, today: string): number | null {
+  if (!submittedAt) return null;
+  const d = (Date.parse(today + "T12:00:00") - Date.parse(submittedAt)) / MS_PER_DAY;
+  if (!Number.isFinite(d)) return null;
+  return Math.max(0, Math.floor(d));
+}
+
+export type StallReport<T> = {
+  /** Submitted ≥ STALL_DAYS with no recorded decision, oldest first. */
+  stalled: (T & { waitingDays: number })[];
+  /** Dollar total of the stalled packets — the number that makes it urgent. */
+  atRisk: number;
+};
+
+export function stalledInvoices<
+  T extends { status: string; amount: number; submittedAt?: string | null },
+>(invoices: T[], today: string, thresholdDays: number = STALL_DAYS): StallReport<T> {
+  const stalled = invoices
+    .flatMap((inv) => {
+      if (inv.status !== "submitted") return [];
+      const w = waitingDays(inv.submittedAt, today);
+      return w != null && w >= thresholdDays ? [{ ...inv, waitingDays: w }] : [];
+    })
+    .sort((a, b) => b.waitingDays - a.waitingDays);
+  const atRisk = stalled.reduce((sum, i) => sum + (Number(i.amount) || 0), 0);
+  return { stalled, atRisk };
+}

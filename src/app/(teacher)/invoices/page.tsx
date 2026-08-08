@@ -1,12 +1,12 @@
 import Link from "next/link";
 import { requireTeacher } from "@/lib/auth";
 import { prisma } from "@/lib/db";
-import { fmt } from "@/lib/dates";
+import { fmt, today } from "@/lib/dates";
 import { Pill, Notice, StatCard } from "@/components/ui";
 import { VerificationNote } from "@/components/VerificationNote";
 import { verificationCounts, railVerification } from "@/lib/observe";
 import type { Tone } from "@/components/ui";
-import { reimbursementMetrics, formatPct } from "@/lib/metrics";
+import { reimbursementMetrics, formatPct, stalledInvoices, waitingDays, STALL_DAYS } from "@/lib/metrics";
 import { buildInvoices } from "../actions";
 
 export const dynamic = "force-dynamic";
@@ -37,6 +37,8 @@ export default async function InvoicesPage({
   const students = await prisma.student.findMany({ where: { schoolId } });
   const nameOf = (id: string) => students.find((s) => s.id === id)?.name || "—";
   const m = reimbursementMetrics(invoices);
+  const td = today();
+  const stall = stalledInvoices(invoices, td);
   const built = sp.built ? Number(sp.built) : null;
   const skipped = sp.skipped ? Number(sp.skipped) : 0;
 
@@ -63,6 +65,18 @@ export default async function InvoicesPage({
           <button className="btn mark">Build packets for {esaStudents} students</button>
         </form>
       </div>
+
+      {stall.stalled.length > 0 && (
+        <div className="notice warn">
+          <strong>
+            {stall.stalled.length === 1 ? "One packet has" : `${stall.stalled.length} packets have`}{" "}
+            waited {STALL_DAYS}+ days without a recorded decision
+          </strong>{" "}
+          — ${stall.atRisk.toLocaleString()} at risk. If the portal already shows a decision, record
+          it on the packet so the rail&apos;s history stays true; if it doesn&apos;t, this is the
+          nudge to chase it.
+        </div>
+      )}
 
       {rail && (
         <div className="notice info">
@@ -126,6 +140,22 @@ export default async function InvoicesPage({
                   <td className="mono">${Number(i.amount).toLocaleString()}</td>
                   <td>
                     <Pill tone={STATUS_TONE[i.status] ?? "warn"}>{i.status}</Pill>
+                    {/* Age on every submitted row, not only stalled ones — the
+                        founder should watch it climb, not be surprised at 21. */}
+                    {i.status === "submitted" && waitingDays(i.submittedAt, td) != null && (
+                      <span
+                        className="small"
+                        style={{
+                          marginLeft: 8,
+                          color:
+                            (waitingDays(i.submittedAt, td) ?? 0) >= STALL_DAYS
+                              ? "var(--warn)"
+                              : "var(--ink3)",
+                        }}
+                      >
+                        waiting {waitingDays(i.submittedAt, td)}d
+                      </span>
+                    )}
                   </td>
                   <td style={{ textAlign: "right" }}>
                     <Link className="btn sec sm" href={`/invoices/${i.id}`}>

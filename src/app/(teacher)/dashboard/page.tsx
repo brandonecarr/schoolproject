@@ -10,7 +10,7 @@ import { typeMeta } from "@/lib/lms";
 import { Icon } from "@/components/icons";
 import { Bar, Card, CardHead, Notice, PageHead, Pill, StackBar, StatCard } from "@/components/ui";
 import { currentOrigin } from "@/lib/tenant-server";
-import { reimbursementMetrics, formatPct } from "@/lib/metrics";
+import { reimbursementMetrics, formatPct, stalledInvoices, STALL_DAYS } from "@/lib/metrics";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Dashboard — Cohort" };
@@ -38,6 +38,7 @@ export default async function Dashboard({
 
   // Coming due soon: the next assignments due, with turn-in progress.
   const td = today();
+  const stall = stalledInvoices(invoices, td);
   const upcoming = await prisma.assignment.findMany({
     where: { schoolId, dueDate: { gte: td } },
     orderBy: { dueDate: "asc" },
@@ -200,6 +201,18 @@ export default async function Dashboard({
         <div className="stack">
           <Card>
             <div className="eyebrow">Getting paid</div>
+            {/* Stalled packets outrank every other number in this card: money
+                submitted, no decision recorded, nobody chasing. Or the decision
+                happened and was never recorded here — either way, look. */}
+            {stall.stalled.length > 0 && (
+              <div className="notice warn" style={{ margin: "8px 0 10px" }}>
+                {stall.stalled.length === 1
+                  ? `A packet has waited ${stall.stalled[0].waitingDays} days`
+                  : `${stall.stalled.length} packets have waited ${STALL_DAYS}+ days`}{" "}
+                without a recorded decision — <strong>${stall.atRisk.toLocaleString()}</strong> at
+                risk. Check the portal, then <Link href="/invoices">record what you find</Link>.
+              </div>
+            )}
             {hasReimbursementData ? (
               <>
                 <h3 className="cardfig">{formatPct(m.firstPassRate)} approved first-pass</h3>
