@@ -30,8 +30,8 @@ export default async function FindSchool({
   return (
     <div className="authplain">
       <main className="authcol">
-        <div className="lockup">
-          <Image src="/logo-mark.png" alt="" width={30} height={39} className="brand-markimg" />
+        <div className="lockup lockup-hero">
+          <Image src="/logo-mark.png" alt="" width={58} height={75} className="brand-markimg" />
           <div>
             <div className="wordmark">Cohort</div>
             <div className="tagline">Run the school. Get paid for it.</div>
