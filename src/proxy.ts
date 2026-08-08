@@ -26,6 +26,7 @@ const APEX_PATHS = [
   "/", // landing + signup entry
   "/signup",
   "/states", // public per-state program pages — the part of the apex built to be found
+  "/find", // lost-link school finder — answers by email, never on screen
   "/logout",
   "/api", // cron and webhooks are called at the production domain
   // Tokenised links. Old emails point at whatever origin sent them, and the

@@ -110,8 +110,8 @@ export default async function Home({
           <div className="lp-find" role="status">
             <strong>Looking for your school?</strong> Each school signs in at its own address, not
             this one — something like <span className="mono">cedar-grove.{root}</span>. It&apos;s in
-            the invitation your school sent you. We can&apos;t look a family&apos;s school up from
-            here, on purpose.
+            the invitation your school sent you. Lost the address?{" "}
+            <Link href="/find">We can email it to you.</Link>
           </div>
         )}
 
