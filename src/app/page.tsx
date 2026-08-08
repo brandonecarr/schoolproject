@@ -4,7 +4,8 @@ import { redirect } from "next/navigation";
 import { getSession } from "@/lib/auth";
 import { currentHostKind } from "@/lib/tenant-server";
 import { rootDomain } from "@/lib/tenant-config";
-import { landingStates, LandingState } from "@/lib/landing";
+import { landingStates } from "@/lib/landing";
+import { PROGRAMS, RAILS } from "@/lib/rules";
 
 // "/" means two different things depending on the address it arrives on.
 //
@@ -54,7 +55,16 @@ export default async function Home({
   const { signin } = await searchParams;
   const root = rootDomain() || "schoolcohort.com";
   const states = landingStates();
-  const verifiedCount = states.filter((s) => !s.unverified).length;
+  // Chips for the workflows section: every configured rail, the three largest
+  // state programs by market, and the multi-state reality. Labels come from
+  // rules.ts so the page can never name a rail or program the code doesn't carry.
+  const chips = [
+    ...Object.values(RAILS).map((r) => r.label),
+    PROGRAMS.AZ.label,
+    PROGRAMS.FL.label,
+    PROGRAMS.TX.label,
+    "Multi-state",
+  ];
 
   return (
     <div className="lp">
@@ -65,7 +75,7 @@ export default async function Home({
             <span className="lp-dot" aria-hidden />
             <a href="#features">What it does</a>
             <span className="lp-dot" aria-hidden />
-            <a href="#states">States</a>
+            <a href="#programs">Programs</a>
             {SHOW_PRICING && (
               <>
                 <span className="lp-dot" aria-hidden />
@@ -387,44 +397,36 @@ export default async function Home({
           </div>
         </section>
 
-        <section className="lp-wrap lp-split lp-section" id="states">
-          <div>
-            <div className="lp-eyebrow">State rules</div>
-            <h2>It knows your state&apos;s rules — and admits which ones it hasn&apos;t proven</h2>
-            <p className="lp-body">
-              A confidently wrong rule gets a school&apos;s funding clawed back. So any rule Cohort
-              has inferred but not yet watched survive a real invoice cycle carries a visible flag,
-              and you treat it as a starting point rather than as advice.
-            </p>
-            <div className="lp-callout">⚑ Unverified rules are marked, everywhere they appear</div>
-            <p className="lp-fine">
-              {states.length} programs configured, {verifiedCount} confirmed against a real invoice
-              cycle. Any other state works too — the teaching and evidence side is the same
-              everywhere.{" "}
-              <Link className="lp-textlink" href="/states">
-                Read the state-by-state guide →
-              </Link>
+        <section className="lp-wrap lp-section" id="programs">
+          <div className="lp-centerhead">
+            <div className="lp-eyebrow">The real workflows</div>
+            <h2 className="lp-h2">Built around the paperwork microschools actually deal with</h2>
+            <p>
+              Cohort is built for operators running on ESA and education-funding programs — where
+              documentation, receipts, reimbursement status and family communication have to stay
+              organized, and hold up in front of a reviewer. The rails and programs below come
+              configured out of the box.
             </p>
           </div>
 
-          {/* Driven from src/lib/rules.ts, never written out. The handoff is
-              explicit that this table must not be able to claim more coverage
-              than the code has verified — and every rail is still verify:true,
-              so every row carries the flag. */}
-          <div className="lp-states">
-            {states.map((s: LandingState) => (
-              <div className="lp-state" key={s.code}>
-                <div>
-                  <div className="lp-statename">{s.name}</div>
-                  <div className="lp-stateprog">{s.program}</div>
-                </div>
-                <span className={`lp-chip ${s.unverified ? "warn" : "good"}`}>
-                  {s.unverified ? "⚑ Rules unverified" : "Supported"}
-                </span>
-              </div>
+          {/* Chip labels come from rules.ts, never written out here — the same
+              rule that keeps every other coverage claim on this page honest. */}
+          <div className="lp-progchips">
+            {chips.map((c) => (
+              <span className="lp-progchip" key={c}>
+                {c}
+              </span>
             ))}
-            <div className="lp-state lp-state-add">[ add states as cycles are observed ]</div>
           </div>
+
+          <p className="lp-fine" style={{ textAlign: "center" }}>
+            Cohort organizes workflows and documentation. It doesn&apos;t guarantee program
+            approval, reimbursement, or compliance outcomes — and any rule it hasn&apos;t watched
+            survive a real invoice cycle carries a visible ⚑ inside the product.{" "}
+            <Link className="lp-textlink" href="/states">
+              Read the state-by-state guide →
+            </Link>
+          </p>
         </section>
 
         <section className="lp-wrap lp-section">
@@ -471,9 +473,9 @@ export default async function Home({
               </p>
             </div>
 
-            <div className="lp-3up lp-tiers">
+            <div className="lp-tiers lp-tiers-2">
               <article className="lp-tier">
-                <h3>Setting up</h3>
+                <h3>Setup Fee</h3>
                 <p className="lp-tiersub">Your address, your calendar, your first roster.</p>
                 <div className="lp-price">Free</div>
                 <div className="lp-pricenote">No card, no expiry</div>
@@ -512,27 +514,10 @@ export default async function Home({
                 </div>
               </article>
 
-              <article className="lp-tier">
-                <h3>Co-op or network</h3>
-                <p className="lp-tiersub">
-                  Several schools under one roof, or one operator running a few sites.
-                </p>
-                <div className="lp-slot">
-                  <span className="lp-slotbox neutral">[ talk to us ]</span>
-                </div>
-                <div className="lp-pricenote">Volume rate per child</div>
-                <div className="lp-hair" />
-                <ul>
-                  <li>Multiple schools, one login</li>
-                  <li>Shared calendar and rules</li>
-                  <li>Onboarding help</li>
-                </ul>
-              </article>
             </div>
 
             <p className="lp-placeholder">
-              [ per-child launch pricing not set — the first cohort keeps $149/mo for their
-              first year regardless ]
+              [ The first cohort keeps $149/mo for their first year regardless ]
             </p>
           </section>
         )}
@@ -605,7 +590,7 @@ export default async function Home({
           </div>
           <nav className="lp-footlinks" aria-label="Footer">
             <a href="#how">How it works</a>
-            <a href="#states">States</a>
+            <Link href="/states">States</Link>
             {SHOW_PRICING && <a href="#pricing">Pricing</a>}
             <a href="#faq">FAQ</a>
             {/* The handoff's footer ends with a Privacy link. There is no

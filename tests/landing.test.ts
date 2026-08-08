@@ -67,9 +67,16 @@ describe("the page cannot hardcode coverage around the derivation", () => {
   const page = read("src/app/page.tsx");
   const code = page.replace(/\/\*[\s\S]*?\*\//g, " ").replace(/^\s*\/\/.*$/gm, " ");
 
-  it("renders the state rows from landingStates()", () => {
+  it("derives the states strip from landingStates()", () => {
     expect(code).toContain("landingStates()");
-    expect(code).toContain("s.unverified");
+  });
+
+  it("derives the workflow chips from rules.ts, never written out", () => {
+    // The full per-state honesty table moved to /states (states.test.ts holds
+    // it there). What the landing keeps is the rule that it cannot NAME a rail
+    // or program the code doesn't carry: chip labels come from RAILS/PROGRAMS.
+    expect(code).toContain("Object.values(RAILS)");
+    expect(code).not.toMatch(/"ClassWallet"|"Step Up For Students"|"Odyssey"/);
   });
 
   it("does not spell out a list of supported states in prose", () => {
@@ -78,8 +85,13 @@ describe("the page cannot hardcode coverage around the derivation", () => {
     expect(code).not.toMatch(/AZ,\s*FL|Arizona,\s*Florida,\s*Iowa/);
   });
 
-  it("shows the unverified count as a number it computed", () => {
-    expect(code).toContain("verifiedCount");
+  it("keeps the no-guarantee line next to the program chips", () => {
+    expect(code).toMatch(/guarantee program\s+approval, reimbursement, or compliance outcomes/);
+    expect(code).toContain("⚑");
+  });
+
+  it("still links to the state-by-state guide", () => {
+    expect(code).toContain('href="/states"');
   });
 });
 
