@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
-import { prisma } from "@/lib/db";
-import { asSystem, enterTenant } from "@/lib/tenant-context";
+import { prisma, prismaSystem } from "@/lib/db";
+import { enterTenant } from "@/lib/tenant-context";
 import { tokenUsable } from "@/lib/tokens";
 import { redirectTokenToTenant } from "@/lib/tenant-server";
 import { acceptInvite } from "../actions";
@@ -33,7 +33,7 @@ export default async function InvitePage({
   const { error } = await searchParams;
 
   // System: a tokenised link is followed before any session exists.
-  const t = await asSystem(() => prisma.token.findUnique({ where: { token } }));
+  const t = await prismaSystem.token.findUnique({ where: { token } });
   if (t) enterTenant(t.schoolId);
   // Sent before this school had its own address, or opened from an
   // inbox that rewrote the link. The token knows where it belongs.

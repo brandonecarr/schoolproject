@@ -6,8 +6,8 @@
 
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
-import { prisma } from "@/lib/db";
-import { asSystem, enterTenant } from "@/lib/tenant-context";
+import { prisma, prismaSystem } from "@/lib/db";
+import { enterTenant } from "@/lib/tenant-context";
 import { hashPassword, newSessionId } from "@/lib/password";
 import { SESSION_COOKIE, SESSION_COOKIE_OPTIONS, logAudit } from "@/lib/auth";
 import { tokenUsable } from "@/lib/tokens";
@@ -19,7 +19,7 @@ export async function acceptInvite(formData: FormData) {
 
   // System: the invite token authenticates this request. Once it names its
   // school, every write below is bound to that school.
-  const t = await asSystem(() => prisma.token.findUnique({ where: { token } }));
+  const t = await prismaSystem.token.findUnique({ where: { token } });
   if (!t || t.type !== "parent_invite" || !tokenUsable(t)) {
     redirect(`/invite/${token}?error=1`);
   }

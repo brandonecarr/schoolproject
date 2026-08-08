@@ -82,17 +82,29 @@ describe("the client wiring", () => {
 
   it("getSession binds the tenant for the rest of the request", () => {
     const auth = read("src/lib/auth.ts");
-    expect(auth).toContain("asSystem(() => resolveSession(sid))");
+    // resolveSession reads via the bypass client (no ALS run), so the
+    // enterTenant that follows propagates to the page's queries.
+    expect(auth).toContain("resolveSession(sid)");
     expect(auth).toContain("enterTenant(resolved.user.schoolId)");
+    expect(auth).toContain("prismaSystem");
   });
 
-  it("the one cross-school read is the aggregate rollup, marked system", () => {
+  it("the bypass client exists and is separate from the app client", () => {
+    expect(db).toContain("export const prismaSystem");
+    expect(db).toContain("export const prisma");
+    // Both extensions run the GUC inside an interactive transaction.
+    expect(db).toContain("runWithGuc");
+  });
+
+  it("the one cross-school read is the aggregate rollup, on the bypass client", () => {
     const observe = read("src/lib/observe.ts");
     const platformBlock = observe.slice(
       observe.indexOf("const [platform, school]"),
-      observe.indexOf('by: ["railId", "programCode", "outcome"]', observe.indexOf("asSystem"))
+      observe.indexOf("for (const r of platform)")
     );
-    expect(platformBlock).toContain("asSystem");
+    expect(platformBlock).toContain("prismaSystem.railObservation.groupBy");
+    // The school-scoped half stays on the context client.
+    expect(platformBlock).toContain("prisma.railObservation.groupBy");
   });
 
   it("the purge runs each school AS that school", () => {

@@ -33,7 +33,12 @@ import { PrismaClient } from "@/generated/prisma/client";
 import { PrismaPg } from "@prisma/adapter-pg";
 import { currentTenantContext } from "@/lib/tenant-context";
 
-const globalForPrisma = globalThis as unknown as { prisma?: PrismaClient };
+// The client Prisma hands an interactive $transaction callback — the model
+// delegates plus $executeRaw, without $extends/$connect. Only $executeRaw is
+// used here.
+type TxClient = { $executeRaw: PrismaClient["$executeRaw"] };
+
+const globalForPrisma = globalThis as unknown as { clients?: Clients };
 
 /**
  * ROW-LEVEL SECURITY, the application half.
@@ -64,71 +69,148 @@ const globalForPrisma = globalThis as unknown as { prisma?: PrismaClient };
  * (retention.ts was refactored off them for exactly this reason), and
  * tests/rls.test.ts fails the build if either reappears.
  */
+// One set_config + query, sharing a transaction's connection so the
+// transaction-local GUC is visible to the query.
+//
+// It MUST be an interactive transaction with the operation re-issued on the tx
+// client. The array form — $transaction([set_config, query(args)]) — does not
+// work: query(args) is the extension's next-hop, not a lazy PrismaPromise, so
+// it executes eagerly on a different connection without the GUC and every
+// policy denies. Verified: the array form returned zero rows even under bypass;
+// this form reads correctly.
+async function runWithGuc(
+  base: PrismaClient,
+  setter: (tx: TxClient) => Promise<unknown>,
+  model: string,
+  operation: string,
+  args: unknown
+) {
+  return base.$transaction(async (tx) => {
+    await setter(tx as unknown as TxClient);
+    const delegate = (tx as unknown as Record<string, Record<string, (a: unknown) => unknown>>)[
+      model.charAt(0).toLowerCase() + model.slice(1)
+    ];
+    return delegate[operation](args);
+  });
+}
+
+/**
+ * The context-aware client. Reads the AsyncLocalStorage tenant context on every
+ * operation and sets the matching GUC; with no context it runs bare, and the
+ * policies deny. This is the client the whole app uses.
+ */
 function withRls(base: PrismaClient): PrismaClient {
   const extended = base.$extends({
     query: {
       $allModels: {
-        async $allOperations({ args, query }) {
+        async $allOperations({ model, operation, args, query }) {
           const ctx = currentTenantContext();
           if (!ctx) return query(args);
-          const guc =
-            ctx.kind === "system"
-              ? base.$executeRaw`SELECT set_config('app.bypass_rls', 'on', true)`
-              : base.$executeRaw`SELECT set_config('app.tenant_id', ${ctx.tenantId}, true)`;
-          const [, result] = await base.$transaction([guc, query(args) as never]);
-          return result;
+          return runWithGuc(
+            base,
+            (tx) =>
+              ctx.kind === "system"
+                ? tx.$executeRaw`SELECT set_config('app.bypass_rls', 'on', true)`
+                : tx.$executeRaw`SELECT set_config('app.tenant_id', ${ctx.tenantId}, true)`,
+            model,
+            operation,
+            args
+          );
         },
       },
     },
   });
-  // The extension changes the static type but not the model API surface the
-  // app uses. The facade stays PrismaClient so ~200 call sites don't churn.
   return extended as unknown as PrismaClient;
 }
 
-function makeClient(): PrismaClient {
+/**
+ * The always-bypass client, for the handful of genuinely system operations —
+ * resolving a session before a user is known, the pre-auth token and login
+ * lookups, the cross-school platform rollup.
+ *
+ * WHY THIS EXISTS AND asSystem's run() DOES NOT SUFFICE HERE. getSession must
+ * read the session as system, THEN bind the tenant for the rest of the request
+ * with enterWith. But AsyncLocalStorage.run() (which asSystem uses) followed by
+ * enterWith does not propagate the binding to the caller's continuation — the
+ * page's later queries would run unbound and be denied. Proven with a reduced
+ * test. A plain enterWith after an ordinary await DOES propagate. So the system
+ * reads must avoid run() entirely: this client carries no ALS at all, it always
+ * bypasses, leaving getSession free to enterWith(tenant) cleanly afterwards.
+ *
+ * Use it ONLY for operations that are correct to run across every school. Every
+ * call site is a place to ask "why may this see everything?".
+ */
+function bypassClient(base: PrismaClient): PrismaClient {
+  const extended = base.$extends({
+    query: {
+      $allModels: {
+        async $allOperations({ model, operation, args }) {
+          return runWithGuc(
+            base,
+            (tx) => tx.$executeRaw`SELECT set_config('app.bypass_rls', 'on', true)`,
+            model,
+            operation,
+            args
+          );
+        },
+      },
+    },
+  });
+  return extended as unknown as PrismaClient;
+}
+
+type Clients = { app: PrismaClient; system: PrismaClient };
+
+function makeClients(): Clients {
   const connectionString = process.env.DATABASE_URL;
   if (!connectionString) {
     throw new Error("DATABASE_URL is not set — point it at your Supabase Postgres database.");
   }
   const adapter = new PrismaPg({ connectionString });
-  return withRls(
-    new PrismaClient({
-      adapter,
-      log: process.env.NODE_ENV === "development" ? ["error", "warn"] : ["error"],
-    })
-  );
+  const base = new PrismaClient({
+    adapter,
+    log: process.env.NODE_ENV === "development" ? ["error", "warn"] : ["error"],
+  });
+  return { app: withRls(base), system: bypassClient(base) };
 }
 
-let cached: PrismaClient | undefined;
+let cached: Clients | undefined;
 
-function realClient(): PrismaClient {
+function clients(): Clients {
   // Module-local cache first — this is the hot path, hit on every property
-  // access, and it must never reach makeClient() twice.
+  // access, and it must never reach makeClients() twice.
   if (cached) return cached;
   // Dev hot reload re-evaluates the module but keeps globalThis, so reuse the
-  // existing client rather than opening another pool on every edit.
-  if (globalForPrisma.prisma) return (cached = globalForPrisma.prisma);
-  cached = makeClient();
-  if (process.env.NODE_ENV !== "production") globalForPrisma.prisma = cached;
+  // existing clients rather than opening another pool on every edit. Both share
+  // one base connection pool.
+  if (globalForPrisma.clients) return (cached = globalForPrisma.clients);
+  cached = makeClients();
+  if (process.env.NODE_ENV !== "production") globalForPrisma.clients = cached;
   return cached;
 }
 
+/** A lazy Proxy over one of the two clients, so ~200 call sites read the same
+ *  `prisma.user.findMany(...)` and construction is still deferred to first use
+ *  (a build must not need a live database). */
+function facade(pick: (c: Clients) => PrismaClient): PrismaClient {
+  return new Proxy({} as PrismaClient, {
+    get(_t, prop) {
+      const c = pick(clients());
+      const value = Reflect.get(c as object, prop, c);
+      return typeof value === "function" ? value.bind(c) : value;
+    },
+    has(_t, prop) {
+      return prop in (pick(clients()) as object);
+    },
+  });
+}
+
+/** The context-aware client. Almost everything uses this. */
+export const prisma = facade((c) => c.app);
+
 /**
- * The client, but only really built on first use.
- *
- * A Proxy rather than a `getPrisma()` function so the ~200 existing call sites
- * keep working unchanged — `prisma.user.findMany(...)` still reads the same.
- * Methods are bound to the underlying client because Prisma's own delegates
- * rely on their `this`.
+ * The always-bypass client. Use ONLY for genuinely cross-school operations —
+ * session resolution, pre-auth token/login lookups, the platform rollup. Every
+ * use is a place to justify why it may see every school. See bypassClient.
  */
-export const prisma = new Proxy({} as PrismaClient, {
-  get(_target, prop) {
-    const c = realClient();
-    const value = Reflect.get(c as object, prop, c);
-    return typeof value === "function" ? value.bind(c) : value;
-  },
-  has(_target, prop) {
-    return prop in (realClient() as object);
-  },
-});
+export const prismaSystem = facade((c) => c.system);

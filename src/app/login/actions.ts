@@ -2,8 +2,8 @@
 
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
-import { prisma } from "@/lib/db";
-import { asSystem, enterTenant } from "@/lib/tenant-context";
+import { prisma, prismaSystem } from "@/lib/db";
+import { enterTenant } from "@/lib/tenant-context";
 import { verifyPassword, newSessionId, logAudit, SESSION_COOKIE, SESSION_COOKIE_OPTIONS } from "@/lib/auth";
 import { currentSlug } from "@/lib/tenant-server";
 
@@ -23,28 +23,26 @@ export async function login(formData: FormData) {
   // matches. The slug lookup and the candidate search are what decide it.
   let candidates;
   if (slug) {
-    const school = await asSystem(() =>
-      prisma.school.findUnique({ where: { slug }, select: { id: true } })
-    );
+    const school = await prismaSystem.school.findUnique({ where: { slug }, select: { id: true } });
     candidates = school
-      ? await asSystem(() => prisma.user.findMany({ where: { schoolId: school.id, email } }))
+      ? await prismaSystem.user.findMany({ where: { schoolId: school.id, email } })
       : [];
   } else {
     // Untenanted: localhost, a preview URL, or tenancy not switched on. No
     // address to scope by, so match on the credentials and only proceed when
     // exactly one account is satisfied — signing someone into an arbitrary one
     // of several schools would be worse than asking.
-    candidates = await asSystem(() => prisma.user.findMany({ where: { email } }));
+    candidates = await prismaSystem.user.findMany({ where: { email } });
   }
   const matches = candidates.filter((u) => verifyPassword(password, u.password));
 
   if (matches.length === 0) {
-    await asSystem(() => logAudit(null, "login_failed", email));
+    await logAudit(null, "login_failed", email);
     redirect("/login?e=bad");
   }
   if (matches.length > 1) {
     // Only reachable untenanted: the same address and password at two schools.
-    await asSystem(() => logAudit(null, "login_ambiguous", email));
+    await logAudit(null, "login_ambiguous", email);
     redirect("/login?e=ambiguous");
   }
   const user = matches[0];

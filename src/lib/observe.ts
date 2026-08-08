@@ -1,8 +1,8 @@
 // Server-side read/write for RailObservation. Pairs with the pure rollups in
 // src/lib/observations.ts the same way lib/mastery.ts pairs with lib/outcomes.ts.
 
-import { prisma } from "@/lib/db";
-import { asSystem } from "@/lib/tenant-context";
+import { prisma, prismaSystem } from "@/lib/db";
+
 import {
   verificationFromCounts,
   NO_EVIDENCE,
@@ -115,13 +115,11 @@ export async function verificationCounts(schoolId: string): Promise<Verification
     // ids — which is exactly the boundary the privacy note above draws.
     // Under row-level security a tenant-scoped run of this query would not
     // fail; it would silently count only this school and quietly claim the
-    // platform has seen less than it has. asSystem keeps it honest.
-    asSystem(() =>
-      prisma.railObservation.groupBy({
-        by: ["railId", "programCode", "outcome"],
-        _count: { _all: true },
-      })
-    ),
+    // platform has seen less than it has. prismaSystem keeps it honest.
+    prismaSystem.railObservation.groupBy({
+      by: ["railId", "programCode", "outcome"],
+      _count: { _all: true },
+    }),
     prisma.railObservation.groupBy({
       by: ["railId", "programCode", "outcome"],
       where: { schoolId },

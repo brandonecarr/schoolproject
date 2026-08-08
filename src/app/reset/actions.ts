@@ -3,8 +3,8 @@
 // Public: a user sets a new password from a one-time reset link.
 
 import { redirect } from "next/navigation";
-import { prisma } from "@/lib/db";
-import { asSystem, enterTenant } from "@/lib/tenant-context";
+import { prisma, prismaSystem } from "@/lib/db";
+import { enterTenant } from "@/lib/tenant-context";
 import { hashPassword } from "@/lib/password";
 import { logAudit } from "@/lib/auth";
 import { tokenUsable } from "@/lib/tokens";
@@ -15,7 +15,7 @@ export async function acceptReset(formData: FormData) {
 
   // System: the token IS the authentication; nothing is scoped until it
   // resolves. Everything after runs as the school the token names.
-  const t = await asSystem(() => prisma.token.findUnique({ where: { token } }));
+  const t = await prismaSystem.token.findUnique({ where: { token } });
   if (!t || t.type !== "password_reset" || !t.userId || !tokenUsable(t)) {
     redirect(`/reset/${token}?error=1`);
   }

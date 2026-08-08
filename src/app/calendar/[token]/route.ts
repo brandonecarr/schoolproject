@@ -18,8 +18,8 @@
 // entries and every due date; a parent sees their own children's; a student sees
 // their own. Nobody sees another family's.
 
-import { prisma } from "@/lib/db";
-import { asSystem, enterTenant } from "@/lib/tenant-context";
+import { prisma, prismaSystem } from "@/lib/db";
+import { enterTenant } from "@/lib/tenant-context";
 import { buildIcal, type IcalEntry, type CalEvent } from "@/lib/calendar";
 import { threadStudentIds, isStaff as isStaffRole } from "@/lib/messages";
 import { icalLocalStamp } from "@/lib/conferences";
@@ -42,7 +42,7 @@ export async function GET(_request: Request, { params }: { params: Promise<{ tok
   // System: the token in the URL is the credential, and it is looked up
   // across schools by design — that is what a calendar token is for.
   const user = token
-    ? await asSystem(() => prisma.user.findUnique({ where: { calendarToken: token } }))
+    ? await prismaSystem.user.findUnique({ where: { calendarToken: token } })
     : null;
   // 404 rather than 401: an unauthenticated probe should not be able to tell a
   // wrong token from a revoked one.

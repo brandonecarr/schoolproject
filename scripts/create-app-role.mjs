@@ -20,7 +20,7 @@ import { randomBytes } from "node:crypto";
 import pg from "pg";
 
 const env = readFileSync(".env", "utf8");
-const direct = env.match(/^DIRECT_URL="([^"]+)"/m)?.[1];
+const direct = env.match(/^DIRECT_URL="?([^"\n]+?)"?$/m)?.[1];
 if (!direct) throw new Error("DIRECT_URL not found in .env");
 
 const password = randomBytes(24).toString("hex");
@@ -64,7 +64,7 @@ try {
 // Rewrite .env: DATABASE_URL becomes the cohort_app pooler connection; the
 // old owner URL is preserved under DATABASE_URL_OWNER for anyone who needs to
 // run something with the old powers deliberately.
-const current = env.match(/^DATABASE_URL="([^"]+)"/m)?.[1];
+const current = env.match(/^DATABASE_URL="?([^"\n]+?)"?$/m)?.[1];
 if (!current) throw new Error("DATABASE_URL not found in .env");
 const url = new URL(current);
 const ref = url.username.split(".")[1]; // postgres.<ref> or cohort_app.<ref>
@@ -73,9 +73,9 @@ url.password = password;
 
 let next = env;
 if (!/^DATABASE_URL_OWNER=/m.test(next) && url.username !== new URL(current).username) {
-  next = next.replace(/^DATABASE_URL="/m, `DATABASE_URL_OWNER="${current}"\nDATABASE_URL="`);
+  next = next.replace(/^DATABASE_URL=/m, `DATABASE_URL_OWNER="${current}"\nDATABASE_URL=`);
 }
-next = next.replace(/^DATABASE_URL="[^"]+"/m, `DATABASE_URL="${url.toString()}"`);
+next = next.replace(/^DATABASE_URL="?[^"\n]+"?$/m, `DATABASE_URL="${url.toString()}"`);
 writeFileSync(".env", next);
 console.log("DATABASE_URL now uses cohort_app (owner URL kept as DATABASE_URL_OWNER)");
 console.log("→ For production: copy the new DATABASE_URL value from .env into Vercel.");

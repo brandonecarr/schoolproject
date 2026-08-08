@@ -9,8 +9,8 @@
 // they're kept for tax/reimbursement audit — but a full family-deletion request
 // DOES remove them, because they contain the child's PII.
 
-import { prisma } from "@/lib/db";
-import { asSystem, withTenant } from "@/lib/tenant-context";
+import { prisma, prismaSystem } from "@/lib/db";
+import { withTenant } from "@/lib/tenant-context";
 import { logAudit } from "@/lib/auth";
 
 export type PurgeResult = {
@@ -72,9 +72,7 @@ export async function purgeSchool(school: { id: string; retentionDays: number })
 // Run the retention purge across every school (the nightly job).
 export async function purgeAllSchools(): Promise<PurgeResult[]> {
   // System: the nightly job is the one caller that legitimately spans schools.
-  const schools = await asSystem(() =>
-    prisma.school.findMany({ select: { id: true, retentionDays: true } })
-  );
+  const schools = await prismaSystem.school.findMany({ select: { id: true, retentionDays: true } });
   const results: PurgeResult[] = [];
   // Each school's purge runs AS that school. Under row-level security this
   // means a bug in purgeSchool cannot reach past the school being processed —

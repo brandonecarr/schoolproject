@@ -11,10 +11,10 @@
 import "server-only";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
-import { prisma } from "@/lib/db";
+import { prisma, prismaSystem } from "@/lib/db";
 import { railForState, type Rail } from "@/lib/rules";
 import { currentHostKind } from "@/lib/tenant-server";
-import { asSystem, enterTenant } from "@/lib/tenant-context";
+import { enterTenant } from "@/lib/tenant-context";
 // Prisma 7's generator names row types `<Model>Model`; alias to the plain names.
 import type { UserModel as User, SchoolModel as School } from "@/generated/prisma/models";
 
@@ -58,7 +58,11 @@ export async function logAudit(
   action: string,
   detail = ""
 ): Promise<void> {
-  await prisma.audit.create({
+  // System client: the audit log is append-only bookkeeping that must succeed
+  // regardless of tenant context — a login_failed with no user yet has no
+  // tenant to scope to. The Audit policy still governs READS (the /audit page
+  // runs as the tenant); only writes bypass.
+  await prismaSystem.audit.create({
     data: { at: new Date().toISOString(), actorId: actorId ?? null, action, detail },
   });
 }
@@ -80,17 +84,19 @@ export type Session = {
 
 // Read the current session from the cookie. Returns null if not signed in.
 //
-// TENANT BINDING happens here, once. The lookups inside run asSystem — they
-// are what DETERMINE the tenant, so they cannot yet be scoped by it — and the
-// last thing this function does on success is enterTenant(user.schoolId),
-// which binds every later query in the calling page or action to that school.
-// See tenant-context.ts for why enterWith reaches the caller's continuation.
+// TENANT BINDING happens here, once. resolveSession reads via prismaSystem —
+// the bypass client, which uses no AsyncLocalStorage run() — so the enterTenant
+// below lands cleanly on the caller's continuation and binds every later query
+// in the page or action to that school. See db.ts for why run() would sever it.
 export async function getSession(): Promise<Session | null> {
   const jar = await cookies();
   const sid = jar.get(SESSION_COOKIE)?.value;
   if (!sid) return null;
 
-  const resolved = await asSystem(() => resolveSession(sid));
+  // resolveSession reads via prismaSystem (bypass, no ALS run) precisely so
+  // this enterTenant lands cleanly on the caller's continuation. A run()-based
+  // asSystem here would sever that binding — see the note in db.ts.
+  const resolved = await resolveSession(sid);
   if (!resolved) return null;
   if (resolved.user.schoolId) enterTenant(resolved.user.schoolId);
   return resolved;
@@ -99,10 +105,10 @@ export async function getSession(): Promise<Session | null> {
 // System context: this IS the authentication step — nothing is scoped until it
 // answers who is asking.
 async function resolveSession(sid: string): Promise<Session | null> {
-  const session = await prisma.session.findUnique({ where: { id: sid } });
+  const session = await prismaSystem.session.findUnique({ where: { id: sid } });
   if (!session) return null;
 
-  const signedIn = await prisma.user.findUnique({ where: { id: session.userId } });
+  const signedIn = await prismaSystem.user.findUnique({ where: { id: session.userId } });
   if (!signedIn) return null;
 
   // Impersonation. The swap happens HERE, once, so that every downstream role
@@ -113,7 +119,7 @@ async function resolveSession(sid: string): Promise<Session | null> {
   let user = signedIn;
   let actor: User | null = null;
   if (session.viewingAsUserId) {
-    const target = await prisma.user.findUnique({ where: { id: session.viewingAsUserId } });
+    const target = await prismaSystem.user.findUnique({ where: { id: session.viewingAsUserId } });
     if (
       target &&
       isStaffRole(signedIn.role) &&
@@ -126,14 +132,14 @@ async function resolveSession(sid: string): Promise<Session | null> {
       // Anything unexpected — target deleted, promoted to staff, moved school —
       // drops the view rather than guessing. Failing open into someone else's
       // account is the one outcome that must never happen.
-      await prisma.session.update({ where: { id: sid }, data: { viewingAsUserId: null } });
+      await prismaSystem.session.update({ where: { id: sid }, data: { viewingAsUserId: null } });
     }
   }
 
   let school: SchoolWithRail | null = null;
   let rail: Rail | null = null;
   if (user.schoolId) {
-    const s = await prisma.school.findUnique({ where: { id: user.schoolId } });
+    const s = await prismaSystem.school.findUnique({ where: { id: user.schoolId } });
     if (s) {
       rail = railForState(s.state);
       school = { ...s, railLabel: rail ? rail.label : "No ESA program" };

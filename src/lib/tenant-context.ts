@@ -46,18 +46,31 @@ export function currentTenantContext(): TenantContext | undefined {
  *  the tenant on — the iCal token route, the retention purge iterating
  *  schools — and in tests. */
 export function withTenant<T>(tenantId: string, fn: () => Promise<T>): Promise<T> {
-  return store.run({ kind: "tenant", tenantId }, fn);
+  // `async () => await fn()`, not `fn`. Prisma operations are lazy: they run
+  // when the returned promise is awaited, not when it is created. If fn is a
+  // one-liner like `() => prisma.x.count()` with no internal await, run()
+  // returns that promise unstarted and the query executes AFTER the scope has
+  // exited — the extension then reads no context and the row is denied. The
+  // inner await forces the query to start while the scope is still open.
+  return store.run({ kind: "tenant", tenantId }, async () => await fn());
 }
 
 /**
- * Run `fn` with the policies' bypass flag.
+ * Run a CODE BLOCK under the bypass flag — for work that itself calls `prisma`
+ * internally and must span schools, i.e. the cron jobs (runSweep,
+ * runInterpretation). The queries live INSIDE fn, so run()'s scope reliably
+ * covers them.
  *
- * The justification belongs AT THE CALL SITE, in a comment, every time. If you
- * cannot write the sentence "this must see across schools because …", it must
- * not be asSystem.
+ * For a single bypass query, do NOT use this — use the `prismaSystem` client
+ * from db.ts. run() followed by enterTenant does not propagate to a caller's
+ * continuation (see db.ts), which is why session resolution and the auth flows
+ * read through prismaSystem instead.
+ *
+ * The justification belongs AT THE CALL SITE. If you cannot write "this must
+ * see across schools because …", it must not be asSystem.
  */
 export function asSystem<T>(fn: () => Promise<T>): Promise<T> {
-  return store.run({ kind: "system" }, fn);
+  return store.run({ kind: "system" }, async () => await fn());
 }
 
 /**

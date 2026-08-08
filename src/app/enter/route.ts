@@ -19,8 +19,8 @@
 // this whole phase exists to hold.
 
 import { NextResponse, type NextRequest } from "next/server";
-import { prisma } from "@/lib/db";
-import { asSystem, enterTenant } from "@/lib/tenant-context";
+import { prisma, prismaSystem } from "@/lib/db";
+import { enterTenant } from "@/lib/tenant-context";
 import { tokenUsable } from "@/lib/tokens";
 import { newSessionId, SESSION_COOKIE, SESSION_COOKIE_OPTIONS, logAudit } from "@/lib/auth";
 import { currentHostKind, currentOrigin } from "@/lib/tenant-server";
@@ -40,13 +40,13 @@ export async function GET(request: NextRequest) {
 
   // System: the handoff token IS the authentication. The moment it resolves,
   // its school is the tenant for every check and write below.
-  const token = await asSystem(() => prisma.token.findUnique({ where: { token: value } }));
+  const token = await prismaSystem.token.findUnique({ where: { token: value } });
   if (!token || token.type !== "signin_handoff" || !token.userId || !tokenUsable(token)) {
     return refuse();
   }
   enterTenant(token.schoolId);
 
-  const user = await prisma.user.findUnique({ where: { id: token.userId } });
+  const user = await prismaSystem.user.findUnique({ where: { id: token.userId } });
   if (!user || user.schoolId !== token.schoolId) return refuse();
 
   // The handoff exists to land the cookie on the school's own host, so with
@@ -55,7 +55,7 @@ export async function GET(request: NextRequest) {
   // and the founder would arrive at a sign-in page having just signed up.
   const kind = await currentHostKind();
   if (kind.kind !== "unknown") {
-    const school = await prisma.school.findUnique({
+    const school = await prismaSystem.school.findUnique({
       where: { id: token.schoolId },
       select: { slug: true },
     });
