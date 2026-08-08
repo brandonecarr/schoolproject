@@ -3,8 +3,7 @@
 // Public: a user sets a new password from a one-time reset link.
 
 import { redirect } from "next/navigation";
-import { prisma, prismaSystem } from "@/lib/db";
-import { enterTenant } from "@/lib/tenant-context";
+import { prismaSystem } from "@/lib/db";
 import { hashPassword } from "@/lib/password";
 import { logAudit } from "@/lib/auth";
 import { tokenUsable } from "@/lib/tokens";
@@ -19,9 +18,10 @@ export async function acceptReset(formData: FormData) {
   if (!t || t.type !== "password_reset" || !t.userId || !tokenUsable(t)) {
     redirect(`/reset/${token}?error=1`);
   }
-  enterTenant(t.schoolId);
-  await prisma.user.update({ where: { id: t.userId }, data: { password: hashPassword(password) } });
-  await prisma.token.update({ where: { id: t.id }, data: { usedAt: new Date().toISOString() } });
+  // System: a password reset is authenticated by the token, not a session, so
+  // there is no request tenant to scope by. The token named the school.
+  await prismaSystem.user.update({ where: { id: t.userId }, data: { password: hashPassword(password) } });
+  await prismaSystem.token.update({ where: { id: t.id }, data: { usedAt: new Date().toISOString() } });
   await logAudit(t.userId, "password_reset", "");
   redirect("/login?reset=1");
 }

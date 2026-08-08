@@ -15,15 +15,16 @@
 // the GUC themselves. That is the correct threat model for RLS-as-backstop:
 // the adversary is our own future code, not an attacker with the keys.
 //
-// THE THREE STATES:
-//   tenant  — acting for one school. Set once per request by getSession(),
-//             which is why nothing else ever needs to call this: every page
-//             and action already begins with requireUser/requireTeacher.
-//   system  — deliberately cross-tenant. Auth flows before a user exists,
-//             cron jobs, the one sanctioned aggregate read. Every asSystem
-//             call site is a place a reviewer should be able to stop and ask
-//             "why is this allowed to see everything?" — keep them few.
-//   none    — the default. Queries return nothing.
+// THE TWO EXPLICIT SCOPES here, plus a third path in db.ts:
+//   withTenant — a code block acting for one school. Used where run()'s scope
+//                reliably covers the queries: the iCal route handler, the
+//                retention purge, tests. NOT the page/action path — enterWith
+//                does not survive a React Server Component render, so pages get
+//                their tenant from the request cookie instead (request-tenant.ts).
+//   asSystem   — a code block acting across schools: the cron jobs. Every use
+//                is a place to ask "why may this see everything?" — keep few.
+//   (none)     — no scope and no request cookie: the query runs bare and the
+//                policies deny it. Fail closed.
 
 // No "server-only" marker, deliberately: db.ts imports this, half the lib
 // directory imports db.ts, and the test suite imports those libs under
@@ -62,9 +63,9 @@ export function withTenant<T>(tenantId: string, fn: () => Promise<T>): Promise<T
  * covers them.
  *
  * For a single bypass query, do NOT use this — use the `prismaSystem` client
- * from db.ts. run() followed by enterTenant does not propagate to a caller's
- * continuation (see db.ts), which is why session resolution and the auth flows
- * read through prismaSystem instead.
+ * from db.ts. enterWith does not survive an RSC render (see db.ts and request-tenant.ts),
+ * which is why session resolution and the auth flows read through prismaSystem
+ * and pages resolve their tenant from the request cookie.
  *
  * The justification belongs AT THE CALL SITE. If you cannot write "this must
  * see across schools because …", it must not be asSystem.
@@ -73,23 +74,3 @@ export function asSystem<T>(fn: () => Promise<T>): Promise<T> {
   return store.run({ kind: "system" }, async () => await fn());
 }
 
-/**
- * Bind the tenant to the REST of the current request.
- *
- * getSession() calls this after resolving who is signed in, so the page or
- * action that awaited it — and everything that page awaits afterwards —
- * queries as that school without any call-site changes. enterWith() rather
- * than run() because getSession cannot wrap its caller's remaining body.
- *
- * The subtlety that makes this correct here and wrong elsewhere: enterWith
- * binds the store to the current async execution and its continuations. Code
- * that awaited getSession() IS such a continuation. A sibling React component
- * rendered in parallel is NOT — but this codebase's server components each
- * call requireUser/requireTeacher themselves, so each render body gets its own
- * binding. A future component that queries the database without going through
- * a require* first will read empty — which is fail-closed doing its job, not
- * a bug in this file.
- */
-export function enterTenant(tenantId: string): void {
-  store.enterWith({ kind: "tenant", tenantId });
-}

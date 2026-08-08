@@ -14,7 +14,6 @@ import { redirect } from "next/navigation";
 import { prisma, prismaSystem } from "@/lib/db";
 import { railForState, type Rail } from "@/lib/rules";
 import { currentHostKind } from "@/lib/tenant-server";
-import { enterTenant } from "@/lib/tenant-context";
 // Prisma 7's generator names row types `<Model>Model`; alias to the plain names.
 import type { UserModel as User, SchoolModel as School } from "@/generated/prisma/models";
 
@@ -84,22 +83,20 @@ export type Session = {
 
 // Read the current session from the cookie. Returns null if not signed in.
 //
-// TENANT BINDING happens here, once. resolveSession reads via prismaSystem —
-// the bypass client, which uses no AsyncLocalStorage run() — so the enterTenant
-// below lands cleanly on the caller's continuation and binds every later query
-// in the page or action to that school. See db.ts for why run() would sever it.
+// This resolves WHO is signed in and gates them to the addressed school. It no
+// longer binds the RLS tenant — that is pulled from the request cookie at query
+// time by the db.ts extension, because enterWith does not survive the RSC
+// render. Auth reads here go through prismaSystem (bypass).
 export async function getSession(): Promise<Session | null> {
   const jar = await cookies();
   const sid = jar.get(SESSION_COOKIE)?.value;
   if (!sid) return null;
 
-  // resolveSession reads via prismaSystem (bypass, no ALS run) precisely so
-  // this enterTenant lands cleanly on the caller's continuation. A run()-based
-  // asSystem here would sever that binding — see the note in db.ts.
-  const resolved = await resolveSession(sid);
-  if (!resolved) return null;
-  if (resolved.user.schoolId) enterTenant(resolved.user.schoolId);
-  return resolved;
+  // No tenant binding here. Auth reads run as system (prismaSystem); the RLS
+  // tenant for the page's own queries is resolved from the request cookie by
+  // the db.ts extension (see request-tenant.ts). enterWith would not survive
+  // the render anyway.
+  return resolveSession(sid);
 }
 
 // System context: this IS the authentication step — nothing is scoped until it

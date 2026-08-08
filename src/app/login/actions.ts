@@ -2,8 +2,7 @@
 
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
-import { prisma, prismaSystem } from "@/lib/db";
-import { enterTenant } from "@/lib/tenant-context";
+import { prismaSystem } from "@/lib/db";
 import { verifyPassword, newSessionId, logAudit, SESSION_COOKIE, SESSION_COOKIE_OPTIONS } from "@/lib/auth";
 import { currentSlug } from "@/lib/tenant-server";
 
@@ -46,12 +45,11 @@ export async function login(formData: FormData) {
     redirect("/login?e=ambiguous");
   }
   const user = matches[0];
-  // Authenticated. The session write and the audit entry belong to this
-  // school, so bind it — same mechanism getSession uses.
-  enterTenant(user.schoolId);
 
+  // System: creating the session is identity establishment, before any request
+  // tenant exists to scope by.
   const sid = newSessionId();
-  await prisma.session.create({ data: { id: sid, userId: user.id } });
+  await prismaSystem.session.create({ data: { id: sid, userId: user.id } });
   await logAudit(user.id, "login", user.role);
 
   const jar = await cookies();

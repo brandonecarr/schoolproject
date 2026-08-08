@@ -6,8 +6,7 @@
 
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
-import { prisma, prismaSystem } from "@/lib/db";
-import { enterTenant } from "@/lib/tenant-context";
+import { prismaSystem } from "@/lib/db";
 import { hashPassword, newSessionId } from "@/lib/password";
 import { SESSION_COOKIE, SESSION_COOKIE_OPTIONS, logAudit } from "@/lib/auth";
 import { tokenUsable } from "@/lib/tokens";
@@ -23,17 +22,16 @@ export async function acceptInvite(formData: FormData) {
   if (!t || t.type !== "parent_invite" || !tokenUsable(t)) {
     redirect(`/invite/${token}?error=1`);
   }
-  enterTenant(t.schoolId);
   const email = (t.email || "").toLowerCase();
   // Scoped to the school that issued the invite. An address already in use at
   // another school is a different person's account there, or the same person
   // wearing a different hat, and neither blocks this one.
-  const exists = await prisma.user.findUnique({
+  const exists = await prismaSystem.user.findUnique({
     where: { schoolId_email: { schoolId: t.schoolId, email } },
   });
   if (exists) redirect("/login"); // already claimed at this school
 
-  const newUser = await prisma.user.create({
+  const newUser = await prismaSystem.user.create({
     data: {
       schoolId: t.schoolId,
       role: "parent",
@@ -44,10 +42,10 @@ export async function acceptInvite(formData: FormData) {
       consentGivenAt: new Date().toISOString(),
     },
   });
-  await prisma.token.update({ where: { id: t.id }, data: { usedAt: new Date().toISOString() } });
+  await prismaSystem.token.update({ where: { id: t.id }, data: { usedAt: new Date().toISOString() } });
 
   const sid = newSessionId();
-  await prisma.session.create({ data: { id: sid, userId: newUser.id } });
+  await prismaSystem.session.create({ data: { id: sid, userId: newUser.id } });
   await logAudit(newUser.id, "invite_accepted", email);
   const jar = await cookies();
   jar.set(SESSION_COOKIE, sid, SESSION_COOKIE_OPTIONS);

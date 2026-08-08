@@ -19,8 +19,7 @@
 // this whole phase exists to hold.
 
 import { NextResponse, type NextRequest } from "next/server";
-import { prisma, prismaSystem } from "@/lib/db";
-import { enterTenant } from "@/lib/tenant-context";
+import { prismaSystem } from "@/lib/db";
 import { tokenUsable } from "@/lib/tokens";
 import { newSessionId, SESSION_COOKIE, SESSION_COOKIE_OPTIONS, logAudit } from "@/lib/auth";
 import { currentHostKind, currentOrigin } from "@/lib/tenant-server";
@@ -44,8 +43,6 @@ export async function GET(request: NextRequest) {
   if (!token || token.type !== "signin_handoff" || !token.userId || !tokenUsable(token)) {
     return refuse();
   }
-  enterTenant(token.schoolId);
-
   const user = await prismaSystem.user.findUnique({ where: { id: token.userId } });
   if (!user || user.schoolId !== token.schoolId) return refuse();
 
@@ -65,7 +62,8 @@ export async function GET(request: NextRequest) {
   // Burn it first. If anything below fails the token is still spent, which is
   // the safe direction — a second attempt gets the sign-in page rather than a
   // second chance at the same link.
-  const burned = await prisma.token.updateMany({
+  // System: this is session establishment authenticated by the handoff token.
+  const burned = await prismaSystem.token.updateMany({
     where: { id: token.id, usedAt: null },
     data: { usedAt: new Date().toISOString() },
   });
@@ -73,7 +71,7 @@ export async function GET(request: NextRequest) {
   if (burned.count !== 1) return refuse();
 
   const sid = newSessionId();
-  await prisma.session.create({ data: { id: sid, userId: user.id } });
+  await prismaSystem.session.create({ data: { id: sid, userId: user.id } });
   await logAudit(user.id, "login", `${user.role} (signup handoff)`);
 
   // Straight to the console with the first-run notice. Handoff tokens are only

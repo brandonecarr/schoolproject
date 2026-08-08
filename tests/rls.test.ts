@@ -80,13 +80,28 @@ describe("the client wiring", () => {
     expect(db).toMatch(/if \(!ctx\) return query\(args\)/);
   });
 
-  it("getSession binds the tenant for the rest of the request", () => {
+  it("getSession resolves auth via the bypass client and binds no tenant", () => {
     const auth = read("src/lib/auth.ts");
-    // resolveSession reads via the bypass client (no ALS run), so the
-    // enterTenant that follows propagates to the page's queries.
+    // Auth reads run as system; the page's RLS tenant comes from the request
+    // cookie (request-tenant.ts), not from an enterWith that RSC would drop.
     expect(auth).toContain("resolveSession(sid)");
-    expect(auth).toContain("enterTenant(resolved.user.schoolId)");
     expect(auth).toContain("prismaSystem");
+    expect(auth).not.toContain("enterTenant");
+  });
+
+  it("the extension falls back to the request cookie when no scope is set", () => {
+    expect(db).toContain("resolveRequestTenant");
+    // Explicit context is checked first; the request pull only runs when it is
+    // absent — guarded by `if (!ctx)`.
+    expect(db).toMatch(/let ctx = currentTenantContext\(\);[\s\S]*?if \(!ctx\) \{[\s\S]*?resolveRequestTenant/);
+  });
+
+  it("request-tenant reads the session cookie via the bypass client, fails closed", () => {
+    const rt = read("src/lib/request-tenant.ts");
+    expect(rt).toContain("prismaSystem");
+    expect(rt).toContain("cookies()");
+    expect(rt).toMatch(/catch\s*\{\s*return null/); // never throws into a render
+    expect(rt).toContain("cache("); // memoised per request
   });
 
   it("the bypass client exists and is separate from the app client", () => {

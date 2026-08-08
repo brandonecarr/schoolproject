@@ -51,11 +51,13 @@ const globalForPrisma = globalThis as unknown as { clients?: Clients };
  * pooler: the setting dies with the transaction and can never leak onto
  * whatever connection the pooler hands out next.
  *
- * When there is NO context, no setting is issued and the query runs bare. The
- * policies then see NULL and return nothing. That asymmetry is the design:
- * the missing-context case must not pay a transaction round-trip on every
- * public page, and it must fail CLOSED at the database rather than being
- * patched open here.
+ * Context comes from one of two places: an explicit withTenant/asSystem scope
+ * (crons, purge, tests), or — on the normal page/action path where none is set
+ * — resolveRequestTenant(), which reads it from the request cookie. Only when
+ * BOTH are absent does the query run bare, and then the policies see NULL and
+ * return nothing: fail closed. (enterWith is deliberately NOT used to push
+ * context down; it does not survive a React Server Component render — see
+ * request-tenant.ts.)
  *
  * ENFORCEMENT DEPENDS ON THE ROLE. The `postgres` role on Supabase holds
  * BYPASSRLS, so while DATABASE_URL points at it, the policies are dormant and
@@ -104,7 +106,17 @@ function withRls(base: PrismaClient): PrismaClient {
     query: {
       $allModels: {
         async $allOperations({ model, operation, args, query }) {
-          const ctx = currentTenantContext();
+          // Explicit context first — withTenant / asSystem, used by crons, the
+          // retention purge, tests and scripts. When there is none (the normal
+          // page and action path), pull the tenant from the request. That pull
+          // is dynamically imported so this module has no static dependency on
+          // request-tenant.ts, which imports back from here.
+          let ctx = currentTenantContext();
+          if (!ctx) {
+            const { resolveRequestTenant } = await import("@/lib/request-tenant");
+            const tenantId = await resolveRequestTenant();
+            if (tenantId) ctx = { kind: "tenant", tenantId };
+          }
           if (!ctx) return query(args);
           return runWithGuc(
             base,
@@ -128,14 +140,10 @@ function withRls(base: PrismaClient): PrismaClient {
  * resolving a session before a user is known, the pre-auth token and login
  * lookups, the cross-school platform rollup.
  *
- * WHY THIS EXISTS AND asSystem's run() DOES NOT SUFFICE HERE. getSession must
- * read the session as system, THEN bind the tenant for the rest of the request
- * with enterWith. But AsyncLocalStorage.run() (which asSystem uses) followed by
- * enterWith does not propagate the binding to the caller's continuation — the
- * page's later queries would run unbound and be denied. Proven with a reduced
- * test. A plain enterWith after an ordinary await DOES propagate. So the system
- * reads must avoid run() entirely: this client carries no ALS at all, it always
- * bypasses, leaving getSession free to enterWith(tenant) cleanly afterwards.
+ * WHY A SEPARATE CLIENT rather than asSystem(run). Session resolution and the
+ * pre-auth token/login lookups happen before any request tenant is known, and
+ * they must not themselves be tenant-scoped. Using this client keeps them free
+ * of AsyncLocalStorage entirely, so they compose cleanly with everything else.
  *
  * Use it ONLY for operations that are correct to run across every school. Every
  * call site is a place to ask "why may this see everything?".

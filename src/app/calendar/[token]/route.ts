@@ -19,7 +19,7 @@
 // their own. Nobody sees another family's.
 
 import { prisma, prismaSystem } from "@/lib/db";
-import { enterTenant } from "@/lib/tenant-context";
+import { withTenant } from "@/lib/tenant-context";
 import { buildIcal, type IcalEntry, type CalEvent } from "@/lib/calendar";
 import { threadStudentIds, isStaff as isStaffRole } from "@/lib/messages";
 import { icalLocalStamp } from "@/lib/conferences";
@@ -50,8 +50,10 @@ export async function GET(_request: Request, { params }: { params: Promise<{ tok
     return new Response("Not found", { status: 404 });
   }
   // The subscriber is real; every read below is their school's data only.
-  enterTenant(user.schoolId);
-
+  // withTenant (not enterTenant): this is a route handler, where run() reliably
+  // scopes its callback's queries — and there is no session cookie here, so the
+  // request-cookie tenant resolution the pages use would find nothing.
+  return withTenant(user.schoolId, async () => {
   const school = await prisma.school.findUnique({ where: { id: user.schoolId } });
   if (!school) return new Response("Not found", { status: 404 });
 
@@ -136,5 +138,6 @@ export async function GET(_request: Request, { params }: { params: Promise<{ tok
       "Referrer-Policy": "no-referrer",
       "X-Robots-Tag": "noindex, nofollow",
     },
+  });
   });
 }

@@ -7,8 +7,7 @@
 
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
-import { prisma, prismaSystem } from "@/lib/db";
-import { enterTenant } from "@/lib/tenant-context";
+import { prismaSystem } from "@/lib/db";
 import { availableSlug, isUsableSlug, slugify } from "@/lib/tenant";
 import { originFor } from "@/lib/tenant-server";
 import { newTokenValue, tokenExpiryMinutes } from "@/lib/tokens";
@@ -55,9 +54,9 @@ export async function signup(formData: FormData) {
   const school = await prismaSystem.school.create({
     data: { name: schoolName, slug, state, esaAmount, address: "" },
   });
-  // The tenant exists now; everything else in this signup belongs to it.
-  enterTenant(school.id);
-  const owner = await prisma.user.create({
+  // System: signup builds a brand-new tenant from nothing; these creates
+  // precede any session or request tenant.
+  const owner = await prismaSystem.user.create({
     data: { schoolId: school.id, role: "owner", name, email, password: hashPassword(password) },
   });
 
@@ -78,7 +77,7 @@ export async function signup(formData: FormData) {
   const origin = originFor(slug);
   if (origin) {
     const handoff = newTokenValue();
-    await prisma.token.create({
+    await prismaSystem.token.create({
       data: {
         token: handoff,
         type: "signin_handoff",
@@ -92,7 +91,7 @@ export async function signup(formData: FormData) {
 
   // Untenanted deployment: one origin, so sign in here.
   const sid = newSessionId();
-  await prisma.session.create({ data: { id: sid, userId: owner.id } });
+  await prismaSystem.session.create({ data: { id: sid, userId: owner.id } });
   const jar = await cookies();
   jar.set(SESSION_COOKIE, sid, SESSION_COOKIE_OPTIONS);
   redirect("/dashboard");
