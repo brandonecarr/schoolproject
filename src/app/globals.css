@@ -4626,19 +4626,23 @@ a:focus-visible {
   color: #fff;
   font-size: 14px;
   font-weight: 700;
-  padding: 11px 8px 11px 18px;
+  /* Top padding 1px shy of bottom, deliberately: Jakarta's tall ascender puts
+     the label's ink below the geometric center, so a centered box reads as
+     text sitting low. The asymmetry lifts the ink to optical center; the
+     .lp-well transform below puts the icon circle back on true center. */
+  padding: 10px 8px 12px 18px;
   border-radius: 999px;
   box-shadow: 0 6px 18px oklch(0.55 0.19 285 / 0.28);
 }
 .lp-pill-lg {
   font-size: 15.5px;
-  padding: 13px 10px 13px 22px;
+  padding: 12px 10px 14px 22px;
 }
 .lp-pill-full {
   width: 100%;
   justify-content: center;
   margin-top: 20px;
-  padding: 13px 18px;
+  padding: 12px 18px 14px;
 }
 .lp-pill:hover,
 .lp-markbtn:hover {
@@ -4652,6 +4656,9 @@ a:focus-visible {
   display: grid;
   place-items: center;
   font-size: 12px;
+  /* Cancels the pill's 1px optical text lift — the circle has no baseline and
+     wants true center. */
+  transform: translateY(1px);
 }
 .lp-markbtn {
   display: inline-flex;
@@ -4661,8 +4668,12 @@ a:focus-visible {
   color: var(--lp-on-mark);
   font-size: 16px;
   font-weight: 800;
-  padding: 14px 26px;
+  /* Same 1px optical lift as .lp-pill — same font, same low-sitting ink. */
+  padding: 13px 26px 15px;
   border-radius: 999px;
+}
+.lp-markbtn > span {
+  transform: translateY(1px);
 }
 .lp-markbtn:hover {
   filter: brightness(1.06);
