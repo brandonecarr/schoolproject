@@ -107,6 +107,27 @@ export async function GET(_request: Request, { params }: { params: Promise<{ tok
     }
   }
 
+  // Program compliance deadlines — STAFF ONLY. A family subscribing to the
+  // school calendar should see terms and homework, not the school's reporting
+  // obligations to its ESA administrator; those are operator business, and a
+  // leaked family link must not disclose them.
+  if (staff) {
+    const deadlines = await prisma.complianceDeadline.findMany({
+      where: { schoolId: school.id, completedAt: null },
+    });
+    for (const d of deadlines) {
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(d.dueDate)) continue;
+      entries.push({
+        uid: `deadline-${d.id}`,
+        summary: `Program deadline: ${d.label}`,
+        start: d.dueDate,
+        end: d.dueDate,
+        description: d.note || undefined,
+        transparent: true,
+      });
+    }
+  }
+
   // The subscriber's own conference, as a real timed event rather than an
   // all-day one — this is the single entry in the feed where the *time* is the
   // whole point.

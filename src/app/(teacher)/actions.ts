@@ -1597,6 +1597,63 @@ export async function regenerateCalendarToken() {
   redirect("/calendar?rotated=1");
 }
 
+// --- Compliance deadlines ---
+// The dates here are typed by the school off their award letter or the program
+// portal — never pre-filled from rules.ts. A program's obligations list can say
+// "there is a quarterly report" (⚑), but only the school knows which quarter
+// applies to their families. A confidently wrong pre-filled deadline would be
+// worse than none.
+
+export async function addDeadline(formData: FormData) {
+  const { user, school } = await requireTeacher();
+  const label = String(formData.get("label") || "").trim().slice(0, 200);
+  const dueDate = String(formData.get("dueDate") || "").trim();
+  const note = String(formData.get("note") || "").trim().slice(0, 500);
+  // programCode ties the deadline to the rail it came from, purely for display
+  // ("AZ ESA — quarterly expense report"). Free text is fine; nothing keys off it.
+  const programCode = String(formData.get("programCode") || "").trim().slice(0, 40);
+
+  if (!label || !/^\d{4}-\d{2}-\d{2}$/.test(dueDate)) {
+    redirect("/calendar?error=deadline");
+  }
+
+  await prisma.complianceDeadline.create({
+    data: { schoolId: school!.id, label, dueDate, note, programCode },
+  });
+  await logAudit(user.id, "deadline_added", `${label} due ${dueDate}`);
+  revalidatePath("/calendar");
+  revalidatePath("/dashboard");
+  redirect("/calendar?deadline=added");
+}
+
+export async function completeDeadline(formData: FormData) {
+  const { user, school } = await requireTeacher();
+  const id = String(formData.get("id"));
+  // updateMany with the schoolId in the where, same shape as every other
+  // teacher mutation: the RLS policy would also catch a cross-school id, but
+  // the application check is the one that runs even under the owner role.
+  const res = await prisma.complianceDeadline.updateMany({
+    where: { id, schoolId: school!.id, completedAt: null },
+    data: { completedAt: new Date().toISOString() },
+  });
+  if (res.count > 0) await logAudit(user.id, "deadline_completed", id);
+  revalidatePath("/calendar");
+  revalidatePath("/dashboard");
+  redirect("/calendar?deadline=done");
+}
+
+export async function removeDeadline(formData: FormData) {
+  const { user, school } = await requireTeacher();
+  const id = String(formData.get("id"));
+  const res = await prisma.complianceDeadline.deleteMany({
+    where: { id, schoolId: school!.id },
+  });
+  if (res.count > 0) await logAudit(user.id, "deadline_removed", id);
+  revalidatePath("/calendar");
+  revalidatePath("/dashboard");
+  redirect("/calendar?deadline=removed");
+}
+
 // --- Announcements ---
 // A broadcast, not a conversation. Publishing is the moment notifications fire,
 // and it happens exactly once: editing afterwards fixes the text without

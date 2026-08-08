@@ -527,6 +527,28 @@ model Message {
   createdAt    DateTime @default(now())
 }
 
+// A program obligation with a date on it: the SLP renewal, the quarterly
+// expense report, the annual contract. THE SCHOOL SETS THE DATE — rules.ts
+// suggests which obligations a program typically carries (⚑ from public
+// writing), but the date that counts is the one on the family's award letter
+// or the program portal, and only the school can read those. Missing one of
+// these can cost a family a year of funding, which is why an invented date
+// would be worse than no reminder at all.
+model ComplianceDeadline {
+  id          String   @id @default(cuid())
+  schoolId    String
+  /// State code this belongs to ("FL"), or "" for a school-wide obligation.
+  programCode String   @default("")
+  label       String
+  dueDate     String // YYYY-MM-DD
+  note        String   @default("")
+  /// ISO timestamp when the school marked it handled; null while open.
+  completedAt String?
+  createdAt   DateTime @default(now())
+
+  @@index([schoolId])
+}
+
 // One-time links for onboarding + password reset. Replaces the shared demo1234
 // password. Link-based (no email dependency): the teacher/owner shares the URL.
 model Token {

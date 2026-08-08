@@ -20,9 +20,19 @@ import {
   WEEKDAY_LABEL,
   type CalEvent,
 } from "@/lib/calendar";
+import { classifyDeadlines, deadlinePhrase, DEADLINE_SOON_DAYS } from "@/lib/deadlines";
+import { PROGRAMS } from "@/lib/rules";
 import { Pill, Notice } from "@/components/ui";
 import type { Tone } from "@/components/ui";
-import { addCalendarEvent, deleteCalendarEvent, saveSchoolDays, regenerateCalendarToken } from "../actions";
+import {
+  addCalendarEvent,
+  deleteCalendarEvent,
+  saveSchoolDays,
+  regenerateCalendarToken,
+  addDeadline,
+  completeDeadline,
+  removeDeadline,
+} from "../actions";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Calendar — Cohort" };
@@ -36,7 +46,14 @@ const KIND: Record<string, { label: string; tone: Tone; help: string }> = {
 export default async function CalendarPage({
   searchParams,
 }: {
-  searchParams: Promise<{ added?: string; deleted?: string; saved?: string; rotated?: string; error?: string }>;
+  searchParams: Promise<{
+    added?: string;
+    deleted?: string;
+    saved?: string;
+    rotated?: string;
+    deadline?: string;
+    error?: string;
+  }>;
 }) {
   const { user, school } = await requireTeacher();
   const sp = await searchParams;
@@ -60,6 +77,26 @@ export default async function CalendarPage({
   });
   const loggedDates = new Set(logged.map((a) => a.date));
   const unlogged = inPeriod.filter((d) => !loggedDates.has(d));
+
+  // Program compliance deadlines. The dates are the school's own — typed off
+  // an award letter or the program portal, never invented here. What rules.ts
+  // contributes is the ⚑ obligations list for the rails this school's students
+  // are actually on, as prompts for what to record.
+  const deadlineRows = await prisma.complianceDeadline.findMany({
+    where: { schoolId: school!.id },
+    orderBy: [{ dueDate: "asc" }],
+  });
+  const dl = classifyDeadlines(deadlineRows, end);
+  const openDeadlines = [...dl.overdue, ...dl.soon, ...dl.later];
+  const railCodes = (
+    await prisma.student.findMany({
+      where: { schoolId: school!.id, esaProgram: { not: null } },
+      select: { esaProgram: true },
+      distinct: ["esaProgram"],
+    })
+  )
+    .map((s) => s.esaProgram!)
+    .filter((c) => PROGRAMS[c]);
 
   // Absolute: this is copied out of the page and pasted into Apple Calendar,
   // where a relative path means nothing. Built from the address the school is
@@ -87,6 +124,10 @@ export default async function CalendarPage({
           subscribed will need the new one.
         </Notice>
       )}
+      {sp.deadline === "added" && <Notice tone="good">Deadline recorded.</Notice>}
+      {sp.deadline === "done" && <Notice tone="good">Marked handled. It stays in the history below.</Notice>}
+      {sp.deadline === "removed" && <Notice tone="good">Deadline removed.</Notice>}
+      {sp.error === "deadline" && <Notice tone="bad">A deadline needs a name and a due date.</Notice>}
       {sp.error === "invalid" && <Notice tone="bad">A title and a valid start date are required.</Notice>}
       {sp.error === "backwards" && <Notice tone="bad">The end date cannot be before the start date.</Notice>}
       {sp.error === "nodays" && <Notice tone="bad">A school has to teach on at least one weekday.</Notice>}
@@ -237,6 +278,133 @@ export default async function CalendarPage({
             )}
           </tbody>
         </table>
+      </div>
+
+      <div className="card" style={{ marginTop: 12 }}>
+        <div className="eyebrow">Program deadlines</div>
+        <p className="small muted" style={{ margin: "6px 0 10px", maxWidth: "72ch" }}>
+          Reporting dates your ESA program holds you or your families to — expense reports, plan
+          renewals, contract signatures. Enter them from your award letter or the program portal;
+          the ones that matter show up on the dashboard as they approach.
+        </p>
+
+        {railCodes.length > 0 && (
+          <div className="small" style={{ margin: "0 0 12px" }}>
+            {railCodes.map((code) => {
+              const p = PROGRAMS[code];
+              const obs = p.obligations ?? [];
+              if (obs.length === 0) return null;
+              return (
+                <div key={code} style={{ marginBottom: 8 }}>
+                  <strong>{p.label}</strong> is publicly documented to expect:
+                  <ul style={{ margin: "4px 0 0", paddingLeft: 18 }}>
+                    {obs.map((o) => (
+                      <li key={o.key} style={{ marginBottom: 2 }}>
+                        {o.label} <span className="muted">— {o.hint}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              );
+            })}
+            <p className="muted" style={{ margin: "6px 0 0" }}>
+              ⚑ means we read this in the program&apos;s public documents but haven&apos;t verified
+              it against a live cycle — confirm the date in your own portal before relying on it.
+            </p>
+          </div>
+        )}
+
+        <form action={addDeadline}>
+          <div className="row" style={{ gap: 12 }}>
+            <div style={{ flex: 2, minWidth: 220 }}>
+              <label htmlFor="dl-label">What is due</label>
+              <input id="dl-label" name="label" required placeholder="Q1 expense report" />
+            </div>
+            <div style={{ flex: 1, minWidth: 150 }}>
+              <label htmlFor="dl-due">Due date</label>
+              <input id="dl-due" name="dueDate" type="date" required />
+            </div>
+            <div style={{ flex: 1, minWidth: 150 }}>
+              <label htmlFor="dl-program">Program (optional)</label>
+              <select id="dl-program" name="programCode" defaultValue={railCodes[0] ?? ""}>
+                <option value="">—</option>
+                {railCodes.map((code) => (
+                  <option key={code} value={code}>
+                    {PROGRAMS[code].label}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
+          <div className="row" style={{ gap: 12, marginTop: 10, alignItems: "center" }}>
+            <div style={{ flex: 2, minWidth: 220 }}>
+              <label htmlFor="dl-note">Note (optional)</label>
+              <input id="dl-note" name="note" placeholder="Where you saw the date, portal link…" />
+            </div>
+            <button className="btn mark" style={{ marginTop: 18 }}>
+              Record deadline
+            </button>
+          </div>
+        </form>
+
+        {(openDeadlines.length > 0 || dl.done.length > 0) && (
+          <table style={{ marginTop: 14 }}>
+            <thead>
+              <tr>
+                <th>Deadline</th>
+                <th>Due</th>
+                <th>Status</th>
+                <th><span className="sr-only">Actions</span></th>
+              </tr>
+            </thead>
+            <tbody>
+              {openDeadlines.map((d) => (
+                <tr key={d.id}>
+                  <td>
+                    {d.label}
+                    {d.programCode && PROGRAMS[d.programCode] ? (
+                      <div className="small muted">{PROGRAMS[d.programCode].label}</div>
+                    ) : null}
+                    {d.note ? <div className="small muted">{d.note}</div> : null}
+                  </td>
+                  <td className="small">{fmt(d.dueDate)}</td>
+                  <td>
+                    <Pill tone={d.daysLeft < 0 ? "bad" : d.daysLeft <= DEADLINE_SOON_DAYS ? "warn" : "info"}>
+                      {deadlinePhrase(d.daysLeft)}
+                    </Pill>
+                  </td>
+                  <td style={{ textAlign: "right" }}>
+                    <div className="row" style={{ gap: 6, justifyContent: "flex-end" }}>
+                      <form action={completeDeadline}>
+                        <input type="hidden" name="id" value={d.id} />
+                        <button className="btn sec sm">Done</button>
+                      </form>
+                      <form action={removeDeadline}>
+                        <input type="hidden" name="id" value={d.id} />
+                        <button className="btn ghost sm">Remove</button>
+                      </form>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+              {dl.done.map((d) => (
+                <tr key={d.id} style={{ opacity: 0.6 }}>
+                  <td>{d.label}</td>
+                  <td className="small">{fmt(d.dueDate)}</td>
+                  <td>
+                    <Pill tone="good">Handled</Pill>
+                  </td>
+                  <td style={{ textAlign: "right" }}>
+                    <form action={removeDeadline}>
+                      <input type="hidden" name="id" value={d.id} />
+                      <button className="btn ghost sm">Remove</button>
+                    </form>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
       </div>
 
       <div className="card" style={{ marginTop: 12 }}>

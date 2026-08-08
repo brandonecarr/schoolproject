@@ -11,6 +11,7 @@ import { Icon } from "@/components/icons";
 import { Bar, Card, CardHead, Notice, PageHead, Pill, StackBar, StatCard } from "@/components/ui";
 import { currentOrigin } from "@/lib/tenant-server";
 import { reimbursementMetrics, formatPct, stalledInvoices, STALL_DAYS } from "@/lib/metrics";
+import { classifyDeadlines, deadlinePhrase } from "@/lib/deadlines";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Dashboard — Cohort" };
@@ -39,6 +40,15 @@ export default async function Dashboard({
   // Coming due soon: the next assignments due, with turn-in progress.
   const td = today();
   const stall = stalledInvoices(invoices, td);
+
+  // Program deadlines close enough to matter. Only overdue + soon surface
+  // here — the full list lives on /calendar, and a nudge that fires for a
+  // date three months out trains people to ignore it.
+  const dl = classifyDeadlines(
+    await prisma.complianceDeadline.findMany({ where: { schoolId }, select: { id: true, label: true, dueDate: true, completedAt: true } }),
+    td
+  );
+  const dlUrgent = [...dl.overdue, ...dl.soon];
   const upcoming = await prisma.assignment.findMany({
     where: { schoolId, dueDate: { gte: td } },
     orderBy: { dueDate: "asc" },
@@ -211,6 +221,23 @@ export default async function Dashboard({
                   : `${stall.stalled.length} packets have waited ${STALL_DAYS}+ days`}{" "}
                 without a recorded decision — <strong>${stall.atRisk.toLocaleString()}</strong> at
                 risk. Check the portal, then <Link href="/invoices">record what you find</Link>.
+              </div>
+            )}
+            {/* A missed reporting deadline can cost a family the next award
+                year — worth a line here even when every invoice is healthy. */}
+            {dlUrgent.length > 0 && (
+              <div className={`notice ${dl.overdue.length > 0 ? "bad" : "warn"}`} style={{ margin: "8px 0 10px" }}>
+                {dlUrgent.length === 1 ? (
+                  <>
+                    <strong>{dlUrgent[0].label}</strong> — {deadlinePhrase(dlUrgent[0].daysLeft).toLowerCase()}.
+                  </>
+                ) : (
+                  <>
+                    {dlUrgent.length} program deadlines need attention — nearest:{" "}
+                    <strong>{dlUrgent[0].label}</strong>, {deadlinePhrase(dlUrgent[0].daysLeft).toLowerCase()}.
+                  </>
+                )}{" "}
+                <Link href="/calendar">See deadlines</Link>.
               </div>
             )}
             {hasReimbursementData ? (

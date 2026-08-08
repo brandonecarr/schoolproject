@@ -160,6 +160,20 @@ export type Program = {
   /** Other programs the same state runs that a microschool might also bill.
    *  PROGRAMS is keyed by state, so only the primary one is selectable today. */
   alsoRuns?: string[];
+  /** Dated obligations this program is publicly documented to carry — SLP
+   *  renewals, expense reports, contract renewals. ⚑ SUGGESTIONS ONLY: the
+   *  school types the actual date into a ComplianceDeadline, because the date
+   *  that counts is on the family's award letter or in the program portal.
+   *  Only listed where public writing actually names the obligation; a state
+   *  with none listed has none we could ground, not none at all. */
+  obligations?: ProgramObligation[];
+};
+
+export type ProgramObligation = {
+  key: string;
+  label: string;
+  /** Where the real date lives, and roughly when to expect it. */
+  hint: string;
 };
 
 // ⚑ EVERY entry below is unverified — see the file header. The rail assignments
@@ -175,9 +189,33 @@ export type Program = {
 export const PROGRAMS: Record<string, Program> = {
   AL: { rail: "classwallet", program: "CHOOSE Act", label: "Alabama CHOOSE Act", kind: "esa", amount: 7000, live: true, alsoRuns: ["CHOOSE Act home education award (~$2,000)"] },
   AK: { rail: "statedirect", program: "Correspondence school allotment", label: "Alaska correspondence allotment", kind: "allotment", amount: 2700, live: true, limited: "Students enrolled in a district correspondence program" },
-  AZ: { rail: "classwallet", program: "Empowerment Scholarship Account", label: "Arizona ESA", kind: "esa", amount: 7400, live: true },
+  AZ: { rail: "classwallet", program: "Empowerment Scholarship Account", label: "Arizona ESA", kind: "esa", amount: 7400, live: true,
+    obligations: [
+      {
+        key: "az_quarterly_expense",
+        label: "Quarterly expense report",
+        hint:
+          "Due the 20th of the last month of each quarter (Sep, Dec, Mar, Jun) per the ESA parent handbook — required even with zero expenses. Confirm in the family's ESA portal. ⚑",
+      },
+      {
+        key: "az_contract_renewal",
+        label: "Annual ESA contract renewal",
+        hint:
+          "Renewal contracts issued by May 1; the family submits by June 30 (Ariz. Admin. Code R7-2-1506). Confirm each family's dates in their portal. ⚑",
+      },
+    ],
+  },
   AR: { rail: "classwallet", program: "Education Freedom Account", label: "Arkansas EFA", kind: "esa", amount: 7600, live: true },
-  FL: { rail: "stepup", program: "Personalized Education Program", label: "Florida PEP", kind: "esa", amount: 8000, live: true, alsoRuns: ["Family Empowerment Scholarship (FES-EO / FES-UA)"] },
+  FL: { rail: "stepup", program: "Personalized Education Program", label: "Florida PEP", kind: "esa", amount: 8000, live: true, alsoRuns: ["Family Empowerment Scholarship (FES-EO / FES-UA)"],
+    obligations: [
+      {
+        key: "fl_slp_renewal",
+        label: "Student Learning Plan (SLP) submission",
+        hint:
+          "PEP families submit an SLP to their scholarship organisation annually — a late initial SLP has cost students the year's funding (May 31 for 2026-27, per FLDOE). Confirm this year's date in the portal. ⚑",
+      },
+    ],
+  },
   GA: { rail: "odyssey", program: "Georgia Promise Scholarship", label: "Georgia Promise Scholarship", kind: "esa", amount: 6500, live: true, limited: "Students zoned to a low-performing public school" },
   ID: { rail: "statedirect", program: "Parental Choice Tax Credit", label: "Idaho Parental Choice Tax Credit", kind: "taxcredit", amount: 5000, live: true },
   IN: { rail: "classwallet", program: "Education Scholarship Account", label: "Indiana ESA", kind: "esa", amount: 7500, live: true, limited: "Students with a disability or service plan" },

@@ -22,7 +22,24 @@ const read = (p: string) => readFileSync(join(ROOT, p), "utf8");
 // avoids $transaction, and prose must not trip a guard about code.
 const code = (src: string) => src.replace(/\/\*[\s\S]*?\*\//g, " ").replace(/^\s*\/\/.*$/gm, " ");
 
-const MIGRATION = "prisma/migrations/20260807230000_rls_policies/migration.sql";
+// Policies live across MANY migrations now: the original sweep plus one block
+// per table added since. Completeness is judged against their union — which is
+// exactly what lets the "add a policy migration for the new model" instruction
+// in the failure message actually resolve the failure.
+import { readdirSync as readDir } from "node:fs";
+function allPoliciesSql(): string {
+  const base = join(ROOT, "prisma", "migrations");
+  return readDir(base)
+    .filter((d) => !d.startsWith("."))
+    .map((d) => {
+      try {
+        return readFileSync(join(base, d, "migration.sql"), "utf8");
+      } catch {
+        return "";
+      }
+    })
+    .join("\n");
+}
 
 function models(): { name: string; hasSchoolId: boolean }[] {
   const schema = read("prisma/schema.prisma");
@@ -33,7 +50,7 @@ function models(): { name: string; hasSchoolId: boolean }[] {
 }
 
 describe("every model has a policy", () => {
-  const sql = read(MIGRATION);
+  const sql = allPoliciesSql();
 
   it.each(models().map((m) => [m.name, m] as const))("%s", (_n, m) => {
     // A model added after this migration needs its own policy migration.
@@ -58,7 +75,7 @@ describe("every model has a policy", () => {
   it("fails closed: no policy grants access without a tenant or the bypass", () => {
     // Every USING clause must reference one of the two GUCs. A policy with a
     // bare `true` would be an open door.
-    const sql = read(MIGRATION);
+    const sql = allPoliciesSql();
     for (const m of sql.matchAll(/USING \(([\s\S]*?)\)\s*\n\s*WITH CHECK/g)) {
       expect(m[1]).toMatch(/app\.tenant_id|app\.bypass_rls/);
     }
