@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Image from "next/image";
 import Link from "next/link";
 import { login } from "./actions";
 
@@ -32,7 +33,7 @@ export default async function LoginPage({
           which is where a returning teacher's eye goes first. */}
       <aside className="auth-brand">
         <div className="lockup">
-          <div className="brand-mark">C</div>
+          <Image src="/logo-mark.png" alt="" width={30} height={39} className="brand-markimg" />
           <div className="wordmark">Cohort</div>
         </div>
 

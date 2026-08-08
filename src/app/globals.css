@@ -4609,6 +4609,12 @@ a:focus-visible {
   display: block;
   flex: 0 0 auto;
 }
+/* Same mark in the app chrome: auth pages and the sidebar fallback (a school's
+   own uploaded logo still wins in the sidebar). */
+.brand-markimg {
+  display: block;
+  flex: 0 0 auto;
+}
 .lp-word {
   font-family: var(--head);
   font-size: 20px;

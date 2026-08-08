@@ -25,6 +25,7 @@
 // add a click to reach things a parent opens weekly, and the accordion only
 // earns its complexity at the teacher's scale.
 
+import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState } from "react";
@@ -120,15 +121,15 @@ export function Sidebar({
   return (
     <nav className="side" aria-label="Main">
       {/* The mark carries the school's logo when one is uploaded, and falls back
-          to Cohort's "C". The wordmark stays Cohort with the school beneath —
-          the printed packet is the artifact that leads with the school (8.5);
-          in the app the person already knows whose school it is. */}
+          to the Cohort shield. The wordmark stays Cohort with the school
+          beneath — the printed packet is the artifact that leads with the
+          school (8.5); in the app the person already knows whose school it is. */}
       <div className="brand">
         {logoSrc ? (
           // eslint-disable-next-line @next/next/no-img-element
           <img className="brand-logo" src={logoSrc} alt="" />
         ) : (
-          <div className="brand-mark">C</div>
+          <Image src="/logo-mark.png" alt="" width={26} height={34} className="brand-markimg" />
         )}
         <div>
           <div className="brand-name">Cohort</div>

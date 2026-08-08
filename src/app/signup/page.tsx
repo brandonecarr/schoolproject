@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Image from "next/image";
 import Link from "next/link";
 import { signup } from "./actions";
 import { SlugField } from "./SlugField";
@@ -32,7 +33,7 @@ export default async function SignupPage({
     <div className="authplain">
       <main className="authcol">
         <div className="lockup">
-          <div className="brand-mark">C</div>
+          <Image src="/logo-mark.png" alt="" width={30} height={39} className="brand-markimg" />
           <div>
             <div className="wordmark">Cohort</div>
             <div className="tagline">Run the school. Get paid for it.</div>

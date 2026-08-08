@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Image from "next/image";
 import { prismaSystem } from "@/lib/db";
 import { tokenUsable } from "@/lib/tokens";
 import { redirectTokenToTenant } from "@/lib/tenant-server";
@@ -12,7 +13,7 @@ function Shell({ children }: { children: React.ReactNode }) {
     <div style={{ minHeight: "100vh", display: "grid", placeItems: "center", padding: 24 }}>
       <div style={{ width: "100%", maxWidth: 420 }}>
         <div className="row" style={{ gap: 10, marginBottom: 20 }}>
-          <div className="brand-mark">C</div>
+          <Image src="/logo-mark.png" alt="" width={30} height={39} className="brand-markimg" />
           <div style={{ fontFamily: "var(--serif)", fontSize: 24, fontWeight: 600 }}>Cohort</div>
         </div>
         {children}
