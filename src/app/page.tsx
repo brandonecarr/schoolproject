@@ -37,11 +37,7 @@ export const metadata = {
  */
 const SHOW_PRICING = true;
 
-export default async function Home({
-  searchParams,
-}: {
-  searchParams: Promise<{ signin?: string }>;
-}) {
+export default async function Home() {
   const kind = await currentHostKind();
 
   if (kind.kind !== "apex") {
@@ -52,7 +48,6 @@ export default async function Home({
     redirect("/dashboard");
   }
 
-  const { signin } = await searchParams;
   const root = rootDomain() || "schoolcohort.com";
   const states = landingStates();
   // Chips for the workflows section: every configured rail, the three largest
@@ -90,7 +85,7 @@ export default async function Home({
           </div>
 
           <div className="lp-headright">
-            <Link className="lp-textlink" href="/login">
+            <Link className="lp-textlink" href="/find">
               Sign in
             </Link>
             <Link className="lp-pill" href="/signup">
@@ -101,19 +96,6 @@ export default async function Home({
             </Link>
           </div>
         </header>
-
-        {/* Someone typed the bare domain looking for their school. They cannot
-            sign in here — the session cookie is host-only, so an account only
-            exists at its own address — and the honest answer is to say where to
-            look rather than show a form that would not work. */}
-        {signin && (
-          <div className="lp-find" role="status">
-            <strong>Looking for your school?</strong> Each school signs in at its own address, not
-            this one — something like <span className="mono">cedar-grove.{root}</span>. It&apos;s in
-            the invitation your school sent you. Lost the address?{" "}
-            <Link href="/find">We can email it to you.</Link>
-          </div>
-        )}
 
         <section className="lp-hero">
           <div className="lp-herocopy">

@@ -82,10 +82,12 @@ export function proxy(request: NextRequest) {
   if (kind.kind === "apex") {
     if (onList(url.pathname, APEX_PATHS)) return NextResponse.next();
     // Someone's bookmark of the app on the bare domain. There is no way to
-    // know which school they meant, so the landing page asks.
+    // know which school they meant — /login lands on the school finder, which
+    // explains why and can email them their school's address; everything else
+    // goes to the front door.
     const to = url.clone();
-    to.pathname = "/";
-    to.search = url.pathname === "/login" ? "?signin=1" : "";
+    to.pathname = url.pathname === "/login" || url.pathname.startsWith("/login/") ? "/find" : "/";
+    to.search = "";
     return NextResponse.redirect(to);
   }
 
