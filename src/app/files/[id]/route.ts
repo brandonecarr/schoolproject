@@ -19,8 +19,11 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
 
   const isStaff = ["owner", "teacher"].includes(user.role) && user.schoolId === f.schoolId;
   // A file with no studentId is a teacher-attached assignment resource — shared
-  // teaching material, readable by anyone signed in at that school.
-  const isSchoolResource = f.studentId == null && user.schoolId === f.schoolId;
+  // teaching material, readable by anyone signed in at that school. EXCEPT an
+  // invoice-attached receipt: that is the school's claim paperwork, not shared
+  // material, so it stays staff-only even though its studentId is null.
+  const isSchoolResource =
+    f.studentId == null && f.invoiceId == null && user.schoolId === f.schoolId;
   let isFamily = false;
   if (user.role === "parent") {
     const ids: string[] = user.studentIdsJson ? JSON.parse(user.studentIdsJson) : [];

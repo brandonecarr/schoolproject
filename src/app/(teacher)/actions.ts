@@ -1858,6 +1858,81 @@ export async function saveConferenceNote(formData: FormData) {
 /** Logo formats a browser will render inline. PDF is absent (it isn't an
  *  image) and so is SVG — an SVG is a document that can carry script, and this
  *  file gets embedded into pages we generate. */
+/** What a receipt may be. The logo set plus PDF, because real receipts are
+ *  routinely emailed PDFs. SVG stays excluded for the same reason as ever:
+ *  it is a document that can carry script, and these get rendered into pages
+ *  we generate. */
+const RECEIPT_TYPES: Record<string, string> = {
+  "image/png": "png",
+  "image/jpeg": "jpg",
+  "image/webp": "webp",
+  "application/pdf": "pdf",
+};
+
+/**
+ * Attach an expense receipt to an invoice.
+ *
+ * This is the itemised proof of purchase a reviewer matches against the amount
+ * claimed — Arizona's rail names "itemised receipts" as a requirement, and
+ * until now our packets had nowhere to carry one. Stored as a FileRec with
+ * studentId null (a financial record, off the COPPA retention clock) and
+ * invoiceId set (which also scopes it to staff in the /files route).
+ */
+export async function uploadReceipt(formData: FormData) {
+  const { user, school } = await requireTeacher();
+  const schoolId = school!.id;
+  const invoiceId = String(formData.get("invoiceId") || "");
+  const back = `/invoices/${invoiceId}`;
+
+  // The invoice must be this school's. RLS backstops this; the app check stays
+  // primary so the failure is a 404, not a silent empty write.
+  const inv = await prisma.invoice.findFirst({ where: { id: invoiceId, schoolId } });
+  if (!inv) redirect("/invoices");
+
+  const file = formData.get("file") as File | null;
+  if (!file || file.size === 0) redirect(`${back}?receipt=empty`);
+  const ext = RECEIPT_TYPES[file.type];
+  if (!ext) redirect(`${back}?receipt=type`);
+  // Bigger than the logo cap (receipts are phone photos), smaller than
+  // unbounded (bytes live in the DB and ride the pooler).
+  if (file.size > 4 * 1024 * 1024) redirect(`${back}?receipt=big`);
+
+  const buf = Buffer.from(await file.arrayBuffer());
+  await prisma.fileRec.create({
+    data: {
+      schoolId,
+      // Null on purpose: studentId marks child data for the retention purge,
+      // and a receipt is a financial record kept for reimbursement audit.
+      studentId: null,
+      invoiceId,
+      label: (file.name || "receipt").slice(0, 120),
+      ext,
+      mime: file.type,
+      bytes: buf.length,
+      data: buf,
+      capturedAt: new Date().toISOString(),
+    },
+  });
+
+  await logAudit(user.id, "receipt_uploaded", `${invoiceId}: ${buf.length} bytes`);
+  revalidatePath(back);
+  redirect(`${back}?receipt=ok`);
+}
+
+/** Remove a receipt. The where-clause requires invoiceId to be set, so this
+ *  action can only ever delete receipts — never a work sample or the logo. */
+export async function removeReceipt(formData: FormData) {
+  const { user, school } = await requireTeacher();
+  const fileId = String(formData.get("fileId") || "");
+  const invoiceId = String(formData.get("invoiceId") || "");
+  const removed = await prisma.fileRec.deleteMany({
+    where: { id: fileId, schoolId: school!.id, invoiceId: { not: null } },
+  });
+  if (removed.count > 0) await logAudit(user.id, "receipt_removed", fileId);
+  revalidatePath(`/invoices/${invoiceId}`);
+  redirect(`/invoices/${invoiceId}?receipt=removed`);
+}
+
 const LOGO_TYPES: Record<string, string> = {
   "image/png": "png",
   "image/jpeg": "jpg",

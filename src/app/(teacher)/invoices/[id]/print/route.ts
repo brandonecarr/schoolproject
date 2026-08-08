@@ -6,7 +6,7 @@
 import { NextResponse } from "next/server";
 import { getSession, logAudit } from "@/lib/auth";
 import { prisma } from "@/lib/db";
-import { packetCss, letterhead, packetFoot, printBar } from "@/lib/packet";
+import { packetCss, letterhead, packetFoot, printBar, receiptFigures } from "@/lib/packet";
 import { brandForSchool } from "@/lib/packet-read";
 import { evidenceFor } from "@/lib/evidence";
 import { RAILS } from "@/lib/rules";
@@ -53,6 +53,12 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
     list.push(p);
     pinsByFile.set(p.fileId, list);
   }
+
+  const receipts = await prisma.fileRec.findMany({
+    where: { schoolId: school!.id, invoiceId: inv.id },
+    orderBy: { createdAt: "asc" },
+    select: { id: true, label: true, mime: true },
+  });
 
   const brand = await brandForSchool(school!.id);
   const printCss = `${packetCss(brand)}
@@ -148,6 +154,8 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
           .join("")}</div>`
       : ""
   }
+
+  ${receiptFigures(receipts)}
 
   ${packetFoot(
     `Prepared by ${esc(user.name)} on ${esc(fmt(today()))} from attendance, coursework, and assessment records maintained contemporaneously by ${esc(school!.name)}.

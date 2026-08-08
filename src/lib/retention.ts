@@ -51,7 +51,16 @@ export async function purgeSchool(school: { id: string; retentionDays: number })
     // Child files are exactly the ones carrying a studentId, and a family's
     // right-to-deletion request removes them by that same key below.
   const files = await prisma.fileRec.deleteMany({
-    where: { schoolId: school.id, studentId: { not: null }, capturedAt: { lt: cutoffIso } },
+    // invoiceId: null is belt-and-braces. Receipts already carry a null
+    // studentId (they are financial records, not child data), but if one ever
+    // gained a studentId through a future change, this clause keeps the purge
+    // from eating a reimbursement audit document on the child-retention clock.
+    where: {
+      schoolId: school.id,
+      studentId: { not: null },
+      invoiceId: null,
+      capturedAt: { lt: cutoffIso },
+    },
   });
 
   const result: PurgeResult = {
@@ -110,6 +119,18 @@ export async function deleteStudentData(
   const observations = await prisma.observation.deleteMany({ where: { studentId, schoolId } });
   const submissions = await prisma.submission.deleteMany({ where: { studentId, schoolId } });
   const files = await prisma.fileRec.deleteMany({ where: { studentId, schoolId } });
+  // Receipts hang off the invoices (studentId null), so the studentId-keyed
+  // delete above misses them. Full deletion takes the child's invoices AND
+  // their receipts — orphaned claim paperwork about a deleted child would be
+  // the worst of both worlds.
+  const invoiceIds = (
+    await prisma.invoice.findMany({ where: { studentId, schoolId }, select: { id: true } })
+  ).map((i) => i.id);
+  const receiptCount =
+    invoiceIds.length > 0
+      ? (await prisma.fileRec.deleteMany({ where: { schoolId, invoiceId: { in: invoiceIds } } }))
+          .count
+      : 0;
   const invoices = await prisma.invoice.deleteMany({ where: { studentId, schoolId } });
   const payments = await prisma.payment.deleteMany({ where: { studentId, schoolId } });
   const logins = await prisma.user.deleteMany({ where: { studentId, schoolId, role: "student" } });
@@ -132,7 +153,7 @@ export async function deleteStudentData(
     attendance: attendance.count,
     observations: observations.count,
     submissions: submissions.count,
-    files: files.count,
+    files: files.count + receiptCount,
     invoices: invoices.count,
     payments: payments.count,
     loginRemoved: logins.count > 0,

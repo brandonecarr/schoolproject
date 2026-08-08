@@ -441,6 +441,13 @@ model FileRec {
   id         String   @id @default(cuid())
   schoolId   String
   studentId  String? // null for teacher-attached assignment resources (no child)
+  /// Set when this file is an EXPENSE RECEIPT attached to a reimbursement
+  /// invoice — the itemised proof of purchase a reviewer matches against the
+  /// amount claimed. Receipts carry studentId: null on purpose: studentId is
+  /// the marker for child data on the COPPA retention clock, and a receipt is
+  /// a financial record kept for reimbursement audit, not child activity.
+  /// Right-to-deletion still removes them via their invoice (retention.ts).
+  invoiceId  String?
   label      String
   ext        String
   mime       String

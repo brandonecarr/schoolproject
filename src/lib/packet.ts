@@ -97,6 +97,34 @@ export function letterhead(brand: Brand): string {
 }
 
 /**
+ * The receipts section of a packet: the itemised proof of purchase a reviewer
+ * matches against the amount claimed. Arizona's rail lists "itemised receipts"
+ * as a requirement by name; our packets carried none until this existed.
+ *
+ * Same figure grid as the work samples, deliberately — a reviewer flipping
+ * through the packet reads both kinds of image evidence the same way. Images
+ * render inline through /files/<id> (the print page is served authenticated,
+ * so the file route's access control still applies); PDFs get a placeholder
+ * card naming the file, since a print engine cannot inline them.
+ *
+ * Returns "" when there are none: a packet must never carry an empty
+ * "Receipts" heading implying documents were withheld.
+ */
+export function receiptFigures(
+  receipts: { id: string; label: string; mime: string }[]
+): string {
+  if (receipts.length === 0) return "";
+  const figs = receipts
+    .map((f) =>
+      f.mime === "application/pdf"
+        ? `<figure><div style="border:1px solid #DCDFD8;border-radius:4px;padding:24px;text-align:center;font-family:sans-serif;font-size:9pt;color:#5C6672">PDF attachment</div><figcaption>${esc(f.label)}</figcaption></figure>`
+        : `<figure><img src="/files/${esc(f.id)}" alt="${esc(f.label)}"><figcaption>${esc(f.label)}</figcaption></figure>`
+    )
+    .join("");
+  return `<h2>Receipts (${receipts.length})</h2><div class="samples">${figs}</div>`;
+}
+
+/**
  * The footer, where Cohort belongs.
  *
  * `provenance` is the document's own sentence about where its contents came

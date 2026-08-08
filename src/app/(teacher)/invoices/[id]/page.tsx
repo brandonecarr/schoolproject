@@ -8,15 +8,26 @@ import { Pill, Notice, VerifyFlag } from "@/components/ui";
 import type { Tone } from "@/components/ui";
 import { RailKnowledge } from "@/components/RailKnowledge";
 import { observationsForRail, verificationCounts, railVerification } from "@/lib/observe";
+import { ConfirmSubmit } from "@/components/ConfirmSubmit";
 import {
   saveNarrative,
   setInvoiceStatus,
   rejectInvoice,
   regenerateNarrative,
+  uploadReceipt,
+  removeReceipt,
 } from "../../actions";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Invoice packet — Cohort" };
+
+const RECEIPT_MSG: Record<string, { tone: "good" | "bad"; text: string }> = {
+  ok: { tone: "good", text: "Receipt attached. It now prints in the packet." },
+  removed: { tone: "good", text: "Receipt removed." },
+  empty: { tone: "bad", text: "Choose a file first." },
+  type: { tone: "bad", text: "Receipts must be PNG, JPG, WebP or PDF." },
+  big: { tone: "bad", text: "That file is over 4 MB — export a smaller copy." },
+};
 
 const STATUS_TONE: Record<string, Tone | "mark"> = {
   draft: "warn",
@@ -58,11 +69,11 @@ export default async function InvoicePacketPage({
   searchParams,
 }: {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ regenerated?: string }>;
+  searchParams: Promise<{ regenerated?: string; receipt?: string }>;
 }) {
   const { school, rail: sessionRail } = await requireTeacher();
   const { id } = await params;
-  const { regenerated } = await searchParams;
+  const { regenerated, receipt } = await searchParams;
 
   const inv = await prisma.invoice.findFirst({ where: { id, schoolId: school!.id } });
   if (!inv) notFound();
@@ -78,6 +89,11 @@ export default async function InvoicePacketPage({
   const railV = rail ? railVerification(await verificationCounts(school!.id), rail.id) : null;
   const r = readiness(inv.evidenceScore);
   const graded = e.submissions.filter((x) => x.status === "graded");
+  const receipts = await prisma.fileRec.findMany({
+    where: { schoolId: school!.id, invoiceId: inv.id },
+    orderBy: { createdAt: "asc" },
+    select: { id: true, label: true, mime: true, bytes: true },
+  });
   const daysToCash =
     inv.status === "paid" && inv.submittedAt && inv.paidAt
       ? daysBetween(inv.submittedAt, inv.paidAt)
@@ -299,6 +315,50 @@ export default async function InvoicePacketPage({
             <div className="line muted">No graded work in this period</div>
           )}
         </div>
+      </div>
+
+      {/* RECEIPTS — the itemised proof of purchase a reviewer matches against
+          the amount claimed. AZ's rail lists "itemised receipts" by name. */}
+      <div className="card" style={{ marginTop: 12 }}>
+        <div className="eyebrow">Receipts</div>
+        <p className="small muted" style={{ margin: "6px 0 12px", maxWidth: "64ch" }}>
+          The itemised proof of purchase behind the amount claimed — curriculum orders, materials,
+          service invoices. These print in the packet after the work samples. PNG, JPG, WebP or
+          PDF, up to 4 MB each.
+        </p>
+
+        {RECEIPT_MSG[receipt ?? ""] && (
+          <Notice tone={RECEIPT_MSG[receipt ?? ""].tone}>{RECEIPT_MSG[receipt ?? ""].text}</Notice>
+        )}
+
+        {receipts.length > 0 && (
+          <div className="rollbook" style={{ margin: "10px 0 14px" }}>
+            {receipts.map((f) => (
+              <div key={f.id} className="line" style={{ alignItems: "center", gap: 10 }}>
+                <a href={`/files/${f.id}`} target="_blank" rel="noopener noreferrer" style={{ flex: 1 }}>
+                  {f.label}
+                </a>
+                <span className="small muted mono">{Math.max(1, Math.round(f.bytes / 1024))} KB</span>
+                <form action={removeReceipt}>
+                  <input type="hidden" name="fileId" value={f.id} />
+                  <input type="hidden" name="invoiceId" value={inv.id} />
+                  <ConfirmSubmit
+                    className="btn ghost sm"
+                    message="Remove this receipt? It will no longer print in the packet."
+                  >
+                    Remove
+                  </ConfirmSubmit>
+                </form>
+              </div>
+            ))}
+          </div>
+        )}
+
+        <form action={uploadReceipt} className="row" style={{ gap: 10, alignItems: "center" }}>
+          <input type="hidden" name="invoiceId" value={inv.id} />
+          <input type="file" name="file" accept="image/png,image/jpeg,image/webp,application/pdf" required />
+          <button className="btn sm">Attach receipt</button>
+        </form>
       </div>
 
       {rail && railV && <RailKnowledge rail={rail} obs={obs} v={railV} />}
