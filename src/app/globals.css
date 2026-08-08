@@ -1047,9 +1047,8 @@ input[type="date"]::-webkit-calendar-picker-indicator {
   color: var(--ink3);
   margin-top: 1px;
 }
-/* The finder's full-size lockup: big shield, wordmark scaled so its width
-   matches the tagline beneath it — which is also what visually centres the
-   whole composition. */
+/* The full-size lockup on /find and /signup: big shield, 42px wordmark, and
+   the tagline split onto two lines centred beneath it. */
 .authplain .lockup-hero {
   gap: 16px;
   margin-bottom: 34px;
@@ -1057,10 +1056,13 @@ input[type="date"]::-webkit-calendar-picker-indicator {
 .authplain .lockup-hero .wordmark {
   font-size: 42px;
   line-height: 1.05;
+  text-align: center;
 }
 .authplain .lockup-hero .tagline {
   font-size: 13.5px;
   margin-top: 3px;
+  line-height: 1.4;
+  text-align: center;
 }
 .authplain h1 {
   font-size: 27px;

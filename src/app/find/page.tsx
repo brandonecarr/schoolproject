@@ -34,7 +34,11 @@ export default async function FindSchool({
           <Image src="/logo-mark.png" alt="" width={58} height={75} className="brand-markimg" />
           <div>
             <div className="wordmark">Cohort</div>
-            <div className="tagline">Run the school. Get paid for it.</div>
+            <div className="tagline">
+              Run the school.
+              <br />
+              Get paid for it.
+            </div>
           </div>
         </div>
 
