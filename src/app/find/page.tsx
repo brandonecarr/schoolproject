@@ -10,7 +10,6 @@ import Image from "next/image";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { currentHostKind } from "@/lib/tenant-server";
-import { rootDomain } from "@/lib/tenant-config";
 import { findMySchool } from "./actions";
 
 export const dynamic = "force-dynamic";
@@ -27,7 +26,6 @@ export default async function FindSchool({
   if (kind.kind !== "apex") redirect("/");
 
   const { sent } = await searchParams;
-  const root = rootDomain() || "schoolcohort.com";
 
   return (
     <div className="authplain">
@@ -41,14 +39,6 @@ export default async function FindSchool({
         </div>
 
         <h1>Find your school</h1>
-
-        {!sent && (
-          <div className="notice info">
-            <strong>Looking for your school?</strong> Each school signs in at its own address, not
-            this one — something like <span className="mono">cedar-grove.{root}</span>. It&apos;s
-            in the invitation your school sent you.
-          </div>
-        )}
 
         {sent ? (
           <>
