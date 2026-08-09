@@ -80,6 +80,18 @@ model School {
   // Who said it. An attestation with nobody behind it is not an attestation.
   providerAttestedById String?
 
+  // --- Onboarding intake: the popup owners see on first sign-in ----------
+  // Context for the operator, not features: who to call, how big the school
+  // expects to be, where they came from. onboardedAt null means the popup
+  // still shows; saving OR skipping stamps it, because a nag that cannot be
+  // dismissed teaches people to hate the product on day one.
+  contactPhone    String   @default("")
+  studentEstimate Int      @default(0)
+  gradesServed    String   @default("")
+  heardFrom       String   @default("")
+  priorTooling    String   @default("")
+  onboardedAt     DateTime?
+
   createdAt DateTime @default(now())
 }
 

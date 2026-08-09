@@ -23,7 +23,29 @@ export type SchoolRow = {
   families: number;
   paid: number;
   ownerEmail: string | null;
+  ownerName: string | null;
+  contactPhone: string;
+  studentEstimate: number;
+  gradesServed: string;
+  heardFrom: string;
+  priorTooling: string;
   invoices: { id: string; periodStart: string; status: string; amount: number }[];
+};
+
+const HEARD_FROM_LABEL: Record<string, string> = {
+  search: "Search",
+  referral: "Referral from another school",
+  social: "Social media",
+  walkthrough: "Walkthrough call",
+  conference: "Conference or event",
+  other: "Somewhere else",
+};
+
+const PRIOR_TOOLING_LABEL: Record<string, string> = {
+  spreadsheets: "Spreadsheets",
+  paper: "Paper and binders",
+  another_tool: "Another tool",
+  nothing: "Nothing — brand new",
 };
 
 const INVOICE_STATUS_LABEL: Record<string, string> = {
@@ -154,6 +176,44 @@ export function SchoolsView({ schools }: { schools: SchoolRow[] }) {
                 <IconChat />
               </Link>
             </span>
+          </div>
+
+          <div className="adm-panelsec">
+            <div className="adm-seclabel">Owner</div>
+            <div className="adm-kv">
+              <span className="k">Name</span>
+              <span className="v">{open.ownerName || "—"}</span>
+            </div>
+            <div className="adm-kv">
+              <span className="k">Email</span>
+              <span className="v mono" style={{ fontSize: 12 }}>
+                {open.ownerEmail || "—"}
+              </span>
+            </div>
+            <div className="adm-kv">
+              <span className="k">Phone</span>
+              <span className="v">{open.contactPhone || "—"}</span>
+            </div>
+          </div>
+
+          <div className="adm-panelsec">
+            <div className="adm-seclabel">About the school</div>
+            <div className="adm-kv">
+              <span className="k">Students expected</span>
+              <span className="v">{open.studentEstimate > 0 ? open.studentEstimate : "—"}</span>
+            </div>
+            <div className="adm-kv">
+              <span className="k">Grades served</span>
+              <span className="v">{open.gradesServed || "—"}</span>
+            </div>
+            <div className="adm-kv">
+              <span className="k">Found Cohort via</span>
+              <span className="v">{HEARD_FROM_LABEL[open.heardFrom] ?? "—"}</span>
+            </div>
+            <div className="adm-kv">
+              <span className="k">Replaced</span>
+              <span className="v">{PRIOR_TOOLING_LABEL[open.priorTooling] ?? "—"}</span>
+            </div>
           </div>
 
           <div className="adm-panelsec">

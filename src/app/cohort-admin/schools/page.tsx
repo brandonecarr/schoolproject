@@ -21,7 +21,19 @@ export default async function AdminSchools() {
   const [schools, students, users, parents, invoiceSums, invoices, owners] = await Promise.all([
     prismaSystem.school.findMany({
       orderBy: { createdAt: "desc" },
-      select: { id: true, name: true, slug: true, state: true, createdAt: true, providerRail: true },
+      select: {
+        id: true,
+        name: true,
+        slug: true,
+        state: true,
+        createdAt: true,
+        providerRail: true,
+        contactPhone: true,
+        studentEstimate: true,
+        gradesServed: true,
+        heardFrom: true,
+        priorTooling: true,
+      },
     }),
     prismaSystem.student.groupBy({ by: ["schoolId"], _count: true }),
     prismaSystem.user.groupBy({ by: ["schoolId"], _count: true }),
@@ -33,7 +45,7 @@ export default async function AdminSchools() {
     }),
     prismaSystem.user.findMany({
       where: { role: "owner" },
-      select: { schoolId: true, email: true },
+      select: { schoolId: true, email: true, name: true },
     }),
   ]);
 
@@ -46,9 +58,11 @@ export default async function AdminSchools() {
       paidBySchool.set(i.schoolId, (paidBySchool.get(i.schoolId) ?? 0) + (i._sum.amount ?? 0));
     }
   }
-  const ownerBySchool = new Map<string, string>();
+  const ownerBySchool = new Map<string, { email: string; name: string }>();
   for (const o of owners) {
-    if (o.schoolId && !ownerBySchool.has(o.schoolId)) ownerBySchool.set(o.schoolId, o.email);
+    if (o.schoolId && !ownerBySchool.has(o.schoolId)) {
+      ownerBySchool.set(o.schoolId, { email: o.email, name: o.name });
+    }
   }
   const invoicesBySchool = new Map<string, SchoolRow["invoices"]>();
   for (const inv of invoices) {
@@ -70,7 +84,13 @@ export default async function AdminSchools() {
     accounts: userCount.get(s.id) ?? 0,
     families: parentCount.get(s.id) ?? 0,
     paid: paidBySchool.get(s.id) ?? 0,
-    ownerEmail: ownerBySchool.get(s.id) ?? null,
+    ownerEmail: ownerBySchool.get(s.id)?.email ?? null,
+    ownerName: ownerBySchool.get(s.id)?.name ?? null,
+    contactPhone: s.contactPhone,
+    studentEstimate: s.studentEstimate,
+    gradesServed: s.gradesServed,
+    heardFrom: s.heardFrom,
+    priorTooling: s.priorTooling,
     invoices: invoicesBySchool.get(s.id) ?? [],
   }));
 

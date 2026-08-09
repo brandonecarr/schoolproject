@@ -2121,3 +2121,42 @@ export async function updateAccent(formData: FormData) {
   revalidatePath("/settings");
   redirect("/settings?saved=1");
 }
+
+// --- Onboarding (the popup owners see on first sign-in) ---------------------
+
+const HEARD_FROM = new Set(["search", "referral", "social", "walkthrough", "conference", "other"]);
+const PRIOR_TOOLING = new Set(["spreadsheets", "paper", "another_tool", "nothing"]);
+
+export async function completeOnboarding(formData: FormData) {
+  const { user, school } = await requireTeacher();
+  // Owner-only: the popup is about the school's identity, and only the person
+  // who created the school should answer for it.
+  if (user.role !== "owner") redirect("/dashboard");
+
+  const skipped = formData.get("skip") === "1";
+  const phone = String(formData.get("contactPhone") || "").trim().slice(0, 30);
+  const estimateRaw = Number(formData.get("studentEstimate"));
+  const studentEstimate =
+    Number.isInteger(estimateRaw) && estimateRaw > 0 && estimateRaw <= 5000 ? estimateRaw : 0;
+  const grades = String(formData.get("gradesServed") || "").trim().slice(0, 60);
+  const heardRaw = String(formData.get("heardFrom") || "");
+  const toolingRaw = String(formData.get("priorTooling") || "");
+
+  // Saving OR skipping stamps onboardedAt — the popup never shows twice.
+  await prisma.school.update({
+    where: { id: school!.id },
+    data: skipped
+      ? { onboardedAt: new Date() }
+      : {
+          contactPhone: phone,
+          studentEstimate,
+          gradesServed: grades,
+          heardFrom: HEARD_FROM.has(heardRaw) ? heardRaw : "",
+          priorTooling: PRIOR_TOOLING.has(toolingRaw) ? toolingRaw : "",
+          onboardedAt: new Date(),
+        },
+  });
+  await logAudit(user.id, "school_onboarded", skipped ? "skipped" : "completed");
+  revalidatePath("/dashboard");
+  redirect("/dashboard");
+}

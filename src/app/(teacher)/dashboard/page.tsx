@@ -12,6 +12,7 @@ import { Bar, Card, CardHead, Notice, PageHead, Pill, StackBar, StatCard } from 
 import { currentOrigin } from "@/lib/tenant-server";
 import { reimbursementMetrics, formatPct, stalledInvoices, STALL_DAYS } from "@/lib/metrics";
 import { classifyDeadlines, deadlinePhrase } from "@/lib/deadlines";
+import { OnboardingModal } from "./OnboardingModal";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Dashboard — Cohort" };
@@ -110,6 +111,9 @@ export default async function Dashboard({
 
   return (
     <>
+      {user.role === "owner" && !school!.onboardedAt && (
+        <OnboardingModal schoolName={school!.name} />
+      )}
       {origin && (
         <Notice tone="good">
           <strong>{school!.name} is set up.</strong> Your school lives at{" "}
