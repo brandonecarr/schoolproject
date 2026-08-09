@@ -4693,8 +4693,6 @@ a:focus-visible {
   width: min(560px, 100%);
 }
 .bookc {
-  display: flex;
-  flex-wrap: wrap;
   width: 100%;
   background: #fff;
   border: 1px solid var(--line);
@@ -4703,7 +4701,12 @@ a:focus-visible {
   overflow: hidden;
   text-align: left;
 }
+.bookc-row {
+  display: flex;
+  flex-wrap: wrap;
+}
 .bookc-loading {
+  display: flex;
   padding: 60px;
   justify-content: center;
   color: var(--ink2);
@@ -4714,26 +4717,11 @@ a:focus-visible {
   max-width: 300px;
   padding: 26px 24px;
   border-right: 1px solid var(--line);
-  position: relative;
-}
-.bookc-back {
-  position: absolute;
-  top: 18px;
-  left: 18px;
-  width: 34px;
-  height: 34px;
-  border: 1px solid var(--line);
-  border-radius: 50%;
-  background: #fff;
-  color: var(--accent);
-  font-size: 16px;
-  cursor: pointer;
 }
 .bookc-host {
   color: var(--ink2);
   font-size: 13px;
   font-weight: 600;
-  margin-top: 26px;
 }
 .bookc-title {
   margin: 4px 0 14px;
@@ -4769,6 +4757,17 @@ a:focus-visible {
 }
 .bookc-form {
   max-width: 380px;
+}
+.bookc-formsec {
+  border-top: 1px solid var(--line);
+  padding: 26px 28px 30px;
+  scroll-margin-top: 16px;
+}
+.bookc-formwhen {
+  color: var(--ink2);
+  font-size: 13.5px;
+  font-weight: 600;
+  margin: -6px 0 14px;
 }
 .calnav {
   display: flex;
