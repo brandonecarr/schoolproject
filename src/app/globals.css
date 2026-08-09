@@ -4699,7 +4699,10 @@ a:focus-visible {
   background: var(--accent-soft, rgba(90, 78, 220, 0.08));
 }
 
-/* Admin availability form: weekday toggle pills + inline time/length row. */
+/* Admin availability form: weekday toggle pills + inline time/length row.
+   The native checkbox is hidden — the app's global `input { width: 100% }`
+   rule would balloon it across the pill — and the pill itself renders the
+   checked and focus states instead. */
 .daypick {
   display: flex;
   flex-wrap: wrap;
@@ -4707,20 +4710,34 @@ a:focus-visible {
   margin-top: 6px;
 }
 .daypick-day {
+  position: relative;
   display: inline-flex;
   align-items: center;
-  gap: 6px;
+  justify-content: center;
   border: 1px solid var(--line);
   border-radius: 10px;
-  padding: 7px 12px;
+  padding: 8px 16px;
   cursor: pointer;
   font-size: 13.5px;
   user-select: none;
+}
+.daypick-day input {
+  position: absolute;
+  opacity: 0;
+  width: 1px;
+  height: 1px;
+  margin: 0;
+  padding: 0;
+  pointer-events: none;
 }
 .daypick-day:has(input:checked) {
   border-color: var(--accent);
   background: var(--accent-soft, rgba(90, 78, 220, 0.08));
   font-weight: 600;
+}
+.daypick-day:has(input:focus-visible) {
+  border-color: var(--blue);
+  box-shadow: var(--ring);
 }
 .formrow {
   display: flex;
@@ -4731,6 +4748,8 @@ a:focus-visible {
   display: flex;
   flex-direction: column;
   gap: 4px;
+  min-width: 140px;
+  flex: 0 1 auto;
 }
 
 /* Secondary CTA under the hero pair: outline pill. */
