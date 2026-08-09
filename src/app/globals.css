@@ -6780,19 +6780,34 @@ a.lp-state:hover {
 }
 
 /* ---- Detail panel ---- */
+/* The panel is a full-height floating column pinned to the viewport's right
+   edge, equal insets top and bottom. It sits OUTSIDE the main column's flow
+   (position: fixed), and the :has() rule below pushes the entire main area —
+   header, account identity, content — left to make room, exactly like the
+   reference. */
 .adm-panel {
+  position: fixed;
+  top: 14px;
+  right: 14px;
+  bottom: 14px;
   width: 384px;
-  flex: none;
   background: var(--a-surface);
   border: 1px solid var(--a-line);
   border-radius: 18px;
-  margin: 6px 14px 14px 0;
   box-shadow: 0 8px 28px rgba(23, 23, 26, 0.06);
   display: flex;
   flex-direction: column;
-  min-height: 0;
   overflow: hidden;
+  z-index: 30;
   animation: admPanelIn 0.16s ease both;
+}
+@media (min-width: 1181px) {
+  .adm-main {
+    transition: margin-right 0.18s ease;
+  }
+  .adm-shell:has(.adm-panel) .adm-main {
+    margin-right: 398px;
+  }
 }
 .adm-panelbody {
   flex: 1;
@@ -7390,12 +7405,12 @@ a.lp-state:hover {
 
 /* ---- Responsive ---- */
 @media (max-width: 1180px) {
+  /* Narrow viewports: the panel overlays instead of pushing, with a heavier
+     shadow to read as a layer above the content. */
   .adm-panel {
-    position: fixed;
-    right: 0;
-    top: 0;
-    height: calc(100vh - 20px);
-    margin: 10px 10px 10px 0;
+    top: 10px;
+    right: 10px;
+    bottom: 10px;
     z-index: 40;
     box-shadow: -16px 0 40px rgba(23, 23, 26, 0.14);
   }
