@@ -44,8 +44,17 @@ describe("booking a generated time", () => {
   it("the public page generates open times from rules; booked rows only subtract", () => {
     expect(bookPage).toContain("expandRules(");
     expect(bookPage).toMatch(/select: \{ startsAt: true \}/);
-    // No slot ids ever reach the visitor — the radio carries the instant.
-    expect(bookPage).toContain('name="startsAt"');
+  });
+
+  it("the picker is the Calendly shape: month grid, times column, details step", () => {
+    const picker = read("src/app/book/BookingPicker.tsx");
+    // No slot ids ever reach the visitor — the hidden field carries the instant.
+    expect(picker).toContain('name="startsAt"');
+    expect(picker).toContain("calgrid");
+    expect(picker).toContain("Select a Date");
+    expect(picker).toContain("Enter Details");
+    // Times render in the visitor's own timezone, resolved in the browser.
+    expect(picker).toContain("resolvedOptions().timeZone");
   });
 
   it("the page is apex-only and the proxy serves it", () => {

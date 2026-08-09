@@ -20,7 +20,7 @@ export type AvailabilityRuleInput = {
 
 export type OpenSlot = { startsAt: Date; durationMin: number };
 
-export const BOOKING_HORIZON_DAYS = 14;
+export const BOOKING_HORIZON_DAYS = 30; // a month grid needs a month of days
 export const MIN_NOTICE_MS = 4 * 60 * 60 * 1000; // no "in ten minutes" bookings
 
 const WEEKDAY_ISO: Record<string, number> = {
@@ -92,7 +92,7 @@ export function expandRules(
 ): OpenSlot[] {
   const horizonDays = opts?.horizonDays ?? BOOKING_HORIZON_DAYS;
   const minNoticeMs = opts?.minNoticeMs ?? MIN_NOTICE_MS;
-  const max = opts?.max ?? 60;
+  const max = opts?.max ?? 500;
   const earliest = now.getTime() + minNoticeMs;
 
   const byInstant = new Map<number, OpenSlot>();
