@@ -9,12 +9,21 @@ import { Prisma } from "@/generated/prisma/client";
 import { prismaSystem } from "@/lib/db";
 import { sendEmail, looksLikeEmail } from "@/lib/email";
 import { expandRules } from "@/lib/availability";
+import { US_STATE_SET } from "@/lib/us-states";
 
 export async function bookWalkthrough(formData: FormData) {
   const startsAtIso = String(formData.get("startsAt") || "");
   const name = String(formData.get("name") || "").trim().slice(0, 120);
   const email = String(formData.get("email") || "").trim().toLowerCase();
-  if (!startsAtIso || Number.isNaN(Date.parse(startsAtIso)) || !name || !looksLikeEmail(email)) {
+  const stateRaw = String(formData.get("state") || "");
+  const state = US_STATE_SET.has(stateRaw) || stateRaw === "Other" ? stateRaw : "";
+  if (
+    !startsAtIso ||
+    Number.isNaN(Date.parse(startsAtIso)) ||
+    !name ||
+    !state ||
+    !looksLikeEmail(email)
+  ) {
     redirect("/book?error=form");
   }
 
@@ -44,7 +53,7 @@ export async function bookWalkthrough(formData: FormData) {
   // UNIQUE, so two people booking the same generated time both INSERT and
   // exactly one succeeds. The loser's lead row is deleted and they repick.
   const lead = await prismaSystem.lead.create({
-    data: { name, email, source: "walkthrough", status: "scheduled", ref },
+    data: { name, email, state, source: "walkthrough", status: "scheduled", ref },
   });
   try {
     await prismaSystem.walkthroughSlot.create({
@@ -87,8 +96,8 @@ export async function bookWalkthrough(formData: FormData) {
   if (operator) {
     await sendEmail({
       to: operator,
-      subject: `Walkthrough booked: ${name}`,
-      text: `${name} <${email}> booked ${when} (UTC).\n\nLead is in /cohort-admin/leads, booking in /cohort-admin/walkthroughs. Send them a meeting link.`,
+      subject: `Walkthrough booked: ${name} (${state})`,
+      text: `${name} <${email}> in ${state} booked ${when} (UTC).\n\nLead is in /cohort-admin/leads, booking in /cohort-admin/walkthroughs. Send them a meeting link.`,
     });
   }
 

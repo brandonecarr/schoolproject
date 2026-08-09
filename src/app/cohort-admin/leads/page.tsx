@@ -91,6 +91,7 @@ export default async function AdminLeads({
                   <td>
                     {l.name || <span className="muted">—</span>}
                     <div className="small mono">{l.email}</div>
+                    {l.state ? <div className="small">{l.state}</div> : null}
                     {l.note ? <div className="small muted">{l.note}</div> : null}
                   </td>
                   <td className="small">{l.source}</td>

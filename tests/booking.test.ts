@@ -36,6 +36,13 @@ describe("booking a generated time", () => {
     expect(bookAction).toContain('status: "scheduled"');
   });
 
+  it("the state is required, validated against the real list, stored on the lead", () => {
+    expect(bookAction).toContain("US_STATE_SET.has(stateRaw)");
+    expect(bookAction).toMatch(/data: \{ name, email, state, source: "walkthrough"/);
+    const picker = read("src/app/book/BookingPicker.tsx");
+    expect(picker).toContain('name="state"');
+  });
+
   it("bookings carry campaign attribution from the coh_ref cookie, capped", () => {
     expect(bookAction).toContain('jar.get("coh_ref")');
     expect(bookAction).toMatch(/\.slice\(0, 60\)/);

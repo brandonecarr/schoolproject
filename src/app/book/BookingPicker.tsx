@@ -1,10 +1,11 @@
 "use client";
 
 // The Calendly-shaped booking flow: a month calendar where only days with
-// open times are clickable, a column of times for the picked day, and — once
-// a time is chosen — the contact details revealed BENEATH the calendar, with
-// a gentle scroll down to them. The calendar never leaves the screen, so
-// changing your mind is a click, not a back-button.
+// open times are clickable, a column of times for the picked day, and — the
+// moment a time is chosen — the contact details revealed BENEATH the
+// calendar, with a gentle scroll down to them. No Next button, no separate
+// step: the calendar never leaves the screen, so changing your mind is a
+// click, not a back-button.
 //
 // Everything renders in the VISITOR's timezone, which is why this is a client
 // component: the server does not know it. Until hydration we show a quiet
@@ -12,6 +13,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { bookWalkthrough } from "./actions";
+import { US_STATES } from "@/lib/us-states";
 
 type Slot = { iso: string; durationMin: number };
 
@@ -29,7 +31,6 @@ export function BookingPicker({ slots }: { slots: Slot[] }) {
   const [anchor, setAnchor] = useState<{ y: number; m: number } | null>(null);
   const [selDay, setSelDay] = useState<string | null>(null);
   const [selIso, setSelIso] = useState<string | null>(null);
-  const [showForm, setShowForm] = useState(false);
   const formRef = useRef<HTMLDivElement>(null);
 
   // Group open times by the visitor's local calendar day.
@@ -51,12 +52,12 @@ export function BookingPicker({ slots }: { slots: Slot[] }) {
     setAnchor({ y: d.getFullYear(), m: d.getMonth() });
   }, [byDay]);
 
-  // The reveal: once Next is hit, bring the details into view.
+  // The reveal: the moment a time is picked, bring the details into view.
   useEffect(() => {
-    if (showForm && selIso) {
+    if (selIso) {
       formRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
     }
-  }, [showForm, selIso]);
+  }, [selIso]);
 
   if (!mounted || !anchor) {
     return <div className="bookc bookc-loading">Loading the calendar…</div>;
@@ -84,7 +85,6 @@ export function BookingPicker({ slots }: { slots: Slot[] }) {
   });
 
   const selSlots = selDay ? (byDay.get(selDay) ?? []) : [];
-  const formOpen = showForm && selIso !== null;
 
   return (
     <div className="bookc">
@@ -166,7 +166,6 @@ export function BookingPicker({ slots }: { slots: Slot[] }) {
                   onClick={() => {
                     setSelDay(key);
                     setSelIso(null);
-                    setShowForm(false);
                   }}
                 >
                   {i + 1}
@@ -182,22 +181,13 @@ export function BookingPicker({ slots }: { slots: Slot[] }) {
             <div className="timeslist">
               {selSlots.map((s) => {
                 const active = s.iso === selIso;
-                return active ? (
-                  <div key={s.iso} className="timerow">
-                    <span className="timebtn timebtn-sel">{timeFmt.format(new Date(s.iso))}</span>
-                    <button type="button" className="nextbtn" onClick={() => setShowForm(true)}>
-                      Next
-                    </button>
-                  </div>
-                ) : (
+                const cls = active ? "timebtn timebtn-sel" : "timebtn";
+                return (
                   <button
                     key={s.iso}
                     type="button"
-                    className="timebtn"
-                    onClick={() => {
-                      setSelIso(s.iso);
-                      setShowForm(false);
-                    }}
+                    className={cls}
+                    onClick={() => setSelIso(s.iso)}
                   >
                     {timeFmt.format(new Date(s.iso))}
                   </button>
@@ -208,23 +198,39 @@ export function BookingPicker({ slots }: { slots: Slot[] }) {
         )}
       </div>
 
-      {formOpen && (
+      {selIso && (
         <div ref={formRef} className="bookc-formsec">
           <h3 className="bookc-step">Enter Details</h3>
           <p className="bookc-formwhen">
-            {fullFmt.format(new Date(selIso!))} · {duration} min
+            {fullFmt.format(new Date(selIso))} · {duration} min
           </p>
           <form action={bookWalkthrough} className="bookc-form">
-            <input type="hidden" name="startsAt" value={selIso ?? ""} />
-            <label htmlFor="book-name">Name</label>
-            <input id="book-name" name="name" required autoComplete="name" />
-            <label htmlFor="book-email" style={{ marginTop: 12 }}>
-              Email
-            </label>
-            <input id="book-email" name="email" type="email" required autoComplete="email" />
-            <button className="btn" style={{ marginTop: 16 }}>
-              Schedule Event
-            </button>
+            <input type="hidden" name="startsAt" value={selIso} />
+            <div>
+              <label htmlFor="book-name">Name</label>
+              <input id="book-name" name="name" required autoComplete="name" />
+            </div>
+            <div>
+              <label htmlFor="book-email">Email</label>
+              <input id="book-email" name="email" type="email" required autoComplete="email" />
+            </div>
+            <div>
+              <label htmlFor="book-state">State your school is in</label>
+              <select id="book-state" name="state" required defaultValue="">
+                <option value="" disabled>
+                  Select a state
+                </option>
+                {US_STATES.map((s) => (
+                  <option key={s} value={s}>
+                    {s}
+                  </option>
+                ))}
+                <option value="Other">Other / outside the US</option>
+              </select>
+            </div>
+            <div className="bookc-formsubmit">
+              <button className="btn">Schedule Event</button>
+            </div>
           </form>
         </div>
       )}
