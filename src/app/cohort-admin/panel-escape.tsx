@@ -1,19 +1,28 @@
 "use client";
 
-// Escape closes the detail panel, matching the × in its header. The panel is
-// URL-backed, so "close" is just navigating to the list without the param.
+// Escape closes the detail panel, matching the × in its header. When the
+// panel is client-driven (shallow URL state) closing is a callback; the
+// router fallback covers any server-rendered use.
 
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
 
-export function PanelEscape({ closeHref }: { closeHref: string }) {
+export function PanelEscape({
+  closeHref,
+  onClose,
+}: {
+  closeHref?: string;
+  onClose?: () => void;
+}) {
   const router = useRouter();
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") router.push(closeHref);
+      if (e.key !== "Escape") return;
+      if (onClose) onClose();
+      else if (closeHref) router.push(closeHref);
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [router, closeHref]);
+  }, [router, closeHref, onClose]);
   return null;
 }

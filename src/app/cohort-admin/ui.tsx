@@ -115,28 +115,38 @@ export function EmptyState({
 }
 
 // The detail panel shell: header with close, scrolling body, pinned footer.
+// With onClose the close control is instant (client state); without it the
+// × is a plain link to closeHref.
 export function Panel({
   title,
   meta,
   closeHref,
+  onClose,
   footer,
   children,
 }: {
   title: string;
   meta?: React.ReactNode;
   closeHref: string;
+  onClose?: () => void;
   footer?: React.ReactNode;
   children: React.ReactNode;
 }) {
   return (
     <aside className="adm-panel" aria-label={title}>
-      <PanelEscape closeHref={closeHref} />
+      <PanelEscape closeHref={closeHref} onClose={onClose} />
       <div className="adm-panelbody">
         <div className="adm-panelhead">
           <div className="adm-paneltitle">{title}</div>
-          <Link className="adm-panelclose" href={closeHref} aria-label="Close panel">
-            <IconX />
-          </Link>
+          {onClose ? (
+            <button type="button" className="adm-panelclose" onClick={onClose} aria-label="Close panel">
+              <IconX />
+            </button>
+          ) : (
+            <Link className="adm-panelclose" href={closeHref} aria-label="Close panel">
+              <IconX />
+            </Link>
+          )}
         </div>
         {meta && <div className="adm-panelmeta">{meta}</div>}
         {children}
