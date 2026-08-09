@@ -85,7 +85,9 @@ describe("the gate itself", () => {
           const src = readFileSync(p, "utf8");
           // A WRITE is `platformAdmin:` inside a prisma `data:` block. Reading
           // the flag (gates, the login door's where-filter) is fine.
-          if (/data:\s*\{[^}]*platformAdmin/s.test(src) && !p.includes("generated")) offenders.push(p);
+          // No dotAll flag needed: [^}] matches newlines on its own, and the
+          // build's TS target predates /s.
+          if (/data:\s*\{[^}]*platformAdmin/.test(src) && !p.includes("generated")) offenders.push(p);
         }
       }
     };
