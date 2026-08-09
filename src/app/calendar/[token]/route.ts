@@ -49,12 +49,15 @@ export async function GET(_request: Request, { params }: { params: Promise<{ tok
   if (!user || !user.schoolId) {
     return new Response("Not found", { status: 404 });
   }
+  // Captured after the guard: TS narrowing does not survive into the
+  // withTenant closure below.
+  const schoolId = user.schoolId;
   // The subscriber is real; every read below is their school's data only.
   // withTenant (not enterTenant): this is a route handler, where run() reliably
   // scopes its callback's queries — and there is no session cookie here, so the
   // request-cookie tenant resolution the pages use would find nothing.
-  return withTenant(user.schoolId, async () => {
-  const school = await prisma.school.findUnique({ where: { id: user.schoolId } });
+  return withTenant(schoolId, async () => {
+  const school = await prisma.school.findUnique({ where: { id: schoolId } });
   if (!school) return new Response("Not found", { status: 404 });
 
   const staff = isStaffRole(user.role);

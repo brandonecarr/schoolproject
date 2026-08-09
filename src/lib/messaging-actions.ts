@@ -20,6 +20,9 @@ export async function sendMessage(formData: FormData) {
   const session = await getSession();
   if (!session) redirect("/login");
   const { user } = session;
+  // Messaging is school-app territory; an operator account has no threads.
+  if (!user.schoolId) redirect("/cohort-admin");
+  const schoolId = user.schoolId;
 
   const studentId = String(formData.get("studentId"));
   const body = String(formData.get("body") || "").trim().slice(0, 4000);
@@ -29,7 +32,7 @@ export async function sendMessage(formData: FormData) {
   const staff = isStaff(user.role);
   await prisma.message.create({
     data: {
-      schoolId: user.schoolId,
+      schoolId,
       studentId,
       senderId: user.id,
       senderRole: user.role,
@@ -44,21 +47,21 @@ export async function sendMessage(formData: FormData) {
   // Notify the other side of the thread. Each role gets a link that works for
   // them — parents, students, and staff read messages at different paths.
   const base = {
-    schoolId: user.schoolId,
+    schoolId,
     type: "message" as const,
     title: `New message from ${user.name}`,
     body: body.slice(0, 140),
   };
   if (staff) {
     const [parents, studentUser] = await Promise.all([
-      parentUserIdsFor(studentId, user.schoolId),
+      parentUserIdsFor(studentId, schoolId),
       studentUserIdFor(studentId),
     ]);
     await notifyUsers(parents, { ...base, linkPath: "/parent/messages" }, user.id);
     await notifyUsers(studentUser, { ...base, linkPath: "/student/messages" }, user.id);
   } else {
     await notifyUsers(
-      await staffUserIdsFor(user.schoolId),
+      await staffUserIdsFor(schoolId),
       { ...base, linkPath: `/messages/${studentId}` },
       user.id
     );

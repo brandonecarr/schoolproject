@@ -81,6 +81,12 @@ export type Session = {
   actor: User | null;
 };
 
+/** A session whose user belongs to a school — what every school-role gate
+ *  returns. Platform operators (role "admin", schoolId null) never pass
+ *  those gates, which is what lets fifty call sites keep reading
+ *  `user.schoolId` as a plain string. */
+export type TenantSession = Session & { user: User & { schoolId: string } };
+
 // Read the current session from the cookie. Returns null if not signed in.
 //
 // This resolves WHO is signed in and gates them to the addressed school. It no
@@ -168,17 +174,26 @@ async function resolveSession(sid: string): Promise<Session | null> {
 }
 
 // Gate a page/action to any signed-in user. Redirects to /login otherwise.
-export async function requireUser(): Promise<Session> {
+// Any signed-in SCHOOL user. Every caller is school-app code (the operator
+// console gates through requirePlatformAdmin/getSession instead), so an
+// operator session — schoolId null — is sent to its own console rather than
+// let loose in an app that assumes a school.
+export async function requireUser(): Promise<TenantSession> {
   const session = await getSession();
   if (!session) redirect("/login");
-  return session;
+  if (!session.user.schoolId) redirect("/cohort-admin");
+  return session as TenantSession;
 }
 
-// Gate to specific roles. "teacher" here means owner or teacher.
-export async function requireRole(...roles: string[]): Promise<Session> {
+// Gate to specific SCHOOL roles. "teacher" here means owner or teacher.
+// Returns a TenantSession: the runtime check below is what makes the
+// narrowing true — an operator account (schoolId null) can never pass,
+// whatever its role string says.
+export async function requireRole(...roles: string[]): Promise<TenantSession> {
   const session = await requireUser();
   if (!roles.includes(session.user.role)) redirect("/");
-  return session;
+  if (!session.user.schoolId) redirect("/cohort-admin");
+  return session as TenantSession;
 }
 
 /**
@@ -199,7 +214,7 @@ export async function requireNotViewing(session: Session, back = "/"): Promise<v
 }
 
 // The teacher gate used everywhere in the console (owner or teacher).
-export async function requireTeacher(): Promise<Session> {
+export async function requireTeacher(): Promise<TenantSession> {
   return requireRole("owner", "teacher");
 }
 

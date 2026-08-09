@@ -110,3 +110,26 @@ describe("what the console shows", () => {
     expect(mig).toContain('CREATE POLICY rls_tenant ON "Lead"');
   });
 });
+
+describe("operator accounts stay out of the school app", () => {
+  const auth = readFileSync(join(process.cwd(), "src/lib/auth.ts"), "utf8");
+
+  it("requireUser refuses a schoolless session into school surfaces", () => {
+    const gate = auth.slice(auth.indexOf("export async function requireUser"));
+    expect(gate.slice(0, 400)).toContain("!session.user.schoolId");
+  });
+
+  it("requireRole re-checks it — the narrowing is runtime-true, not a cast alone", () => {
+    const gate = auth.slice(auth.indexOf("export async function requireRole"));
+    expect(gate.slice(0, 400)).toContain("!session.user.schoolId");
+  });
+
+  it("operator emails are unique among themselves at the database", () => {
+    const mig = readFileSync(
+      join(process.cwd(), "prisma/migrations/20260809030000_operator_accounts/migration.sql"),
+      "utf8"
+    );
+    expect(mig).toContain('WHERE "schoolId" IS NULL');
+    expect(mig).toContain("UNIQUE INDEX");
+  });
+});

@@ -28,7 +28,8 @@ export async function findMySchool(formData: FormData) {
       where: { email },
       select: { schoolId: true },
     });
-    const ids = [...new Set(users.map((u) => u.schoolId))];
+    // Operator accounts carry no school and have no sign-in address to send.
+    const ids = [...new Set(users.map((u) => u.schoolId).filter((x): x is string => Boolean(x)))];
     const schools = ids.length
       ? (
           await prismaSystem.school.findMany({

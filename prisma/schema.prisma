@@ -97,12 +97,14 @@ model User {
   // that they find out) and OFF for staff, who live in the app all day and would
   // just be emailing themselves about their own school.
   emailAlerts     Boolean  @default(true)
-  /// Platform operator: may open /admin, which reads across schools. Granted
-  /// only by scripts/grant-admin.mjs — no UI can set it, so a compromised
-  /// teacher account cannot escalate itself.
+  /// Platform operator: may open /cohort-admin, which reads across schools.
+  /// Granted only by scripts (grant-admin.mjs, create-operator.mjs) — no UI
+  /// can set it, so a compromised teacher account cannot escalate itself.
   platformAdmin   Boolean  @default(false)
-  schoolId        String
-  role            String // owner | teacher | parent | student
+  /// Null for platform operators — the operator is not a tenant. Every
+  /// school-role gate narrows this to non-null before any scoped code runs.
+  schoolId        String?
+  role            String // owner | teacher | parent | student | admin
   name            String
   /// Unique per SCHOOL, not globally. The same person legitimately holds two
   /// accounts in this market: a parent with children in two programmes, or a

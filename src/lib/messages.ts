@@ -8,6 +8,8 @@ export const isStaff = (role: string) => role === "owner" || role === "teacher";
 
 // Which student ids can this user see threads for?
 export async function threadStudentIds(user: User): Promise<string[]> {
+  // Operator accounts have no school and therefore no threads.
+  if (!user.schoolId) return [];
   if (isStaff(user.role)) {
     const students = await prisma.student.findMany({ where: { schoolId: user.schoolId } });
     return students.map((s) => s.id);
