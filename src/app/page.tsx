@@ -5,6 +5,7 @@ import { getSession } from "@/lib/auth";
 import { currentHostKind } from "@/lib/tenant-server";
 import { rootDomain } from "@/lib/tenant-config";
 import { landingStates } from "@/lib/landing";
+import { TrackView } from "@/components/TrackView";
 import { PROGRAMS, RAILS } from "@/lib/rules";
 
 // "/" means two different things depending on the address it arrives on.
@@ -63,6 +64,7 @@ export default async function Home() {
 
   return (
     <div className="lp">
+      <TrackView path="/" />
       <div className="lp-card">
         <header className="lp-head">
           <nav className="lp-nav" aria-label="Sections">

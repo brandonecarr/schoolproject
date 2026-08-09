@@ -3,36 +3,62 @@
 // Public: book a walkthrough. This is the walkthrough button's destination
 // and the admin console's lead source — a booking IS a lead, born scheduled.
 
+import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
+import { Prisma } from "@/generated/prisma/client";
 import { prismaSystem } from "@/lib/db";
 import { sendEmail, looksLikeEmail } from "@/lib/email";
+import { expandRules } from "@/lib/availability";
 
 export async function bookWalkthrough(formData: FormData) {
-  const slotId = String(formData.get("slotId") || "");
+  const startsAtIso = String(formData.get("startsAt") || "");
   const name = String(formData.get("name") || "").trim().slice(0, 120);
   const email = String(formData.get("email") || "").trim().toLowerCase();
-  if (!slotId || !name || !looksLikeEmail(email)) redirect("/book?error=form");
+  if (!startsAtIso || Number.isNaN(Date.parse(startsAtIso)) || !name || !looksLikeEmail(email)) {
+    redirect("/book?error=form");
+  }
+
+  // The picked time must be one the rules would offer RIGHT NOW — recomputed
+  // server-side, booked times subtracted. Anything else (stale page, crafted
+  // POST, 3am on a Sunday) is simply not on the menu.
+  const [rules, booked] = await Promise.all([
+    prismaSystem.availabilityRule.findMany({ orderBy: { createdAt: "asc" } }),
+    prismaSystem.walkthroughSlot.findMany({
+      where: { startsAt: { gt: new Date() } },
+      select: { startsAt: true },
+    }),
+  ]);
+  const open = expandRules(rules, new Date(), new Set(booked.map((b) => b.startsAt.getTime())));
+  const picked = open.find((s) => s.startsAt.getTime() === Date.parse(startsAtIso));
+  if (!picked) redirect("/book?error=taken");
+
+  // Campaign attribution: the coh_ref cookie is set by the proxy when the
+  // visitor first arrived with ?ref= / ?utm_source=, and surfaces in the
+  // admin Marketing tab. Absent is fine — most leads have no campaign.
+  const jar = await cookies();
+  const ref = (jar.get("coh_ref")?.value ?? "").slice(0, 60);
 
   // prismaSystem: platform tables — a prospect has no tenant.
   //
-  // Claim order matters: create the lead, then claim the slot ATOMICALLY with
-  // "WHERE leadId IS NULL". Two people racing for the same slot both reach
-  // this line; exactly one updateMany returns count 1. The loser's lead row
-  // is deleted and they pick another time.
+  // Race safety lives in the database now: WalkthroughSlot.startsAt is
+  // UNIQUE, so two people booking the same generated time both INSERT and
+  // exactly one succeeds. The loser's lead row is deleted and they repick.
   const lead = await prismaSystem.lead.create({
-    data: { name, email, source: "walkthrough", status: "scheduled" },
+    data: { name, email, source: "walkthrough", status: "scheduled", ref },
   });
-  const claimed = await prismaSystem.walkthroughSlot.updateMany({
-    where: { id: slotId, leadId: null, startsAt: { gt: new Date() } },
-    data: { leadId: lead.id },
-  });
-  if (claimed.count === 0) {
+  try {
+    await prismaSystem.walkthroughSlot.create({
+      data: { startsAt: picked.startsAt, durationMin: picked.durationMin, leadId: lead.id },
+    });
+  } catch (e) {
     await prismaSystem.lead.delete({ where: { id: lead.id } });
-    redirect("/book?error=taken");
+    if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === "P2002") {
+      redirect("/book?error=taken");
+    }
+    throw e;
   }
 
-  const slot = await prismaSystem.walkthroughSlot.findUnique({ where: { id: slotId } });
-  const when = slot?.startsAt.toISOString() ?? "";
+  const when = picked.startsAt.toISOString();
 
   // Confirmation to the prospect. The UTC spell-out is deliberate: we do not
   // know their timezone server-side, and a wrong local time on a calendar
@@ -44,7 +70,7 @@ export async function bookWalkthrough(formData: FormData) {
     text: [
       `Hi ${name},`,
       ``,
-      `You're booked for a ${slot?.durationMin ?? 20}-minute walkthrough of Cohort.`,
+      `You're booked for a ${picked.durationMin}-minute walkthrough of Cohort.`,
       ``,
       `When: ${when} (UTC) — the time you picked, shown in your local time on the page.`,
       ``,
@@ -62,7 +88,7 @@ export async function bookWalkthrough(formData: FormData) {
     await sendEmail({
       to: operator,
       subject: `Walkthrough booked: ${name}`,
-      text: `${name} <${email}> booked ${when} (UTC).\n\nLead is in /cohort-admin/leads, slot in /cohort-admin/walkthroughs. Send them a meeting link.`,
+      text: `${name} <${email}> booked ${when} (UTC).\n\nLead is in /cohort-admin/leads, booking in /cohort-admin/walkthroughs. Send them a meeting link.`,
     });
   }
 

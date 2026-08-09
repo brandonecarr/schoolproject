@@ -1,19 +1,18 @@
-// Tabs for the admin console. The grayed entry is the roadmap, visible on
-// purpose: the tabs say where this surface is going without pretending the
-// feature exists yet.
+// Tabs for the admin console.
 
 import Link from "next/link";
 
 const ON = "btn sec sm";
 const OFF = "btn ghost sm";
 
-export type AdminTab = "overview" | "leads" | "walkthroughs" | "email";
+export type AdminTab = "overview" | "leads" | "walkthroughs" | "email" | "marketing";
 
 const TABS: { key: AdminTab; label: string; href: string }[] = [
   { key: "overview", label: "Overview", href: "/cohort-admin" },
   { key: "leads", label: "Leads", href: "/cohort-admin/leads" },
   { key: "walkthroughs", label: "Walkthroughs", href: "/cohort-admin/walkthroughs" },
   { key: "email", label: "Email", href: "/cohort-admin/email" },
+  { key: "marketing", label: "Marketing", href: "/cohort-admin/marketing" },
 ];
 
 export function AdminNav({ active }: { active: AdminTab }) {
@@ -31,7 +30,6 @@ export function AdminNav({ active }: { active: AdminTab }) {
           </Link>
         );
       })}
-      <span className="small muted">Marketing — coming next</span>
     </nav>
   );
 }

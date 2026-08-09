@@ -8,6 +8,7 @@ import { revalidatePath } from "next/cache";
 import { requirePlatformAdmin } from "@/lib/auth";
 import { prismaSystem } from "@/lib/db";
 import { looksLikeEmail, sendEmail } from "@/lib/email";
+import { isValidTimeZone } from "@/lib/availability";
 
 const LEAD_STATUSES = new Set(["new", "contacted", "scheduled", "won", "lost"]);
 
@@ -45,38 +46,55 @@ export async function removeLead(formData: FormData) {
   redirect("/cohort-admin/leads?removed=1");
 }
 
-// --- Walkthrough slots ---
+// --- Recurring availability (the walkthrough calendar) ---
 
-export async function addSlots(formData: FormData) {
+// "HH:MM" → minutes from midnight, or null if it isn't a time.
+function parseHM(v: unknown): number | null {
+  const m = /^(\d{1,2}):(\d{2})$/.exec(String(v ?? ""));
+  if (!m) return null;
+  const mins = Number(m[1]) * 60 + Number(m[2]);
+  return mins <= 24 * 60 ? mins : null;
+}
+
+export async function addAvailability(formData: FormData) {
   await requirePlatformAdmin();
-  let isos: string[];
-  try {
-    isos = JSON.parse(String(formData.get("isos") || "[]"));
-  } catch {
-    redirect("/cohort-admin/walkthroughs");
+  const weekdays = [...new Set(formData.getAll("weekday").map(Number))].filter(
+    (d) => Number.isInteger(d) && d >= 1 && d <= 7,
+  );
+  const startMin = parseHM(formData.get("start"));
+  const endMin = parseHM(formData.get("end"));
+  const slotMinutes = Math.min(120, Math.max(10, Number(formData.get("slotMinutes")) || 20));
+  const timezone = String(formData.get("timezone") || "");
+  if (
+    weekdays.length === 0 ||
+    startMin === null ||
+    endMin === null ||
+    startMin + slotMinutes > endMin ||
+    !isValidTimeZone(timezone)
+  ) {
+    redirect("/cohort-admin/walkthroughs?error=window");
   }
-  const durationMin = Math.min(120, Math.max(10, Number(formData.get("durationMin")) || 20));
-  const now = Date.now();
-  const valid = isos
-    .filter((s) => typeof s === "string" && !Number.isNaN(Date.parse(s)))
-    .filter((s) => Date.parse(s) > now)
-    .slice(0, 50);
-  if (valid.length > 0) {
-    await prismaSystem.walkthroughSlot.createMany({
-      data: valid.map((iso) => ({ startsAt: new Date(iso), durationMin })),
-    });
-  }
+
+  // One rule per weekday keeps removal granular: dropping Wednesdays later
+  // doesn't mean re-entering the rest of the week.
+  const existing = await prismaSystem.availabilityRule.count();
+  if (existing + weekdays.length > 50) redirect("/cohort-admin/walkthroughs?error=window");
+  await prismaSystem.availabilityRule.createMany({
+    data: weekdays.map((weekday) => ({ weekday, startMin, endMin, slotMinutes, timezone })),
+  });
   revalidatePath("/cohort-admin/walkthroughs");
+  revalidatePath("/book");
   redirect("/cohort-admin/walkthroughs?added=1");
 }
 
-export async function deleteSlot(formData: FormData) {
+export async function deleteAvailability(formData: FormData) {
   await requirePlatformAdmin();
   const id = String(formData.get("id"));
-  // Only open slots: a booked slot is an appointment with a person, and
-  // cancelling on them is a conversation, not a button.
-  await prismaSystem.walkthroughSlot.deleteMany({ where: { id, leadId: null } });
+  // Removing a rule only stops OFFERING those times — existing bookings are
+  // rows of their own and keep their appointments.
+  await prismaSystem.availabilityRule.deleteMany({ where: { id } });
   revalidatePath("/cohort-admin/walkthroughs");
+  revalidatePath("/book");
   redirect("/cohort-admin/walkthroughs?removed=1");
 }
 

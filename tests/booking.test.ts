@@ -12,15 +12,23 @@ const bookAction = read("src/app/book/actions.ts");
 const bookPage = read("src/app/book/page.tsx");
 const adminActions = read("src/app/cohort-admin/actions.ts");
 
-describe("booking a slot", () => {
-  it("claims atomically — updateMany guarded on leadId null and a future start", () => {
-    expect(bookAction).toMatch(/updateMany\(\{\s*where: \{ id: slotId, leadId: null, startsAt: \{ gt/);
+describe("booking a generated time", () => {
+  it("the picked time must be one the rules offer right now — recomputed server-side", () => {
+    expect(bookAction).toContain("expandRules(");
+    expect(bookAction).toMatch(/open\.find\(/);
+    const afterCheck = bookAction.slice(bookAction.indexOf("if (!picked)"));
+    expect(afterCheck).toContain("error=taken");
+  });
+
+  it("the race has one winner — unique startsAt insert, P2002 loses", () => {
+    expect(bookAction).toContain("walkthroughSlot.create");
+    expect(bookAction).toContain('e.code === "P2002"');
   });
 
   it("the race's loser is cleaned up and told to pick again", () => {
-    const afterClaim = bookAction.slice(bookAction.indexOf("claimed.count === 0"));
-    expect(afterClaim).toContain("lead.delete");
-    expect(afterClaim).toContain("error=taken");
+    const afterCatch = bookAction.slice(bookAction.indexOf("catch (e)"));
+    expect(afterCatch).toContain("lead.delete");
+    expect(afterCatch).toContain("error=taken");
   });
 
   it("a booking is a lead, born scheduled from the walkthrough source", () => {
@@ -28,8 +36,16 @@ describe("booking a slot", () => {
     expect(bookAction).toContain('status: "scheduled"');
   });
 
-  it("the public page reads only open future slots", () => {
-    expect(bookPage).toMatch(/where: \{ leadId: null, startsAt: \{ gt: new Date\(\) \} \}/);
+  it("bookings carry campaign attribution from the coh_ref cookie, capped", () => {
+    expect(bookAction).toContain('jar.get("coh_ref")');
+    expect(bookAction).toMatch(/\.slice\(0, 60\)/);
+  });
+
+  it("the public page generates open times from rules; booked rows only subtract", () => {
+    expect(bookPage).toContain("expandRules(");
+    expect(bookPage).toMatch(/select: \{ startsAt: true \}/);
+    // No slot ids ever reach the visitor — the radio carries the instant.
+    expect(bookPage).toContain('name="startsAt"');
   });
 
   it("the page is apex-only and the proxy serves it", () => {
@@ -42,9 +58,17 @@ describe("booking a slot", () => {
   });
 });
 
-describe("slot management stays humane", () => {
-  it("only open slots can be deleted — a booked slot is an appointment", () => {
-    expect(adminActions).toMatch(/walkthroughSlot\.deleteMany\(\{ where: \{ id, leadId: null \} \}/);
+describe("availability management stays humane", () => {
+  it("removing a rule stops offering times; it never touches bookings", () => {
+    expect(adminActions).toMatch(/availabilityRule\.deleteMany\(\{ where: \{ id \} \}/);
+    // No admin action deletes a booking — that's an appointment with a
+    // person, and cancelling on them is a conversation, not a button.
+    expect(adminActions).not.toContain("walkthroughSlot.delete");
+  });
+
+  it("a window must fit at least one slot and carry a real timezone", () => {
+    expect(adminActions).toContain("startMin + slotMinutes > endMin");
+    expect(adminActions).toContain("isValidTimeZone(timezone)");
   });
 });
 

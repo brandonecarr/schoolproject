@@ -10,6 +10,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { currentHostKind } from "@/lib/tenant-server";
 import { statePages } from "@/lib/states";
+import { TrackView } from "@/components/TrackView";
 
 export const dynamic = "force-dynamic";
 
@@ -28,6 +29,7 @@ export default async function StatesIndex() {
 
   return (
     <div className="lp">
+      <TrackView path="/states" />
       <div className="lp-card">
         <header className="lp-head">
           <Link className="lp-lockup" href="/">

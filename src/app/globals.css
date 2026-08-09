@@ -4699,6 +4699,40 @@ a:focus-visible {
   background: var(--accent-soft, rgba(90, 78, 220, 0.08));
 }
 
+/* Admin availability form: weekday toggle pills + inline time/length row. */
+.daypick {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 6px;
+}
+.daypick-day {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 7px 12px;
+  cursor: pointer;
+  font-size: 13.5px;
+  user-select: none;
+}
+.daypick-day:has(input:checked) {
+  border-color: var(--accent);
+  background: var(--accent-soft, rgba(90, 78, 220, 0.08));
+  font-weight: 600;
+}
+.formrow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px;
+}
+.formrow > div {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
 /* Secondary CTA under the hero pair: outline pill. */
 .lp-pill-outline {
   display: inline-flex;

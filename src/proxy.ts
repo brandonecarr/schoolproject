@@ -82,7 +82,26 @@ export function proxy(request: NextRequest) {
   if (kind.kind === "unknown") return noindex();
 
   if (kind.kind === "apex") {
-    if (onList(url.pathname, APEX_PATHS)) return NextResponse.next();
+    if (onList(url.pathname, APEX_PATHS)) {
+      // Campaign attribution: ?ref=x (or utm_source) sticks for 30 days so a
+      // walkthrough booked next week still credits the campaign. First touch
+      // wins — an existing cookie is never overwritten. Value is clamped and
+      // stripped to a slug; anything else in the URL is ignored.
+      const ref = (url.searchParams.get("ref") || url.searchParams.get("utm_source") || "")
+        .slice(0, 60)
+        .replace(/[^a-zA-Z0-9_-]/g, "");
+      if (ref && !request.cookies.get("coh_ref")) {
+        const res = NextResponse.next();
+        res.cookies.set("coh_ref", ref, {
+          maxAge: 30 * 24 * 60 * 60,
+          path: "/",
+          sameSite: "lax",
+          httpOnly: true,
+        });
+        return res;
+      }
+      return NextResponse.next();
+    }
     // Someone's bookmark of the app on the bare domain. There is no way to
     // know which school they meant — /login lands on the school finder, which
     // explains why and can email them their school's address; everything else

@@ -10,7 +10,9 @@ import { currentHostKind } from "@/lib/tenant-server";
 import { prismaSystem } from "@/lib/db";
 import { Notice } from "@/components/ui";
 import { LocalTime } from "@/components/LocalTime";
+import { expandRules } from "@/lib/availability";
 import { bookWalkthrough } from "./actions";
+import { TrackView } from "@/components/TrackView";
 
 export const dynamic = "force-dynamic";
 export const metadata: Metadata = { title: "Book a walkthrough — Cohort" };
@@ -25,16 +27,25 @@ export default async function BookPage({
 
   const sp = await searchParams;
 
-  // prismaSystem: platform table, and the one public read of it — open
-  // future slots only, which is exactly what a booking page is for.
-  const slots = await prismaSystem.walkthroughSlot.findMany({
-    where: { leadId: null, startsAt: { gt: new Date() } },
-    orderBy: { startsAt: "asc" },
-    take: 40,
-  });
+  // prismaSystem: platform tables, and the one public read of them. Open
+  // times are GENERATED from the recurring availability rules — booked rows
+  // are only subtracted, never shown.
+  const [rules, booked] = await Promise.all([
+    prismaSystem.availabilityRule.findMany({ orderBy: { createdAt: "asc" } }),
+    prismaSystem.walkthroughSlot.findMany({
+      where: { startsAt: { gt: new Date() } },
+      select: { startsAt: true },
+    }),
+  ]);
+  const slots = expandRules(
+    rules,
+    new Date(),
+    new Set(booked.map((b) => b.startsAt.getTime())),
+  ).slice(0, 40);
 
   return (
     <div className="authplain">
+      <TrackView path="/book" />
       <main className="authcol">
         <div className="lockup lockup-hero">
           <Image src="/logo-mark.png" alt="" width={58} height={75} className="brand-markimg" />
@@ -84,8 +95,8 @@ export default async function BookPage({
                 <label>Pick a time</label>
                 <div className="book-slots">
                   {slots.map((s) => (
-                    <label key={s.id} className="book-slot">
-                      <input type="radio" name="slotId" value={s.id} required />
+                    <label key={s.startsAt.toISOString()} className="book-slot">
+                      <input type="radio" name="startsAt" value={s.startsAt.toISOString()} required />
                       <span>
                         <LocalTime iso={s.startsAt.toISOString()} /> · {s.durationMin} min
                       </span>

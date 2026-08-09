@@ -895,6 +895,10 @@ model Lead {
   /// Where it came from: walkthrough | manual | find | ...
   source    String   @default("manual")
   note      String   @default("")
+  /// Campaign attribution: the coh_ref cookie value at booking time, from a
+  /// ?ref= or ?utm_source= on the visitor's first landing. Empty for manual
+  /// leads and unattributed visitors.
+  ref       String   @default("")
   /// new | contacted | scheduled | won | lost
   status    String   @default("new")
   createdAt DateTime @default(now())
@@ -926,4 +930,34 @@ model EmailBlast {
   body      String
   sentCount Int
   createdAt DateTime @default(now())
+}
+
+// Daily aggregate page views for the PUBLIC marketing pages only — the
+// beacon's allowlist keeps app surfaces out. PLATFORM TABLE, and deliberately
+// privacy-light: a day, a path, a referrer hostname, a count. No IPs, no
+// user agents, no cookies read, nothing per-visitor.
+model PageView {
+  id           String @id @default(cuid())
+  day          String // YYYY-MM-DD (UTC)
+  path         String
+  referrerHost String @default("")
+  count        Int    @default(0)
+
+  @@unique([day, path, referrerHost])
+}
+
+// Recurring availability, Calendly-style: "Mondays 9:00-11:00, 20-minute
+// slots, America/Phoenix". Open times on /book are GENERATED from these
+// rules; only actual bookings materialize as WalkthroughSlot rows. The
+// timezone is stored as an IANA name so DST does the right thing forever.
+model AvailabilityRule {
+  id          String   @id @default(cuid())
+  weekday     Int // ISO: 1=Mon ... 7=Sun
+  startMin    Int // minutes from local midnight
+  endMin      Int
+  slotMinutes Int      @default(20)
+  timezone    String
+  createdAt   DateTime @default(now())
+
+  @@index([weekday])
 }

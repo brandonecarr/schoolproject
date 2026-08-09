@@ -11,6 +11,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { currentHostKind } from "@/lib/tenant-server";
 import { findMySchool } from "./actions";
+import { TrackView } from "@/components/TrackView";
 
 export const dynamic = "force-dynamic";
 export const metadata: Metadata = { title: "Find your school — Cohort" };
@@ -29,6 +30,7 @@ export default async function FindSchool({
 
   return (
     <div className="authplain">
+      <TrackView path="/find" />
       <main className="authcol">
         <div className="lockup lockup-hero">
           <Image src="/logo-mark.png" alt="" width={58} height={75} className="brand-markimg" />
