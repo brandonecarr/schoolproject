@@ -9,7 +9,6 @@
 import type { Metadata } from "next";
 import { requirePlatformAdmin } from "@/lib/auth";
 import { prismaSystem } from "@/lib/db";
-import { AdminNav } from "../nav";
 
 export const dynamic = "force-dynamic";
 export const metadata: Metadata = { title: "Marketing — Cohort Admin" };
@@ -21,6 +20,7 @@ function dayString(d: Date): string {
 }
 
 const LEAD_STATUS_ORDER = ["new", "contacted", "scheduled", "won", "lost"] as const;
+const FUNNEL_HEADS = ["New", "Cont.", "Sched.", "Won", "Lost"];
 
 export default async function AdminMarketing() {
   await requirePlatformAdmin();
@@ -40,10 +40,12 @@ export default async function AdminMarketing() {
   const byReferrer = new Map<string, number>();
   for (const v of views) {
     byPath.set(v.path, (byPath.get(v.path) ?? 0) + v.count);
-    if (v.referrerHost) byReferrer.set(v.referrerHost, (byReferrer.get(v.referrerHost) ?? 0) + v.count);
+    if (v.referrerHost)
+      byReferrer.set(v.referrerHost, (byReferrer.get(v.referrerHost) ?? 0) + v.count);
   }
   const paths = [...byPath.entries()].sort((a, b) => b[1] - a[1]);
   const referrers = [...byReferrer.entries()].sort((a, b) => b[1] - a[1]).slice(0, 15);
+  const topPath = paths[0]?.[1] ?? 1;
 
   const funnel = new Map<string, Map<string, number>>();
   for (const l of leads) {
@@ -63,155 +65,136 @@ export default async function AdminMarketing() {
   const campaigns = [...byRef.entries()].sort((a, b) => b[1].total - a[1].total);
 
   return (
-    <>
-      <AdminNav active="marketing" />
-      <div className="eyebrow">Marketing</div>
+    <div className="adm-screen">
+      <div className="adm-eyebrow">Marketing</div>
       <h1>Traffic and funnel — last {WINDOW_DAYS} days</h1>
-      <p className="small muted" style={{ margin: "6px 0 0" }}>
+      <p className="adm-intro">
         First-party counts from the public pages only: no cookies read, no IPs stored, bots
-        included in the numbers. Email opens are not tracked — the blast log records what was
-        sent, nothing about what happened after.
+        included in the numbers. Email opens are not tracked.
       </p>
 
-      <div className="card" style={{ marginTop: 14 }}>
-        <div className="eyebrow">Page views</div>
-        <p style={{ margin: "6px 0 10px" }}>
-          <strong>{total.toLocaleString()}</strong>{" "}
-          <span className="small muted">views across {paths.length} pages</span>
-        </p>
-        <table>
-          <thead>
-            <tr>
-              <th>Page</th>
-              <th style={{ textAlign: "right" }}>Views</th>
-            </tr>
-          </thead>
-          <tbody>
+      <div className="adm-grid2">
+        <div className="adm-card">
+          <div className="adm-cardtitle">
+            Page views
+            <span className="adm-cardmeta">
+              {total.toLocaleString()} across {paths.length} page{paths.length === 1 ? "" : "s"}
+            </span>
+          </div>
+          <div style={{ marginTop: 10 }}>
             {paths.length === 0 ? (
-              <tr>
-                <td colSpan={2} className="small muted">
-                  Nothing yet — counts start with the next visit to the landing page.
-                </td>
-              </tr>
+              <p className="adm-cardsub" style={{ marginTop: 8 }}>
+                Nothing yet — counts start with the next visit to the landing page.
+              </p>
             ) : (
               paths.map(([path, n]) => (
-                <tr key={path}>
-                  <td className="mono small">{path}</td>
-                  <td style={{ textAlign: "right" }}>{n.toLocaleString()}</td>
-                </tr>
+                <div key={path} className="adm-viewrow">
+                  <span className="adm-viewpath">{path}</span>
+                  <span className="adm-viewtrack">
+                    <span
+                      className="adm-viewfill"
+                      style={{ width: `${Math.max(3, (n / topPath) * 100)}%`, display: "block" }}
+                    />
+                  </span>
+                  <span className="adm-viewcount">{n.toLocaleString()}</span>
+                </div>
               ))
             )}
-          </tbody>
-        </table>
-      </div>
+          </div>
+        </div>
 
-      <div className="card" style={{ marginTop: 12 }}>
-        <div className="eyebrow">Referrers</div>
-        <p className="small muted" style={{ margin: "6px 0 10px" }}>
-          Where visitors arrived from, when the browser said. Direct visits and stripped
-          referrers don&apos;t appear — most traffic legitimately shows nothing.
-        </p>
-        <table>
-          <thead>
-            <tr>
-              <th>Site</th>
-              <th style={{ textAlign: "right" }}>Views</th>
-            </tr>
-          </thead>
-          <tbody>
+        <div className="adm-card">
+          <div className="adm-cardtitle">Referrers</div>
+          <p className="adm-cardsub">
+            Direct visits and stripped referrers don&apos;t appear.
+          </p>
+          <div style={{ marginTop: 4 }}>
             {referrers.length === 0 ? (
-              <tr>
-                <td colSpan={2} className="small muted">
-                  No referred visits in the window.
-                </td>
-              </tr>
+              <p className="adm-cardsub" style={{ marginTop: 8 }}>
+                No referred visits in the window.
+              </p>
             ) : (
               referrers.map(([host, n]) => (
-                <tr key={host}>
-                  <td className="mono small">{host}</td>
-                  <td style={{ textAlign: "right" }}>{n.toLocaleString()}</td>
-                </tr>
+                <div key={host} className="adm-refrow">
+                  <span className="mono" style={{ fontSize: 12 }}>
+                    {host}
+                  </span>
+                  <span className="adm-viewcount">{n.toLocaleString()}</span>
+                </div>
               ))
             )}
-          </tbody>
-        </table>
+          </div>
+        </div>
       </div>
 
-      <div className="card" style={{ marginTop: 12 }}>
-        <div className="eyebrow">Lead funnel</div>
-        <p className="small muted" style={{ margin: "6px 0 10px" }}>
-          Every lead ever, by where it came from and where it stands.
-        </p>
-        <table>
-          <thead>
-            <tr>
-              <th>Source</th>
-              {LEAD_STATUS_ORDER.map((s) => (
-                <th key={s} style={{ textAlign: "right" }}>
-                  {s}
-                </th>
+      <div className="adm-grid2 adm-grid2-views">
+        <div className="adm-card">
+          <div className="adm-cardtitle">Lead funnel</div>
+          <p className="adm-cardsub">Every lead ever, by where it came from and where it stands.</p>
+          {funnel.size === 0 ? (
+            <p className="adm-cardsub" style={{ marginTop: 8 }}>
+              No leads yet.
+            </p>
+          ) : (
+            <div className="adm-funnelgrid">
+              <div className="adm-funnelhead">Source</div>
+              {FUNNEL_HEADS.map((h) => (
+                <div key={h} className="adm-funnelhead adm-funnelnum">
+                  {h}
+                </div>
               ))}
-            </tr>
-          </thead>
-          <tbody>
-            {funnel.size === 0 ? (
-              <tr>
-                <td colSpan={6} className="small muted">
-                  No leads yet.
-                </td>
-              </tr>
-            ) : (
-              [...funnel.entries()].map(([source, row]) => (
-                <tr key={source}>
-                  <td>{source}</td>
-                  {LEAD_STATUS_ORDER.map((s) => (
-                    <td key={s} style={{ textAlign: "right" }}>
-                      {row.get(s) ?? 0}
-                    </td>
-                  ))}
-                </tr>
-              ))
-            )}
-          </tbody>
-        </table>
-      </div>
+              {[...funnel.entries()].map(([source, row]) => (
+                <div key={source} style={{ display: "contents" }}>
+                  <div className="adm-cellcap">{source}</div>
+                  {LEAD_STATUS_ORDER.map((s) => {
+                    const n = row.get(s) ?? 0;
+                    const cls =
+                      s === "won"
+                        ? "adm-funnelnum adm-funnelwon"
+                        : s === "lost"
+                          ? "adm-funnelnum adm-funnellost"
+                          : "adm-funnelnum";
+                    return (
+                      <div key={s} className={cls}>
+                        {n}
+                      </div>
+                    );
+                  })}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
 
-      <div className="card" style={{ marginTop: 12 }}>
-        <div className="eyebrow">Campaigns</div>
-        <p className="small muted" style={{ margin: "6px 0 10px" }}>
-          Leads whose first visit carried <span className="mono">?ref=</span> or{" "}
-          <span className="mono">?utm_source=</span> — tag any link you post and bookings credit
-          it for 30 days.
-        </p>
-        <table>
-          <thead>
-            <tr>
-              <th>Campaign</th>
-              <th style={{ textAlign: "right" }}>Leads</th>
-              <th style={{ textAlign: "right" }}>Won</th>
-            </tr>
-          </thead>
-          <tbody>
+        <div className="adm-card">
+          <div className="adm-cardtitle">Campaigns</div>
+          <p className="adm-cardsub">
+            Tag any link you post with <span className="mono">?ref=</span> and bookings credit it
+            for 30 days.
+          </p>
+          <div style={{ marginTop: 4 }}>
             {campaigns.length === 0 ? (
-              <tr>
-                <td colSpan={3} className="small muted">
-                  No campaign-tagged leads yet. Try{" "}
-                  <span className="mono">schoolcohort.com/?ref=your-campaign</span> on the next
-                  post.
-                </td>
-              </tr>
+              <p className="adm-cardsub" style={{ marginTop: 8 }}>
+                No campaign-tagged leads yet. Try{" "}
+                <span className="mono">schoolcohort.com/?ref=your-campaign</span> on the next
+                post.
+              </p>
             ) : (
               campaigns.map(([ref, row]) => (
-                <tr key={ref}>
-                  <td className="mono small">{ref}</td>
-                  <td style={{ textAlign: "right" }}>{row.total}</td>
-                  <td style={{ textAlign: "right" }}>{row.won}</td>
-                </tr>
+                <div key={ref} className="adm-camprow">
+                  <span className="mono" style={{ fontSize: 12 }}>
+                    {ref}
+                  </span>
+                  <span className="adm-campnums">
+                    <span>{row.total}</span>
+                    <span className="adm-campwon">{row.won}</span>
+                  </span>
+                </div>
               ))
             )}
-          </tbody>
-        </table>
+          </div>
+        </div>
       </div>
-    </>
+    </div>
   );
 }

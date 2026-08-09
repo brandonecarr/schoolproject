@@ -6,7 +6,7 @@ import type { Metadata } from "next";
 import Image from "next/image";
 import { redirect } from "next/navigation";
 import { getSession } from "@/lib/auth";
-import { Notice } from "@/components/ui";
+import { AdmNotice } from "../ui";
 import { adminLogin } from "./actions";
 
 export const dynamic = "force-dynamic";
@@ -23,26 +23,32 @@ export default async function AdminLogin({
   const { error } = await searchParams;
 
   return (
-    <div className="authplain">
-      <main className="authcol">
-        <div className="lockup">
-          <Image src="/logo-mark.png" alt="" width={30} height={39} className="brand-markimg" />
-          <div>
-            <div className="wordmark">Cohort</div>
-            <div className="tagline">Operator console</div>
-          </div>
+    <div className="adm-auth">
+      <div className="adm-authlockup">
+        <span className="adm-authmark">
+          <Image src="/logo-mark.png" alt="" width={26} height={33} />
+        </span>
+        <span>
+          <span className="adm-authname">Cohort</span>
+          <span className="adm-authrole">Operator console</span>
+        </span>
+      </div>
+
+      <h1>Admin sign in</h1>
+
+      {error && (
+        <div style={{ width: "100%" }}>
+          <AdmNotice tone="bad">That didn&apos;t work.</AdmNotice>
         </div>
+      )}
 
-        <h1>Admin sign in</h1>
-
-        {error && <Notice tone="bad">That didn&apos;t work.</Notice>}
-
-        <form action={adminLogin} className="card2 authcard">
+      <form action={adminLogin} className="adm-authcard">
+        <div className="adm-field" style={{ marginTop: 0 }}>
           <label htmlFor="admin-email">Email</label>
           <input id="admin-email" name="email" type="email" required autoComplete="email" />
-          <label htmlFor="admin-password" style={{ marginTop: 12 }}>
-            Password
-          </label>
+        </div>
+        <div className="adm-field">
+          <label htmlFor="admin-password">Password</label>
           <input
             id="admin-password"
             name="password"
@@ -50,15 +56,15 @@ export default async function AdminLogin({
             required
             autoComplete="current-password"
           />
-          <button className="btn" style={{ marginTop: 14, width: "100%" }}>
-            Sign in
-          </button>
-        </form>
-        <p className="small muted" style={{ marginTop: 14 }}>
-          Operator accounts are granted by hand. If this page refuses you, the flag hasn&apos;t
-          been set for your account.
-        </p>
-      </main>
+        </div>
+        <button className="adm-btn" style={{ marginTop: 16, width: "100%", padding: 12 }}>
+          Sign in
+        </button>
+      </form>
+      <p className="adm-authfoot">
+        Operator accounts are granted by hand. If this page refuses you, the flag hasn&apos;t
+        been set for your account.
+      </p>
     </div>
   );
 }

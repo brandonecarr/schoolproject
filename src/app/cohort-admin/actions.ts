@@ -9,6 +9,7 @@ import { requirePlatformAdmin } from "@/lib/auth";
 import { prismaSystem } from "@/lib/db";
 import { looksLikeEmail, sendEmail } from "@/lib/email";
 import { isValidTimeZone } from "@/lib/availability";
+import { US_STATE_SET } from "@/lib/us-states";
 
 const LEAD_STATUSES = new Set(["new", "contacted", "scheduled", "won", "lost"]);
 
@@ -17,14 +18,23 @@ export async function addLead(formData: FormData) {
   const email = String(formData.get("email") || "").trim().toLowerCase();
   const name = String(formData.get("name") || "").trim().slice(0, 120);
   const note = String(formData.get("note") || "").trim().slice(0, 1000);
-  if (!looksLikeEmail(email)) redirect("/cohort-admin/leads?error=email");
+  const stateRaw = String(formData.get("state") || "");
+  const state = US_STATE_SET.has(stateRaw) || stateRaw === "Other" ? stateRaw : "";
+  if (!looksLikeEmail(email)) redirect("/cohort-admin/leads?new=lead&error=email");
 
   // prismaSystem: leads are a platform table — there is no tenant to scope to.
   await prismaSystem.lead.create({
-    data: { email, name, note, source: "manual" },
+    data: { email, name, note, state, source: "manual" },
   });
   revalidatePath("/cohort-admin/leads");
   redirect("/cohort-admin/leads?added=1");
+}
+
+// Panel-aware redirect target: server actions posted from the detail panel
+// carry a `back` field so the redirect lands on the still-open record.
+function backTo(formData: FormData, fallback: string): string {
+  const back = String(formData.get("back") || "");
+  return back.startsWith("/cohort-admin") ? back : fallback;
 }
 
 export async function setLeadStatus(formData: FormData) {
@@ -35,7 +45,7 @@ export async function setLeadStatus(formData: FormData) {
 
   await prismaSystem.lead.update({ where: { id }, data: { status } });
   revalidatePath("/cohort-admin/leads");
-  redirect("/cohort-admin/leads");
+  redirect(backTo(formData, "/cohort-admin/leads"));
 }
 
 export async function removeLead(formData: FormData) {

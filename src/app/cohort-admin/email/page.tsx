@@ -7,8 +7,7 @@ import type { Metadata } from "next";
 import { requirePlatformAdmin } from "@/lib/auth";
 import { prismaSystem } from "@/lib/db";
 import { emailConfigured } from "@/lib/email";
-import { Notice, Pill } from "@/components/ui";
-import { AdminNav } from "../nav";
+import { AdmNotice, AdmPill, fmtDate } from "../ui";
 import { sendBlast } from "../actions";
 
 export const dynamic = "force-dynamic";
@@ -31,87 +30,100 @@ export default async function AdminEmail({
   ]);
 
   return (
-    <>
-      <AdminNav active="email" />
-      <div className="eyebrow">Outreach</div>
+    <div className="adm-screen">
+      <div className="adm-eyebrow">Outreach</div>
       <h1>Email blasts</h1>
 
-      {sp.sent && <Notice tone="good">Sent to {sp.sent} recipient{sp.sent === "1" ? "" : "s"}.</Notice>}
+      {sp.sent && (
+        <AdmNotice tone="good">
+          Sent to {sp.sent} recipient{sp.sent === "1" ? "" : "s"}.
+        </AdmNotice>
+      )}
       {sp.error === "incomplete" && (
-        <Notice tone="bad">Audience, subject, body and the confirm box are all required.</Notice>
+        <AdmNotice tone="bad">Audience, subject, body and the confirm box are all required.</AdmNotice>
       )}
       {!emailConfigured() && (
-        <Notice tone="warn">
+        <AdmNotice tone="warn">
           Email isn&apos;t configured in this environment — a blast here would send nothing.
           RESEND_API_KEY and EMAIL_FROM make it real.
-        </Notice>
+        </AdmNotice>
       )}
 
-      <div className="card" style={{ marginTop: 14 }}>
-        <div className="eyebrow">Compose</div>
-        <form action={sendBlast} style={{ marginTop: 8 }}>
-          <label htmlFor="blast-audience">Audience</label>
-          <select id="blast-audience" name="audience" required>
-            <option value="open_leads">Open leads — new, contacted or scheduled ({openLeads})</option>
-            <option value="all_leads">All leads, including won and lost ({allLeads})</option>
-            <option value="owners">School owners — every customer ({owners})</option>
-          </select>
+      <div className="adm-grid2" style={{ gridTemplateColumns: "1.1fr 1fr" }}>
+        <div className="adm-card">
+          <div className="adm-cardtitle">Compose</div>
+          <form action={sendBlast} style={{ marginTop: 4 }}>
+            <div className="adm-field">
+              <label htmlFor="blast-audience">Audience</label>
+              <select id="blast-audience" name="audience" required>
+                <option value="open_leads">
+                  Open leads — new, contacted or scheduled ({openLeads})
+                </option>
+                <option value="all_leads">All leads, including won and lost ({allLeads})</option>
+                <option value="owners">School owners — every customer ({owners})</option>
+              </select>
+            </div>
 
-          <label htmlFor="blast-subject" style={{ marginTop: 12 }}>
-            Subject
-          </label>
-          <input id="blast-subject" name="subject" required maxLength={160} />
+            <div className="adm-field">
+              <label htmlFor="blast-subject">Subject</label>
+              <input id="blast-subject" name="subject" required maxLength={160} />
+            </div>
 
-          <label htmlFor="blast-body" style={{ marginTop: 12 }}>
-            Body (plain text)
-          </label>
-          <textarea id="blast-body" name="body" rows={10} required maxLength={10000} />
-          <p className="small muted" style={{ margin: "6px 0 0" }}>
-            A footer is added automatically: who this is from, why they got it, and how to opt
-            out. Replies land in your inbox via the forwarder.
-          </p>
+            <div className="adm-field">
+              <label htmlFor="blast-body">Body (plain text)</label>
+              <textarea
+                id="blast-body"
+                name="body"
+                rows={8}
+                required
+                maxLength={10000}
+                style={{ lineHeight: 1.6, resize: "vertical" }}
+              />
+              <p className="adm-cardsub" style={{ marginTop: 7 }}>
+                A footer is added automatically: who this is from, why they got it, and how to
+                opt out. Replies land in your inbox via the forwarder.
+              </p>
+            </div>
 
-          <label className="row small" style={{ gap: 8, alignItems: "center", marginTop: 14 }}>
-            <input type="checkbox" name="confirm" required /> Yes — send this to real people now.
-          </label>
-          <button className="btn mark" style={{ marginTop: 12 }}>
-            Send blast
-          </button>
-        </form>
-      </div>
+            <label className="adm-checkline">
+              <input type="checkbox" name="confirm" required /> Yes — send this to real people
+              now.
+            </label>
+            <button className="adm-btn adm-btn-accent" style={{ marginTop: 14, padding: "11px 20px" }}>
+              Send blast
+            </button>
+          </form>
+        </div>
 
-      <div className="card" style={{ marginTop: 12, padding: "16px 10px" }}>
-        <table>
-          <thead>
-            <tr>
-              <th>Sent</th>
-              <th>Audience</th>
-              <th>Subject</th>
-              <th>Recipients</th>
-            </tr>
-          </thead>
-          <tbody>
+        <div className="adm-card">
+          <div className="adm-cardtitle">History</div>
+          <p className="adm-cardsub">Body kept verbatim. Opens are not tracked.</p>
+          <div style={{ marginTop: 6 }}>
             {blasts.length === 0 ? (
-              <tr>
-                <td colSpan={4} className="small muted">
-                  No blasts yet. The history lands here, body kept verbatim.
-                </td>
-              </tr>
+              <p className="adm-cardsub" style={{ marginTop: 10 }}>
+                No blasts yet. The history lands here.
+              </p>
             ) : (
               blasts.map((b) => (
-                <tr key={b.id}>
-                  <td className="small muted">{b.createdAt.toISOString().slice(0, 10)}</td>
-                  <td>
-                    <Pill tone="info">{b.audience}</Pill>
-                  </td>
-                  <td>{b.subject}</td>
-                  <td className="num">{b.sentCount}</td>
-                </tr>
+                <div key={b.id} className="adm-listrow" style={{ alignItems: "flex-start" }}>
+                  <div className="adm-listmain">
+                    <div className="adm-listname">{b.subject}</div>
+                    <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 5 }}>
+                      <AdmPill tone="info" square>
+                        {b.audience}
+                      </AdmPill>
+                      <span className="adm-cardsub" style={{ margin: 0 }}>
+                        {b.sentCount} recipient{b.sentCount === 1 ? "" : "s"}
+                      </span>
+                    </div>
+                  </div>
+                  <div className="adm-listend">{fmtDate(b.createdAt)}</div>
+                </div>
               ))
             )}
-          </tbody>
-        </table>
+          </div>
+        </div>
       </div>
-    </>
+    </div>
   );
 }
