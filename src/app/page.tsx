@@ -128,12 +128,9 @@ export default async function Home() {
                 See a packet get built
               </a>
             </div>
-            {/* Not linked yet, deliberately: the booking flow (and the lead it
-                creates) lands with the admin console. The button ships first so
-                the layout is settled. */}
-            <span className="lp-pill-outline" aria-disabled="true">
+            <Link className="lp-pill-outline" href="/book">
               Prefer a walkthrough? Book 20 minutes with the founder
-            </span>
+            </Link>
           </div>
 
           {/* No right padding on purpose: the screenshot bleeds off the card.

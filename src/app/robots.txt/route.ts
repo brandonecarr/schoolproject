@@ -40,6 +40,7 @@ export async function GET() {
     "Disallow: /reset/",
     "Disallow: /enter",
     "Disallow: /find",
+    "Disallow: /cohort-admin",
     "Disallow: /api/",
     `Sitemap: ${tenantProtocol()}://${rootDomain()}/sitemap.xml`,
     "",

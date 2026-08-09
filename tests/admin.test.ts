@@ -17,7 +17,7 @@ function adminSourceFiles(): string[] {
       else if (p.endsWith(".tsx") || p.endsWith(".ts")) out.push(p);
     }
   };
-  walk(join(process.cwd(), "src/app/admin"));
+  walk(join(process.cwd(), "src/app/cohort-admin"));
   return out;
 }
 
@@ -34,7 +34,7 @@ describe("every admin surface is gated", () => {
   });
 
   it("every server action starts with the gate", () => {
-    const actions = read("src/app/admin/actions.ts");
+    const actions = read("src/app/cohort-admin/actions.ts");
     const fns = actions.split(/export async function /).slice(1);
     for (const fn of fns) {
       const name = fn.slice(0, fn.indexOf("("));
@@ -73,7 +73,7 @@ describe("the gate itself", () => {
 
 describe("what the console shows", () => {
   it("the overview renders no child data — schools and counts only", () => {
-    const page = read("src/app/admin/page.tsx");
+    const page = read("src/app/cohort-admin/page.tsx");
     expect(page).not.toContain("prismaSystem.submission");
     expect(page).not.toContain("prismaSystem.fileRec");
     expect(page).not.toMatch(/student\.findMany/);

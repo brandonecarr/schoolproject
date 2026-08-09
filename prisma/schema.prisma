@@ -899,3 +899,29 @@ model Lead {
 
   @@index([status])
 }
+
+// A bookable walkthrough slot — the Calendly piece. PLATFORM TABLE: slots
+// belong to the operator, not to any school. leadId doubles as the booked
+// flag; claiming is an atomic update WHERE leadId IS NULL, so two prospects
+// racing for the same slot cannot both win.
+model WalkthroughSlot {
+  id          String   @id @default(cuid())
+  startsAt    DateTime
+  durationMin Int      @default(20)
+  leadId      String?
+  createdAt   DateTime @default(now())
+
+  @@index([startsAt])
+}
+
+// A record of every email blast the console has sent. The body is kept
+// verbatim: "what exactly did we tell people" is a question that will come
+// up, and the answer should not depend on anyone's memory.
+model EmailBlast {
+  id        String   @id @default(cuid())
+  audience  String
+  subject   String
+  body      String
+  sentCount Int
+  createdAt DateTime @default(now())
+}
