@@ -13,6 +13,7 @@ import { originFor } from "@/lib/tenant-server";
 import { newTokenValue, tokenExpiryMinutes } from "@/lib/tokens";
 import { hashPassword, newSessionId } from "@/lib/password";
 import { SESSION_COOKIE, SESSION_COOKIE_OPTIONS, logAudit } from "@/lib/auth";
+import { sendEmail, appUrl } from "@/lib/email";
 
 export async function signup(formData: FormData) {
   const schoolName = String(formData.get("schoolName") || "").trim();
@@ -62,6 +63,34 @@ export async function signup(formData: FormData) {
 
   await logAudit(owner.id, "school_created", `${schoolName} (${state})`);
 
+  // The welcome email: transactional, and mostly a delivery vehicle for the
+  // one fact worth keeping — the school's permanent address. Best-effort by
+  // design: sendEmail never throws and fails closed when unconfigured, so a
+  // mail outage can never break signup itself.
+  const schoolOrigin = originFor(slug);
+  await sendEmail({
+    to: email,
+    subject: `Welcome to Cohort — ${schoolName} is set up`,
+    text: [
+      `${schoolName} now has its own home on Cohort:`,
+      ``,
+      `  ${schoolOrigin || appUrl()}`,
+      ``,
+      `That address is permanent — it's where you and your families sign in,`,
+      `so bookmark it and use it in your invitations.`,
+      ``,
+      `Good first steps, in order:`,
+      `  1. Add your students (Students -> Add, or import a CSV).`,
+      `  2. Publish your term dates (Calendar) — they set the instructional-day`,
+      `     count every ESA invoice claims.`,
+      `  3. Take attendance. It's the single biggest input to getting paid.`,
+      ``,
+      `Reply to this email and it reaches the founder.`,
+      ``,
+      `— Cohort. Run the school. Get paid for it.`,
+    ].join("\n"),
+  });
+
   // SIGNING IN ON THE RIGHT HOST.
   //
   // Signup happens on the apex; the school lives on its own subdomain. The
@@ -74,7 +103,7 @@ export async function signup(formData: FormData) {
   // in a URL and therefore lands in history and any logs along the way, which
   // is exactly why it dies on first use and why two minutes is the whole
   // budget for a redirect the browser follows on its own.
-  const origin = originFor(slug);
+  const origin = schoolOrigin;
   if (origin) {
     const handoff = newTokenValue();
     await prismaSystem.token.create({
