@@ -24,6 +24,9 @@ function adminSourceFiles(): string[] {
 describe("every admin surface is gated", () => {
   it("each page and the actions file call requirePlatformAdmin", () => {
     for (const p of adminSourceFiles()) {
+      // The one exemption: login/ IS the gate's door. Its action scopes the
+      // candidate lookup to platformAdmin accounts instead, held below.
+      if (p.includes("/login/")) continue;
       const src = readFileSync(p, "utf8");
       const isPage = p.endsWith("page.tsx");
       const isActions = p.endsWith("actions.ts");
@@ -31,6 +34,24 @@ describe("every admin surface is gated", () => {
         expect(src, p).toContain("requirePlatformAdmin");
       }
     }
+  });
+
+  it("the login door only ever considers platformAdmin accounts", () => {
+    const login = read("src/app/cohort-admin/login/actions.ts");
+    expect(login).toMatch(/where: \{ email, platformAdmin: true \}/);
+    expect(login).toContain("verifyPassword");
+    // Uniform failure: one redirect target for every bad outcome.
+    expect(login).toContain('redirect("/cohort-admin/login?error=1")');
+  });
+
+  it("an unauthenticated visitor lands on the console's own door", () => {
+    const auth = read("src/lib/auth.ts");
+    const gate = auth.slice(auth.indexOf("export async function requirePlatformAdmin"));
+    expect(gate).toContain('redirect("/cohort-admin/login")');
+  });
+
+  it("the apex serves the console", () => {
+    expect(read("src/proxy.ts")).toContain('"/cohort-admin"');
   });
 
   it("every server action starts with the gate", () => {
@@ -62,7 +83,9 @@ describe("the gate itself", () => {
         if (statSync(p).isDirectory()) walk(p);
         else if (p.endsWith(".ts") || p.endsWith(".tsx")) {
           const src = readFileSync(p, "utf8");
-          if (/platformAdmin\s*:/.test(src) && !p.includes("generated")) offenders.push(p);
+          // A WRITE is `platformAdmin:` inside a prisma `data:` block. Reading
+          // the flag (gates, the login door's where-filter) is fine.
+          if (/data:\s*\{[^}]*platformAdmin/s.test(src) && !p.includes("generated")) offenders.push(p);
         }
       }
     };

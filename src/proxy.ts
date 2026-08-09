@@ -28,6 +28,7 @@ const APEX_PATHS = [
   "/states", // public per-state program pages — the part of the apex built to be found
   "/find", // lost-link school finder — answers by email, never on screen
   "/book", // walkthrough booking — the landing CTA's destination
+  "/cohort-admin", // operator console — its own sign-in, robots-disallowed
   "/logout",
   "/api", // cron and webhooks are called at the production domain
   // Tokenised links. Old emails point at whatever origin sent them, and the

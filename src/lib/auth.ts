@@ -157,10 +157,12 @@ async function resolveSession(sid: string): Promise<Session | null> {
   // slug changed. Re-checked on every request rather than at sign-in.
   const kind = await currentHostKind();
   if (kind.kind === "tenant" && school?.slug !== kind.slug) return null;
-  // On the apex there is no school, so there is no app to be signed into. The
-  // proxy already routes app paths away from there; this makes it true even if
-  // a route slips the matcher.
-  if (kind.kind === "apex") return null;
+  // On the apex there is no school, so there is no school app to be signed
+  // into — with ONE exception: the operator console lives there, and a
+  // platform admin's session is the thing that opens it. The check is on
+  // signedIn (the real human), never the impersonated user, so a "view as"
+  // can never widen into an apex session. Everyone else stays void here.
+  if (kind.kind === "apex" && !signedIn.platformAdmin) return null;
 
   return { user, school, rail, actor };
 }
@@ -209,7 +211,11 @@ export async function requireTeacher(): Promise<Session> {
  * an admin viewing a parent must not carry admin powers into that view.
  */
 export async function requirePlatformAdmin(): Promise<Session> {
-  const session = await requireUser();
+  const session = await getSession();
+  // No session goes to the console's OWN door — on the apex there is no
+  // school /login to send anyone to. A session without the flag (or an
+  // impersonation) goes home instead: that person has an app; this isn't it.
+  if (!session) redirect("/cohort-admin/login");
   if (session.actor || !session.user.platformAdmin) redirect("/");
   return session;
 }

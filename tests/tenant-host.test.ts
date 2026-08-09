@@ -89,8 +89,11 @@ describe("the tenant gate is wired into the session, not just written down", () 
     expect(auth).toMatch(/kind\.kind === "tenant" && school\?\.slug !== kind\.slug\) return null/);
   });
 
-  it("the apex carries no signed-in session", () => {
-    expect(auth).toMatch(/kind\.kind === "apex"\) return null/);
+  it("the apex voids every session except a platform admin's", () => {
+    // The operator console lives on the apex; its flag is the ONE exception
+    // to "no sessions here". Checked on signedIn — the real human — so an
+    // impersonated view can never widen into an apex session.
+    expect(auth).toMatch(/kind\.kind === "apex" && !signedIn\.platformAdmin\) return null/);
   });
 });
 
