@@ -33,6 +33,15 @@ describe("the gate", () => {
     expect(fallback).toContain("provisionSchool");
   });
 
+  it("PRODUCTION with no Stripe refuses loudly — no silent free schools", () => {
+    const fallback = signupAction.slice(signupAction.indexOf("// ---- No Stripe configured"));
+    const guard = fallback.slice(0, fallback.indexOf("provisionSchool"));
+    expect(guard).toContain('deploymentEnv() === "production"');
+    expect(guard).toContain("error=billing");
+    // The signup page has words for it.
+    expect(read("src/app/signup/page.tsx")).toContain("billing:");
+  });
+
   it("the intent stores a HASH; the raw password never waits anywhere", () => {
     expect(signupAction).toContain("passwordHash: hashPassword(password)");
     expect(signupAction).not.toMatch(/passwordHash:\s*password[,\s]/);

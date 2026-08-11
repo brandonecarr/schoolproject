@@ -16,6 +16,8 @@ const ERRORS: Record<string, string> = {
   slug: "That address isn't available. Try another.",
   slugbad:
     "An address can use lowercase letters, numbers and hyphens, and needs at least three characters.",
+  billing:
+    "Signups are momentarily paused while we finish setting up billing. Nothing was created — email info@schoolcohort.com and we'll let you know the moment it reopens.",
 };
 
 export default async function SignupPage({

@@ -16,6 +16,7 @@ import { newTokenValue, tokenExpiryMinutes } from "@/lib/tokens";
 import { hashPassword, newSessionId } from "@/lib/password";
 import { SESSION_COOKIE, SESSION_COOKIE_OPTIONS } from "@/lib/auth";
 import { appUrl } from "@/lib/email";
+import { deploymentEnv } from "@/lib/environment";
 import { stripeConfigured, createCheckoutSession } from "@/lib/stripe";
 import { provisionSchool } from "@/lib/provision";
 
@@ -82,7 +83,14 @@ export async function signup(formData: FormData) {
     redirect(session.url);
   }
 
-  // ---- No Stripe configured: provision directly (dev/preview/smoke) --------
+  // ---- No Stripe configured ------------------------------------------------
+  // In PRODUCTION that is a misconfiguration, and the wrong failure mode is
+  // the quiet one: silently giving away a free school teaches nobody that
+  // billing is down. Refuse loudly instead. Everywhere else — local dev,
+  // previews, the smoke test — direct provisioning is the point.
+  if (deploymentEnv() === "production") {
+    redirect("/signup?error=billing");
+  }
   const provisioned = await provisionSchool({
     schoolName,
     slug,
