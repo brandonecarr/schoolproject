@@ -13,6 +13,7 @@ import { currentOrigin } from "@/lib/tenant-server";
 import { reimbursementMetrics, formatPct, stalledInvoices, STALL_DAYS } from "@/lib/metrics";
 import { classifyDeadlines, deadlinePhrase } from "@/lib/deadlines";
 import { OnboardingModal } from "./OnboardingModal";
+import { TriageView, DueSoonView } from "./TriageView";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Dashboard — Cohort" };
@@ -189,28 +190,20 @@ export default async function Dashboard({
       <div className="split">
         {/* Sorted ascending by evidence score — least ready first. This is the
             point of the screen, and alphabetical would defeat it. */}
-        <Card pad={false}>
-          <CardHead eyebrow="Needs attention" title="Who isn't invoice-ready" href="/evidence" linkLabel="Full board" />
-          <div className="rowlist">
-            {triage.map(({ s: st, e }) => {
-              const r = readiness(e.score);
-              return (
-                <Link key={st.id} href={`/students/${st.id}`} className="rowitem attnrow">
-                  <div style={{ minWidth: 0 }}>
-                    <div className="rowname">{st.name}</div>
-                    <div className="rowmeta">
-                      Grade {st.grade} ·{" "}
-                      {st.esaProgram ? PROGRAMS[st.esaProgram]?.label ?? st.esaProgram : "Private pay"}
-                    </div>
-                  </div>
-                  <Bar pct={e.score} tone={r.tone} />
-                  <Pill tone={r.tone}>{r.label}</Pill>
-                  <span className="num rowscore">{e.score}</span>
-                </Link>
-              );
-            })}
-          </div>
-        </Card>
+        <TriageView
+          rows={triage.map(({ s: st, e }) => ({
+            id: st.id,
+            name: st.name,
+            grade: st.grade,
+            programLabel: st.esaProgram
+              ? (PROGRAMS[st.esaProgram]?.label ?? st.esaProgram)
+              : "Private pay",
+            score: e.score,
+            presentDays: e.presentDays,
+            graded: e.submissions.filter((x) => x.status === "graded").length,
+            samples: e.samples.length,
+          }))}
+        />
 
         <div className="stack">
           <Card>
@@ -297,35 +290,21 @@ export default async function Dashboard({
             </Link>
           </Card>
 
-          <Card pad={false}>
-            <CardHead eyebrow="Coming due soon" title="" href="/assignments" linkLabel="All" />
-            {upcomingRows.length === 0 ? (
-              <p className="cardbody" style={{ padding: "0 var(--card-pad) var(--card-pad)" }}>
-                No assignments due ahead. <Link href="/assignments">Assign some work</Link>.
-              </p>
-            ) : (
-              <div className="rowlist">
-                {upcomingRows.map(({ a, inHand, total, daysLeft }) => {
-                  const tm = typeMeta(a.type);
-                  const tone = daysLeft <= 1 ? "warn" : "info";
-                  return (
-                    <div key={a.id} className="rowitem duerow">
-                      <span className="glyph" aria-hidden>
-                        {tm.icon}
-                      </span>
-                      <span style={{ minWidth: 0 }}>
-                        <span className="rowname ellip">{a.title}</span>
-                        <span className="rowmeta">
-                          {inHand}/{total} turned in · {fmt(a.dueDate)}
-                        </span>
-                      </span>
-                      <Pill tone={tone}>{dueLabel(daysLeft)}</Pill>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-          </Card>
+          <DueSoonView
+            rows={upcomingRows.map(({ a, inHand, total, daysLeft }) => {
+              const tm = typeMeta(a.type);
+              return {
+                id: a.id,
+                title: a.title,
+                icon: tm.icon,
+                typeLabel: tm.label,
+                inHand,
+                total,
+                dueDateLabel: fmt(a.dueDate),
+                daysLeft,
+              };
+            })}
+          />
         </div>
       </div>
     </>

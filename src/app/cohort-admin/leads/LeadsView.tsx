@@ -6,7 +6,7 @@
 // ?lead=<id>, ?new=lead) so refresh, back/forward and server-action
 // redirects all land where you were. Mutations stay server actions.
 
-import { useShallowParams } from "../use-shallow-params";
+import { useShallowParams } from "@/components/use-shallow-params";
 import { US_STATES } from "@/lib/us-states";
 import { LocalTime } from "@/components/LocalTime";
 import {

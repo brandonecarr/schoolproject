@@ -8,7 +8,7 @@ import { dueSoonForStudents, dueLabel } from "@/lib/due";
 import { threadStudentIds, unreadForFamily } from "@/lib/messages";
 import { typeMeta } from "@/lib/lms";
 import { masteryForStudent } from "@/lib/mastery";
-import { StandardsBars } from "@/components/StandardsSummary";
+import { ChildrenView } from "./ChildrenView";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Home — Cohort" };
@@ -162,64 +162,21 @@ export default async function ParentHomePage() {
         </div>
       )}
 
-      {/* per-child snapshot */}
-      <div className="eyebrow" style={{ marginTop: 22 }}>
-        {multi ? "Each child" : "Snapshot"}
-      </div>
-      <div className="child-grid" style={{ marginTop: 10 }}>
-        {perChild.map(({ k, presentDays, loggedDays, avgPct, openCount, ledger, mastery }) => (
-          <div key={k.id} className="card child-card">
-            <div className="spread">
-              <div>
-                <div className="eyebrow" style={{ margin: 0 }}>
-                  Grade {k.grade}
-                </div>
-                <h2 style={{ margin: "2px 0 0" }}>{k.name}</h2>
-              </div>
-            </div>
-            <div className="child-stats">
-              <div>
-                <div className="cs-n">{openCount}</div>
-                <div className="cs-l">To do</div>
-              </div>
-              <div>
-                <div className="cs-n">{avgPct != null ? `${avgPct}%` : "—"}</div>
-                <div className="cs-l">Avg grade</div>
-              </div>
-              <div>
-                <div className="cs-n">
-                  {presentDays}
-                  <span className="cs-sub">/{loggedDays}</span>
-                </div>
-                <div className="cs-l">Present</div>
-              </div>
-              <div>
-                <div className="cs-n">${Math.round(ledger.familyBalance).toLocaleString()}</div>
-                <div className="cs-l">You owe</div>
-              </div>
-            </div>
-            {mastery.summary.assessed > 0 && (
-              <div style={{ marginTop: 14 }}>
-                <div className="spread" style={{ alignItems: "baseline" }}>
-                  <span className="small muted">Standards mastered</span>
-                  <span className="small">
-                    <strong>{mastery.summary.mastered}</strong> of {mastery.summary.assessed}
-                  </span>
-                </div>
-                <StandardsBars summary={mastery.summary} />
-              </div>
-            )}
-            <div className="row" style={{ gap: 10, marginTop: 12 }}>
-              <Link className="btn ghost sm" href="/parent/feed">
-                Feed
-              </Link>
-              <Link className="btn ghost sm" href="/parent/children">
-                Details
-              </Link>
-            </div>
-          </div>
-        ))}
-      </div>
+      {/* per-child snapshot — cards open the child's slide-out panel */}
+      <ChildrenView
+        multi={multi}
+        rows={perChild.map(({ k, presentDays, loggedDays, avgPct, openCount, ledger, mastery }) => ({
+          id: k.id,
+          name: k.name,
+          grade: k.grade,
+          openCount,
+          avgPct,
+          presentDays,
+          loggedDays,
+          owe: ledger.familyBalance,
+          mastery: mastery.summary,
+        }))}
+      />
 
       {/* tuition */}
       <div className="card" style={{ marginTop: 16 }}>

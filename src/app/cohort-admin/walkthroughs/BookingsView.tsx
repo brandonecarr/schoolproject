@@ -8,7 +8,7 @@
 
 import Link from "next/link";
 import { LocalTime } from "@/components/LocalTime";
-import { useShallowParams } from "../use-shallow-params";
+import { useShallowParams } from "@/components/use-shallow-params";
 import { Monogram, AdmPill, Panel, LEAD_STATUS_TONE, fmtDate } from "../ui";
 import { IconMail, IconUsers, IconSend } from "../icons";
 

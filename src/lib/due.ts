@@ -24,12 +24,7 @@ export function daysBetween(from: string, to: string): number {
 }
 
 // A friendly urgency label: "Overdue", "Due today", "Due tomorrow", "in 3 days".
-export function dueLabel(daysLeft: number): string {
-  if (daysLeft < 0) return daysLeft === -1 ? "1 day overdue" : `${-daysLeft} days overdue`;
-  if (daysLeft === 0) return "Due today";
-  if (daysLeft === 1) return "Due tomorrow";
-  return `Due in ${daysLeft} days`;
-}
+export { dueLabel } from "@/lib/due-label";
 
 // Open work (not yet turned in) for a set of students, joined to assignment +
 // course, sorted soonest-due first. Returns everything open; callers slice.

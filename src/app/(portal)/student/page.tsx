@@ -8,6 +8,7 @@ import { typeMeta } from "@/lib/lms";
 import { masteryForStudent } from "@/lib/mastery";
 import { StandardsSummary } from "@/components/StandardsSummary";
 import { Pill } from "@/components/ui";
+import { WorkView } from "./WorkView";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Home — Cohort" };
@@ -149,29 +150,20 @@ export default async function StudentHomePage() {
           </p>
         </div>
       ) : (
-        <div className="worklist">
-          {due.slice(0, 5).map((d) => {
+        <WorkView
+          rows={due.slice(0, 5).map((d) => {
             const m = typeMeta(d.type);
-            const tone = d.daysLeft < 0 ? "bad" : d.daysLeft <= 1 ? "warn" : "info";
-            return (
-              <Link key={d.submissionId} href="/student/work" className="workrow">
-                <span className="worktile" aria-hidden>
-                  {m.icon}
-                </span>
-                <span className="grow">
-                  <span className="worktitle" style={{ display: "block" }}>
-                    {d.title}
-                  </span>
-                  <span className="workmeta" style={{ display: "block" }}>
-                    {d.courseName} · {m.label}
-                    {d.status === "returned" ? " · needs changes" : ""}
-                  </span>
-                </span>
-                <Pill tone={tone}>{dueLabel(d.daysLeft)}</Pill>
-              </Link>
-            );
+            return {
+              submissionId: d.submissionId,
+              title: d.title,
+              courseName: d.courseName,
+              typeLabel: m.label,
+              icon: m.icon,
+              daysLeft: d.daysLeft,
+              needsChanges: d.status === "returned",
+            };
           })}
-        </div>
+        />
       )}
 
       {/* skills mastered */}

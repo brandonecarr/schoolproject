@@ -7,7 +7,7 @@
 // to the server just to slide a panel in.
 
 import Link from "next/link";
-import { useShallowParams } from "../use-shallow-params";
+import { useShallowParams } from "@/components/use-shallow-params";
 import { Monogram, AdmPill, Panel, EmptyState, fmtDate, fmtMonthYear } from "../ui";
 import { IconDoc, IconMail, IconChat, IconSend } from "../icons";
 

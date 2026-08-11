@@ -7497,3 +7497,156 @@ a.lp-state:hover {
     grid-template-columns: 1fr;
   }
 }
+
+/* ============================================================
+   APP SLIDE-OUT PANEL — the operator console's treatment, worn
+   with the school app's own tokens. Full-height floating column
+   pinned right, equal insets; .shell:has() pushes the main panel
+   (header included) left to make room.
+   ============================================================ */
+.app-side {
+  position: fixed;
+  top: 14px;
+  right: 14px;
+  bottom: 14px;
+  width: 384px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  z-index: 60;
+  animation: admPanelIn 0.16s ease both;
+}
+@media (min-width: 1181px) {
+  .shell .panel {
+    transition: margin-right 0.18s ease;
+  }
+  .shell:has(.app-side) .panel {
+    margin-right: 398px;
+  }
+}
+@media (max-width: 1180px) {
+  .app-side {
+    top: 10px;
+    right: 10px;
+    bottom: 10px;
+    box-shadow: -16px 0 40px oklch(0.3 0.04 285 / 0.18);
+  }
+}
+.app-side-body {
+  flex: 1;
+  overflow-y: auto;
+}
+.app-side-head {
+  padding: 20px 20px 0;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+}
+.app-side-title {
+  font-size: 17px;
+  font-weight: 700;
+  letter-spacing: -0.015em;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.app-side-close {
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  border: 1px solid var(--line);
+  background: var(--surface);
+  color: var(--ink);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  flex: none;
+}
+.app-side-close:hover {
+  background: var(--accent-soft);
+}
+.app-side-meta {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 8px 20px 0;
+  font-size: 12px;
+  color: var(--ink2, #6b7280);
+}
+.app-side-sec {
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--line);
+}
+.app-side-sec:last-child {
+  border-bottom: none;
+}
+.app-side-seclabel {
+  font-size: 11px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--ink2, #6b7280);
+  font-weight: 700;
+  margin-bottom: 10px;
+}
+.app-kv {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 6px 0;
+  font-size: 13.5px;
+}
+.app-kv .k {
+  color: var(--ink2, #6b7280);
+}
+.app-kv .v {
+  font-weight: 600;
+  text-align: right;
+}
+.app-side-foot {
+  border-top: 1px solid var(--line);
+  padding: 14px 20px 18px;
+  flex: none;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 9px;
+}
+.app-side-foot > .btn {
+  width: 100%;
+  justify-content: center;
+}
+.app-side-id {
+  text-align: center;
+  padding: 18px 20px;
+  border-bottom: 1px solid var(--line);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+}
+/* A card that opens a panel: pointer + a lift on hover. */
+.app-clickcard {
+  cursor: pointer;
+  transition: box-shadow 0.15s ease, transform 0.15s ease;
+}
+.app-clickcard:hover {
+  box-shadow: var(--shadow), 0 10px 28px oklch(0.4 0.06 285 / 0.08);
+  transform: translateY(-1px);
+}
+.app-side-mono {
+  width: 68px;
+  height: 68px;
+  border-radius: 50%;
+  background: var(--accent-soft);
+  color: var(--accent-dark);
+  font-size: 22px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}

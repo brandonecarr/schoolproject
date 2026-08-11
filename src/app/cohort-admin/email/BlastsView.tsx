@@ -5,7 +5,7 @@
 // the full body verbatim. The log has always kept the body; this is the
 // first place it's readable. URL-backed via ?blast=<id>.
 
-import { useShallowParams } from "../use-shallow-params";
+import { useShallowParams } from "@/components/use-shallow-params";
 import { AdmPill, Panel, fmtDate } from "../ui";
 
 export type BlastRow = {

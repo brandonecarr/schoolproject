@@ -5,7 +5,7 @@
 
 import Link from "next/link";
 import { IconX } from "./icons";
-import { PanelEscape } from "./panel-escape";
+import { PanelEscape } from "@/components/panel-escape";
 
 export type AdmTone = "good" | "info" | "warn" | "bad" | "plain";
 
