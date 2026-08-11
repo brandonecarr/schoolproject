@@ -33,6 +33,7 @@ export default async function AdminSchools() {
         gradesServed: true,
         heardFrom: true,
         priorTooling: true,
+        subscriptionStatus: true,
       },
     }),
     prismaSystem.student.groupBy({ by: ["schoolId"], _count: true }),
@@ -91,6 +92,7 @@ export default async function AdminSchools() {
     gradesServed: s.gradesServed,
     heardFrom: s.heardFrom,
     priorTooling: s.priorTooling,
+    subscriptionStatus: s.subscriptionStatus,
     invoices: invoicesBySchool.get(s.id) ?? [],
   }));
 

@@ -92,6 +92,15 @@ model School {
   priorTooling    String   @default("")
   onboardedAt     DateTime?
 
+  // --- Cohort billing (the SaaS subscription, never ESA money) -------------
+  // Set when the school is created through paid checkout; subscriptionStatus
+  // is maintained by the Stripe webhook (active | past_due | canceled | ...).
+  // Empty strings mean the school predates billing or was provisioned in a
+  // deployment without Stripe configured.
+  stripeCustomerId     String @default("")
+  stripeSubscriptionId String @default("")
+  subscriptionStatus   String @default("")
+
   createdAt DateTime @default(now())
 }
 
@@ -975,4 +984,27 @@ model AvailabilityRule {
   createdAt   DateTime @default(now())
 
   @@index([weekday])
+}
+
+// A signup that has passed validation but not yet paid. The school does NOT
+// exist until Stripe confirms checkout — this row carries everything needed
+// to build it the moment payment lands, from either the success redirect or
+// the webhook, whichever arrives first (consumedAt makes fulfillment run
+// exactly once). The password is hashed HERE, at intent time; the raw value
+// never waits anywhere.
+model SignupIntent {
+  id              String    @id @default(cuid())
+  schoolName      String
+  slug            String
+  state           String
+  esaAmount       Float
+  ownerName       String
+  email           String
+  passwordHash    String
+  stripeSessionId String    @default("")
+  consumedAt      DateTime?
+  schoolId        String?
+  createdAt       DateTime  @default(now())
+
+  @@index([stripeSessionId])
 }

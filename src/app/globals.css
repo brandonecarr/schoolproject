@@ -5545,6 +5545,13 @@ a.lp-state:hover {
 .lp-tiers {
   align-items: start;
 }
+/* One tier since the paywall landed: the founding rate, centered. */
+.lp-tiers-1 {
+  display: grid;
+  grid-template-columns: 1fr;
+  margin: 34px auto 0;
+  max-width: 480px;
+}
 /* Two tiers since the co-op card came out: an equal pair, stretched to the
    same height, narrower than the old three-across so neither card sprawls. */
 .lp-tiers-2 {

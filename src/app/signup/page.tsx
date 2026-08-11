@@ -6,6 +6,7 @@ import { SlugField } from "./SlugField";
 import { StateNote } from "./StateNote";
 import { rootDomain } from "@/lib/tenant-config";
 import { PROGRAMS } from "@/lib/rules";
+import { stripeConfigured } from "@/lib/stripe";
 
 export const metadata: Metadata = { title: "Create your school — Cohort" };
 export const dynamic = "force-dynamic";
@@ -20,10 +21,11 @@ const ERRORS: Record<string, string> = {
 export default async function SignupPage({
   searchParams,
 }: {
-  searchParams: Promise<{ error?: string }>;
+  searchParams: Promise<{ error?: string; canceled?: string }>;
 }) {
-  const { error } = await searchParams;
+  const { error, canceled } = await searchParams;
   const message = error ? ERRORS[error] : undefined;
+  const paywalled = stripeConfigured();
   const root = rootDomain();
   // Code -> programme label, e.g. AZ -> "Arizona ESA". Only what the note
   // needs; the client component gets no more of the rules table than that.
@@ -47,6 +49,18 @@ export default async function SignupPage({
         <h1>Start your school</h1>
 
         {message && <div className="notice bad">{message}</div>}
+        {canceled && (
+          <div className="notice warn">
+            Checkout was canceled — nothing was charged and no school was created. Your details
+            below start fresh.
+          </div>
+        )}
+        {paywalled && (
+          <p className="small muted" style={{ marginBottom: 12 }}>
+            Next step is secure checkout — <strong>$149/month</strong>, flat, any number of
+            students, cancel anytime. Your school is created the moment payment completes.
+          </p>
+        )}
 
         <form action={signup} className="card2 authcard">
           <label htmlFor="schoolName">School name</label>

@@ -455,25 +455,11 @@ export default async function Home() {
               <p>
                 At launch, Cohort will be priced per child — because that&apos;s how you&apos;re
                 funded. While it&apos;s early, it&apos;s simpler than that: everything, every
-                student, one rate, locked for your first twelve months. Free until your first
-                children are enrolled.
+                student, one rate, locked for your first twelve months.
               </p>
             </div>
 
-            <div className="lp-tiers lp-tiers-2">
-              <article className="lp-tier">
-                <h3>Setup Fee</h3>
-                <p className="lp-tiersub">Your address, your calendar, your first roster.</p>
-                <div className="lp-price">Free</div>
-                <div className="lp-pricenote">No card, no expiry</div>
-                <div className="lp-hair" />
-                <ul>
-                  <li>Full product, one school</li>
-                  <li>Attendance and grading</li>
-                  <li>Packets you can preview</li>
-                </ul>
-              </article>
-
+            <div className="lp-tiers lp-tiers-1">
               <article className="lp-tier featured">
                 <div className="lp-tierhead">
                   <h3>The first cohort</h3>

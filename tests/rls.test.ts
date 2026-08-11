@@ -59,7 +59,12 @@ describe("every model has a policy", () => {
     expect(sql, `no CREATE POLICY for "${m.name}" — add a policy migration`).toContain(
       `CREATE POLICY rls_tenant ON "${m.name}"`
     );
-    if (m.hasSchoolId && !["User"].includes(m.name)) {
+    // Exemptions from the schoolId-keyed shape, each with a reason:
+    //   User — schoolId is nullable (platform operators), keyed differently.
+    //   SignupIntent — a PLATFORM table: rows exist before any tenant does
+    //     (they BECOME schools), and its schoolId is a fulfillment record,
+    //     not a tenancy key. It carries the platform policy shape instead.
+    if (m.hasSchoolId && !["User", "SignupIntent"].includes(m.name)) {
       const block = sql.slice(sql.indexOf(`CREATE POLICY rls_tenant ON "${m.name}"`));
       const policy = block.slice(0, block.indexOf(";"));
       expect(policy, `${m.name} policy must key on its own schoolId or a sanctioned join`).toMatch(

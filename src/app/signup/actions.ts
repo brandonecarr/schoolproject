@@ -1,9 +1,11 @@
 "use server";
 
-// Public: create a new school + its owner account, and sign in. This is what
-// makes the deployment multi-tenant at the application layer — every query is
-// already scoped by schoolId. (Database-level row-level security is a separate
-// step that requires the Postgres migration; see roadmap 6.2.)
+// Public: start a new school. With Stripe configured this is a PAYWALL —
+// nothing is created until checkout completes: the form's details become a
+// SignupIntent (password hashed immediately), the founder goes to Stripe,
+// and fulfillment happens on the way back (or via webhook, whichever lands
+// first). Without Stripe configured — local dev, previews, the smoke test —
+// signup provisions directly, exactly as it always did.
 
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
@@ -12,8 +14,10 @@ import { availableSlug, isUsableSlug, slugify } from "@/lib/tenant";
 import { originFor } from "@/lib/tenant-server";
 import { newTokenValue, tokenExpiryMinutes } from "@/lib/tokens";
 import { hashPassword, newSessionId } from "@/lib/password";
-import { SESSION_COOKIE, SESSION_COOKIE_OPTIONS, logAudit } from "@/lib/auth";
-import { sendEmail, appUrl } from "@/lib/email";
+import { SESSION_COOKIE, SESSION_COOKIE_OPTIONS } from "@/lib/auth";
+import { appUrl } from "@/lib/email";
+import { stripeConfigured, createCheckoutSession } from "@/lib/stripe";
+import { provisionSchool } from "@/lib/provision";
 
 export async function signup(formData: FormData) {
   const schoolName = String(formData.get("schoolName") || "").trim();
@@ -26,10 +30,6 @@ export async function signup(formData: FormData) {
   if (!schoolName || !state || !name || !email || !password) {
     redirect("/signup?error=1");
   }
-  // No duplicate check on the address any more. Signup CREATES a school, so
-  // the new owner account is the first in an empty tenant and cannot collide
-  // with anything — and a founder who already runs one microschool starting a
-  // second is a real case this used to block outright.
 
   // THE WEB ADDRESS. Whatever the form sent is re-derived here rather than
   // trusted: the field is a client component and could send anything, and a
@@ -52,43 +52,45 @@ export async function signup(formData: FormData) {
     if (!slug) redirect("/signup?error=slugbad");
   }
 
-  const school = await prismaSystem.school.create({
-    data: { name: schoolName, slug, state, esaAmount, address: "" },
-  });
-  // System: signup builds a brand-new tenant from nothing; these creates
-  // precede any session or request tenant.
-  const owner = await prismaSystem.user.create({
-    data: { schoolId: school.id, role: "owner", name, email, password: hashPassword(password) },
-  });
+  // ---- The paywall ---------------------------------------------------------
+  if (stripeConfigured()) {
+    // Hash NOW: the raw password's life ends inside this request. The intent
+    // row waits with everything fulfillment needs and nothing more.
+    const intent = await prismaSystem.signupIntent.create({
+      data: {
+        schoolName,
+        slug,
+        state,
+        esaAmount,
+        ownerName: name,
+        email,
+        passwordHash: hashPassword(password),
+      },
+    });
 
-  await logAudit(owner.id, "school_created", `${schoolName} (${state})`);
+    const base = appUrl();
+    const session = await createCheckoutSession({
+      intentId: intent.id,
+      email,
+      successUrl: `${base}/signup/complete?session_id={CHECKOUT_SESSION_ID}`,
+      cancelUrl: `${base}/signup?canceled=1`,
+    });
+    await prismaSystem.signupIntent.update({
+      where: { id: intent.id },
+      data: { stripeSessionId: session.id },
+    });
+    redirect(session.url);
+  }
 
-  // The welcome email: transactional, and mostly a delivery vehicle for the
-  // one fact worth keeping — the school's permanent address. Best-effort by
-  // design: sendEmail never throws and fails closed when unconfigured, so a
-  // mail outage can never break signup itself.
-  const schoolOrigin = originFor(slug);
-  await sendEmail({
-    to: email,
-    subject: `Welcome to Cohort — ${schoolName} is set up`,
-    text: [
-      `${schoolName} now has its own home on Cohort:`,
-      ``,
-      `  ${schoolOrigin || appUrl()}`,
-      ``,
-      `That address is permanent — it's where you and your families sign in,`,
-      `so bookmark it and use it in your invitations.`,
-      ``,
-      `Good first steps, in order:`,
-      `  1. Add your students (Students -> Add, or import a CSV).`,
-      `  2. Publish your term dates (Calendar) — they set the instructional-day`,
-      `     count every ESA invoice claims.`,
-      `  3. Take attendance. It's the single biggest input to getting paid.`,
-      ``,
-      `Reply to this email and it reaches the founder.`,
-      ``,
-      `— Cohort. Run the school. Get paid for it.`,
-    ].join("\n"),
+  // ---- No Stripe configured: provision directly (dev/preview/smoke) --------
+  const provisioned = await provisionSchool({
+    schoolName,
+    slug,
+    state,
+    esaAmount,
+    ownerName: name,
+    email,
+    passwordHash: hashPassword(password),
   });
 
   // SIGNING IN ON THE RIGHT HOST.
@@ -103,15 +105,15 @@ export async function signup(formData: FormData) {
   // in a URL and therefore lands in history and any logs along the way, which
   // is exactly why it dies on first use and why two minutes is the whole
   // budget for a redirect the browser follows on its own.
-  const origin = schoolOrigin;
+  const origin = originFor(provisioned.slug);
   if (origin) {
     const handoff = newTokenValue();
     await prismaSystem.token.create({
       data: {
         token: handoff,
         type: "signin_handoff",
-        schoolId: school.id,
-        userId: owner.id,
+        schoolId: provisioned.schoolId,
+        userId: provisioned.ownerId,
         expiresAt: tokenExpiryMinutes(2),
       },
     });
@@ -120,7 +122,7 @@ export async function signup(formData: FormData) {
 
   // Untenanted deployment: one origin, so sign in here.
   const sid = newSessionId();
-  await prismaSystem.session.create({ data: { id: sid, userId: owner.id } });
+  await prismaSystem.session.create({ data: { id: sid, userId: provisioned.ownerId } });
   const jar = await cookies();
   jar.set(SESSION_COOKIE, sid, SESSION_COOKIE_OPTIONS);
   redirect("/dashboard");

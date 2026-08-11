@@ -29,6 +29,7 @@ export type SchoolRow = {
   gradesServed: string;
   heardFrom: string;
   priorTooling: string;
+  subscriptionStatus: string;
   invoices: { id: string; periodStart: string; status: string; amount: number }[];
 };
 
@@ -235,6 +236,18 @@ export function SchoolsView({ schools }: { schools: SchoolRow[] }) {
             <div className="adm-kv" style={{ marginTop: 10 }}>
               <span className="k">Funding rail</span>
               <span className="v">{open.providerRail || "Not set"}</span>
+            </div>
+            <div className="adm-kv">
+              <span className="k">Billing</span>
+              <span className="v">
+                {open.subscriptionStatus ? (
+                  <AdmPill tone={open.subscriptionStatus === "active" ? "good" : "warn"}>
+                    {open.subscriptionStatus}
+                  </AdmPill>
+                ) : (
+                  "—"
+                )}
+              </span>
             </div>
           </div>
 
