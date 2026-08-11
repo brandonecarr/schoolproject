@@ -7,8 +7,9 @@ import type { Metadata } from "next";
 import { requirePlatformAdmin } from "@/lib/auth";
 import { prismaSystem } from "@/lib/db";
 import { emailConfigured } from "@/lib/email";
-import { AdmNotice, AdmPill, fmtDate } from "../ui";
+import { AdmNotice } from "../ui";
 import { sendBlast } from "../actions";
+import { BlastsView, type BlastRow } from "./BlastsView";
 
 export const dynamic = "force-dynamic";
 export const metadata: Metadata = { title: "Email — Cohort Admin" };
@@ -95,34 +96,18 @@ export default async function AdminEmail({
           </form>
         </div>
 
-        <div className="adm-card">
-          <div className="adm-cardtitle">History</div>
-          <p className="adm-cardsub">Body kept verbatim. Opens are not tracked.</p>
-          <div style={{ marginTop: 6 }}>
-            {blasts.length === 0 ? (
-              <p className="adm-cardsub" style={{ marginTop: 10 }}>
-                No blasts yet. The history lands here.
-              </p>
-            ) : (
-              blasts.map((b) => (
-                <div key={b.id} className="adm-listrow" style={{ alignItems: "flex-start" }}>
-                  <div className="adm-listmain">
-                    <div className="adm-listname">{b.subject}</div>
-                    <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 5 }}>
-                      <AdmPill tone="info" square>
-                        {b.audience}
-                      </AdmPill>
-                      <span className="adm-cardsub" style={{ margin: 0 }}>
-                        {b.sentCount} recipient{b.sentCount === 1 ? "" : "s"}
-                      </span>
-                    </div>
-                  </div>
-                  <div className="adm-listend">{fmtDate(b.createdAt)}</div>
-                </div>
-              ))
-            )}
-          </div>
-        </div>
+        <BlastsView
+          blasts={blasts.map(
+            (b): BlastRow => ({
+              id: b.id,
+              subject: b.subject,
+              body: b.body,
+              audience: b.audience,
+              sentCount: b.sentCount,
+              createdIso: b.createdAt.toISOString(),
+            }),
+          )}
+        />
       </div>
     </div>
   );

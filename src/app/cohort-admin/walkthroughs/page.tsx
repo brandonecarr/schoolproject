@@ -8,15 +8,15 @@ import { requirePlatformAdmin } from "@/lib/auth";
 import { prismaSystem } from "@/lib/db";
 import { expandRules } from "@/lib/availability";
 import { LocalTime } from "@/components/LocalTime";
-import { AdmNotice, AdmPill } from "../ui";
+import { AdmNotice } from "../ui";
 import { addAvailability, deleteAvailability } from "../actions";
 import { TimezoneField } from "./TimezoneField";
+import { BookingsView, type BookingRow } from "./BookingsView";
 
 export const dynamic = "force-dynamic";
 export const metadata: Metadata = { title: "Walkthroughs — Cohort Admin" };
 
 const DAY_SHORT = ["", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
-const MONTHS_UP = ["JAN", "FEB", "MAR", "APR", "MAY", "JUN", "JUL", "AUG", "SEP", "OCT", "NOV", "DEC"];
 
 function hm(mins: number): string {
   const h = Math.floor(mins / 60);
@@ -47,6 +47,20 @@ export default async function AdminWalkthroughs({
     ? await prismaSystem.lead.findMany({ where: { id: { in: leadIds } } })
     : [];
   const leadById = new Map(leads.map((l) => [l.id, l]));
+
+  const bookingRows: BookingRow[] = bookings.map((s) => {
+    const lead = s.leadId ? leadById.get(s.leadId) : null;
+    return {
+      id: s.id,
+      startsAtIso: s.startsAt.toISOString(),
+      durationMin: s.durationMin,
+      leadId: lead?.id ?? null,
+      leadName: lead?.name ?? "",
+      leadEmail: lead?.email ?? "",
+      leadState: lead?.state ?? "",
+      leadStatus: lead?.status ?? "",
+    };
+  });
 
   // The visitor's-eye preview: exactly what /book computes, so "did my rules
   // do what I meant?" is answered here, not by opening an incognito window.
@@ -165,37 +179,7 @@ export default async function AdminWalkthroughs({
             </div>
           )}
 
-          <div className="adm-card">
-            <div className="adm-cardtitle">Upcoming bookings</div>
-            <div style={{ marginTop: 6 }}>
-              {bookings.length === 0 ? (
-                <p className="adm-cardsub" style={{ marginTop: 10 }}>
-                  No bookings yet. Once availability is set, the walkthrough button does the rest.
-                </p>
-              ) : (
-                bookings.map((s) => {
-                  const lead = s.leadId ? leadById.get(s.leadId) : null;
-                  return (
-                    <div key={s.id} className="adm-listrow">
-                      <div className="adm-dateblock" style={{ width: 64 }}>
-                        <div className="adm-datemonth">
-                          {MONTHS_UP[s.startsAt.getUTCMonth()]} {s.startsAt.getUTCDate()}
-                        </div>
-                        <div className="adm-datetime">
-                          <LocalTime iso={s.startsAt.toISOString()} />
-                        </div>
-                      </div>
-                      <div className="adm-listmain">
-                        <div className="adm-listname">{lead?.name || "—"}</div>
-                        <div className="adm-listsub">{lead?.email || "no lead attached"}</div>
-                      </div>
-                      <AdmPill tone={lead ? "good" : "info"}>{lead ? "Booked" : "Held"}</AdmPill>
-                    </div>
-                  );
-                })
-              )}
-            </div>
-          </div>
+          <BookingsView bookings={bookingRows} />
         </div>
       </div>
     </div>

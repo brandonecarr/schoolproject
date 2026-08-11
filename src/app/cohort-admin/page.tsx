@@ -9,6 +9,7 @@
 // and invoice totals, never student names or work.
 
 import type { Metadata } from "next";
+import Link from "next/link";
 import { requirePlatformAdmin } from "@/lib/auth";
 import { prismaSystem } from "@/lib/db";
 import { LocalTime } from "@/components/LocalTime";
@@ -189,8 +190,8 @@ export default async function AdminOverview() {
             ) : (
               upcoming.map((s) => {
                 const lead = s.leadId ? leadById.get(s.leadId) : null;
-                return (
-                  <div key={s.id} className="adm-listrow">
+                const inner = (
+                  <>
                     <div className="adm-dateblock">
                       <div className="adm-datemonth">{MONTHS_UP[s.startsAt.getUTCMonth()]}</div>
                       <div className="adm-dateday">{s.startsAt.getUTCDate()}</div>
@@ -202,6 +203,20 @@ export default async function AdminOverview() {
                     <div className="adm-listend">
                       <LocalTime iso={s.startsAt.toISOString()} />
                     </div>
+                  </>
+                );
+                // A booking with a lead opens that lead's panel over on Leads.
+                return lead ? (
+                  <Link
+                    key={s.id}
+                    className="adm-listrow adm-rowlink"
+                    href={`/cohort-admin/leads?lead=${lead.id}`}
+                  >
+                    {inner}
+                  </Link>
+                ) : (
+                  <div key={s.id} className="adm-listrow">
+                    {inner}
                   </div>
                 );
               })
