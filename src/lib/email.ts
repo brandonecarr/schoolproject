@@ -15,8 +15,13 @@
 export type EmailMessage = {
   to: string;
   subject: string;
-  /** Plain text. We send text-only on purpose — see renderEmail. */
+  /** Plain text. Notifications send text-only on purpose — see renderEmail. */
   text: string;
+  /** Optional HTML body. Used ONLY for teacher-composed announcements (email
+   *  blasts), where a person designed the content deliberately. Automatic
+   *  notifications never set this — the text-only rationale in renderEmail
+   *  is about child data, and it stands. */
+  html?: string;
 };
 
 export type SendResult =
@@ -49,6 +54,7 @@ export async function sendEmail(msg: EmailMessage): Promise<SendResult> {
         to: [msg.to],
         subject: msg.subject,
         text: msg.text,
+        ...(msg.html ? { html: msg.html } : {}),
       }),
     });
     if (!res.ok) {

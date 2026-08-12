@@ -79,6 +79,7 @@ export const TEACHER_NAV: NavGroup[] = [
     group: "Family",
     items: [
       { href: "/announcements", label: "Announcements", icon: "messages" },
+      { href: "/email", label: "Email blasts", icon: "messages" },
       { href: "/messages", label: "Messages", icon: "messages" },
     ],
   },

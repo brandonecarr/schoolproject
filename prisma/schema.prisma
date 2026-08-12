@@ -1008,3 +1008,20 @@ model SignupIntent {
 
   @@index([stripeSessionId])
 }
+
+// A teacher-composed email announcement: the ParentSquare-shaped answer to
+// "parents don't log in to see announcements." The block list is kept
+// verbatim so history shows exactly what was designed; sentCount is what
+// actually went out. Tenant-scoped like everything a school writes.
+model SchoolBlast {
+  id         String   @id @default(cuid())
+  schoolId   String
+  senderId   String
+  subject    String
+  blocksJson String
+  audience   String // "all" | "students:<n>" — descriptor, for history
+  sentCount  Int      @default(0)
+  createdAt  DateTime @default(now())
+
+  @@index([schoolId, createdAt])
+}
