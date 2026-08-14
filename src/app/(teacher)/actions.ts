@@ -1774,23 +1774,43 @@ export async function togglePinAnnouncement(formData: FormData) {
 // --- Inline annotation on uploaded work ---
 // Pins live on the submission, not the file, so a resubmitted photo starts
 // clean rather than inheriting marks about work the student has since redone.
-export async function addAnnotation(formData: FormData) {
+//
+// Both actions are called DIRECTLY from the Annotator and RETURN rather than
+// redirect: they used to end in revalidatePath + redirect, which re-rendered
+// the entire grading queue (every one of its queries) before the browser
+// showed the pin. The Annotator now renders the pin optimistically and these
+// just persist it — the queue's server-rendered pins are only a first paint.
+export async function addAnnotation(input: {
+  submissionId: string;
+  x: number;
+  y: number;
+  body: string;
+}): Promise<
+  | { pin: { id: string; x: number; y: number; body: string; authorName: string; createdAt: string } }
+  | { error: string }
+> {
   const { user, school } = await requireTeacher();
-  const submissionId = String(formData.get("submissionId"));
-  const body = String(formData.get("body") || "").trim().slice(0, 600);
-  const x = clamp01(Number(formData.get("x")));
-  const y = clamp01(Number(formData.get("y")));
+  const submissionId = String(input.submissionId);
+  const body = String(input.body || "").trim().slice(0, 600);
+  const x = clamp01(Number(input.x));
+  const y = clamp01(Number(input.y));
+  if (!body) return { error: "Write the note first." };
 
   const sub = await prisma.submission.findFirst({
     where: { id: submissionId, schoolId: school!.id },
+    select: { id: true, fileId: true },
   });
-  if (!sub || !sub.fileId || !body) redirect("/grading");
+  if (!sub?.fileId) return { error: "That work has no attached file to pin." };
 
-  // Only pin on something we can actually place a pin on.
-  const file = await prisma.fileRec.findUnique({ where: { id: sub.fileId } });
-  if (!isAnnotatable(file)) redirect("/grading");
+  // Only pin on something we can actually place a pin on. Metadata only —
+  // this check must not haul the image's bytes out of the database.
+  const file = await prisma.fileRec.findUnique({
+    where: { id: sub.fileId },
+    select: { mime: true, ext: true },
+  });
+  if (!isAnnotatable(file)) return { error: "Pins need an image file." };
 
-  await prisma.annotation.create({
+  const created = await prisma.annotation.create({
     data: {
       schoolId: school!.id,
       submissionId,
@@ -1803,19 +1823,27 @@ export async function addAnnotation(formData: FormData) {
     },
   });
   await logAudit(user.id, "annotation_added", `${submissionId} @ ${x.toFixed(2)},${y.toFixed(2)}`);
-  revalidatePath("/grading");
-  redirect("/grading");
+  return {
+    pin: {
+      id: created.id,
+      x,
+      y,
+      body,
+      authorName: user.name,
+      createdAt: created.createdAt.toISOString(),
+    },
+  };
 }
 
-export async function deleteAnnotation(formData: FormData) {
+export async function deleteAnnotation(id: string): Promise<{ ok: boolean }> {
   const { user, school } = await requireTeacher();
-  const id = String(formData.get("id"));
-  const a = await prisma.annotation.findFirst({ where: { id, schoolId: school!.id } });
-  if (!a) redirect("/grading");
-  await prisma.annotation.delete({ where: { id } });
-  await logAudit(user.id, "annotation_deleted", id);
-  revalidatePath("/grading");
-  redirect("/grading");
+  // Delete scoped to the school in one statement — the old read-then-delete
+  // pair cost an extra round trip per removal.
+  const del = await prisma.annotation.deleteMany({
+    where: { id: String(id), schoolId: school!.id },
+  });
+  if (del.count > 0) await logAudit(user.id, "annotation_deleted", String(id));
+  return { ok: del.count > 0 };
 }
 
 // Pin or unpin a nav item for the signed-in teacher.

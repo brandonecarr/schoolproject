@@ -13,12 +13,16 @@
 // PageUp/PageDown, corners with Home/End. It is genuinely usable, not a
 // compliance gesture.
 //
-// Existing pins render from the server, so they survive with JavaScript off;
-// only placing a NEW one needs the client.
+// OPTIMISTIC. Adding or removing a pin used to post a form, run the action,
+// and re-render the whole grading queue before anything changed on screen —
+// seconds of dead time per pin. The pins now live in client state seeded
+// from the server: a new pin appears the moment "Add pin" is clicked and a
+// removed one vanishes immediately, while the action persists in the
+// background. On failure the change rolls back and the reason is shown.
 
 import { useRef, useState } from "react";
 import { toFraction, pinStyle, numbered, clamp01 } from "@/lib/annotate";
-import { addAnnotation } from "@/app/(teacher)/actions";
+import { addAnnotation, deleteAnnotation } from "@/app/(teacher)/actions";
 
 export type Pin = {
   id: string;
@@ -36,10 +40,12 @@ const STEP = 0.02;
 const FINE = 0.005;
 const COARSE = 0.1;
 
+let tmpSeq = 1;
+
 export function Annotator({
   submissionId,
   fileId,
-  pins,
+  pins: initialPins,
   alt = "Turned-in work",
 }: {
   submissionId: string;
@@ -48,11 +54,54 @@ export function Annotator({
   alt?: string;
 }) {
   const wrapRef = useRef<HTMLDivElement>(null);
+  const [pins, setPins] = useState<Pin[]>(initialPins);
+  const [error, setError] = useState<string | null>(null);
   const [draft, setDraft] = useState<{ x: number; y: number } | null>(null);
   // Where the keyboard crosshair sits. Separate from `draft` so arrowing around
   // doesn't open the comment box on every keypress.
   const [cursor, setCursor] = useState<{ x: number; y: number } | null>(null);
   const marks = numbered(pins);
+
+  // Optimistic add: the pin exists on screen under a temporary id before the
+  // server has heard of it; the id is swapped for the real one (or the pin
+  // rolled back) when the action returns.
+  const submitPin = (at: { x: number; y: number }, body: string) => {
+    const tmpId = `tmp-${tmpSeq++}`;
+    setError(null);
+    setDraft(null);
+    setPins((p) => [...p, { id: tmpId, x: at.x, y: at.y, body, authorName: "", createdAt: "" }]);
+    addAnnotation({ submissionId, x: at.x, y: at.y, body })
+      .then((res) => {
+        if ("error" in res) {
+          setPins((p) => p.filter((x) => x.id !== tmpId));
+          setError(res.error);
+        } else {
+          setPins((p) => p.map((x) => (x.id === tmpId ? res.pin : x)));
+        }
+      })
+      .catch(() => {
+        setPins((p) => p.filter((x) => x.id !== tmpId));
+        setError("Couldn't save the pin — try again.");
+      });
+  };
+
+  // Optimistic remove, with the same rollback contract.
+  const removePin = (id: string) => {
+    const prev = pins;
+    setError(null);
+    setPins((p) => p.filter((x) => x.id !== id));
+    deleteAnnotation(id)
+      .then((r) => {
+        if (!r.ok) {
+          setPins(prev);
+          setError("Couldn't remove that pin — try again.");
+        }
+      })
+      .catch(() => {
+        setPins(prev);
+        setError("Couldn't remove that pin — try again.");
+      });
+  };
 
   function place(e: React.MouseEvent<HTMLDivElement>) {
     const el = wrapRef.current;
@@ -158,10 +207,15 @@ export function Annotator({
       </p>
 
       {draft ? (
-        <form action={addAnnotation} className="card" style={{ marginTop: 10, maxWidth: 420 }}>
-          <input type="hidden" name="submissionId" value={submissionId} />
-          <input type="hidden" name="x" value={draft.x} />
-          <input type="hidden" name="y" value={draft.y} />
+        <form
+          onSubmit={(e) => {
+            e.preventDefault();
+            const body = String(new FormData(e.currentTarget).get("body") || "").trim();
+            if (body) submitPin(draft, body.slice(0, 600));
+          }}
+          className="card"
+          style={{ marginTop: 10, maxWidth: 420 }}
+        >
           <label htmlFor={`note-${submissionId}`}>
             Note at {pct(draft.x)}% across, {pct(draft.y)}% down
           </label>
@@ -185,6 +239,29 @@ export function Annotator({
           Click the image to pin a note to a spot — or focus it and use the arrow keys, then Enter.
           Pins go to the student with their feedback, and appear in the ESA packet.
         </p>
+      )}
+
+      {error && (
+        <p className="small" style={{ color: "var(--bad)", margin: "8px 0 0" }}>
+          {error}
+        </p>
+      )}
+
+      {marks.length > 0 && (
+        <div className="row" style={{ gap: 8, marginTop: 8, flexWrap: "wrap" }}>
+          {marks.map((m) => (
+            <button
+              key={m.id}
+              type="button"
+              className="btn ghost sm"
+              title={m.id.startsWith("tmp-") ? "Saving…" : m.body}
+              disabled={m.id.startsWith("tmp-")}
+              onClick={() => removePin(m.id)}
+            >
+              Remove pin {m.n}
+            </button>
+          ))}
+        </div>
       )}
     </div>
   );

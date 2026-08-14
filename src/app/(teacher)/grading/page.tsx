@@ -12,9 +12,9 @@ import {
   scoreItem,
   type Item,
 } from "@/lib/lms";
-import { saveGrade, returnSubmission, deleteAnnotation } from "../actions";
+import { saveGrade, returnSubmission } from "../actions";
 import { Annotator, type Pin } from "@/components/Annotator";
-import { isAnnotatable, numbered } from "@/lib/annotate";
+import { isAnnotatable } from "@/lib/annotate";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Grading — Cohort" };
@@ -372,18 +372,8 @@ function UploadView({
           </p>
         </>
       )}
-      {fileId && pins.length > 0 && (
-        <div className="row" style={{ gap: 8, marginTop: 8, flexWrap: "wrap" }}>
-          {numbered(pins).map((m) => (
-            <form key={m.id} action={deleteAnnotation}>
-              <input type="hidden" name="id" value={m.id} />
-              <button className="btn ghost sm" title={m.body}>
-                Remove pin {m.n}
-              </button>
-            </form>
-          ))}
-        </div>
-      )}
+      {/* The pin list (with its remove buttons) lives inside the Annotator
+          now, so removals are optimistic instead of a full page round trip. */}
     </div>
   );
 }
