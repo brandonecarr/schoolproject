@@ -194,6 +194,11 @@
   --blue-deep: var(--accent-dark);
   --mark: var(--accent);
   --mark-deep: var(--accent-dark);
+  /* Text ON a --mark surface. The old design's mark was chartreuse with
+     dark-olive text; the redesign remapped --mark to the violet accent, and
+     every rule still carrying the olive hex rendered black-on-violet. The
+     pairing now travels together. */
+  --mark-ink: #ffffff;
   --good-soft: var(--good-s);
   --warn-soft: var(--warn-s);
   --bad-soft: var(--bad-s);
@@ -613,7 +618,7 @@ h3 {
 }
 .pill.mark {
   background: var(--mark);
-  color: #3e4a0c;
+  color: var(--mark-ink);
 }
 
 /* tables */
@@ -730,7 +735,7 @@ input[type="date"]::-webkit-calendar-picker-indicator {
 }
 .btn.mark {
   background: var(--mark);
-  color: #2f3908;
+  color: var(--mark-ink);
   border-color: var(--mark-deep);
   box-shadow: 0 1px 2px rgba(20, 28, 38, 0.05), 0 4px 12px rgba(143, 165, 36, 0.28);
 }
@@ -1189,7 +1194,7 @@ input[type="date"]::-webkit-calendar-picker-indicator {
 }
 .streak {
   background: var(--mark);
-  color: #2f3908;
+  color: var(--mark-ink);
   border: 1px solid var(--mark-deep);
   border-radius: 20px;
   padding: 5px 12px;
@@ -1743,7 +1748,7 @@ input[type="date"]::-webkit-calendar-picker-indicator {
   flex: 0 0 auto;
   border-radius: 50%;
   background: var(--mark);
-  color: #2f3908;
+  color: var(--mark-ink);
   font-weight: 700;
   font-size: 12px;
   display: flex;
@@ -2065,7 +2070,7 @@ a.mod-item:hover {
 }
 .mod-item.done .mi-ic {
   background: var(--mark);
-  color: #2f3908;
+  color: var(--mark-ink);
 }
 .mod-item.locked .mi-ic {
   background: #eceee7;
@@ -2256,7 +2261,7 @@ a.mod-item:hover {
 }
 .notif.unread .notif-ic {
   background: var(--mark);
-  color: #2f3908;
+  color: var(--mark-ink);
 }
 .notif-main {
   display: flex;
@@ -2452,7 +2457,7 @@ a.mod-item:hover {
 }
 .mcell.mastered {
   background: var(--mark);
-  color: #2f3908;
+  color: var(--mark-ink);
 }
 .mcell.near {
   background: var(--warn-soft);
