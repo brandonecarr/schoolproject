@@ -23,7 +23,7 @@
 
 import { cache } from "react";
 import { cookies } from "next/headers";
-import { prismaSystem } from "@/lib/db";
+import { sessionRowFor, userRowFor } from "@/lib/auth-rows";
 
 // Mirrors SESSION_COOKIE in auth.ts. Inlined rather than imported to keep this
 // module free of the auth → db → (dynamic) request-tenant chain; a divergence
@@ -37,18 +37,14 @@ export const resolveRequestTenant = cache(async (): Promise<string | null> => {
     if (!sid) return null;
 
     // Read as system: this IS the tenant-resolution step, so it cannot itself
-    // be tenant-scoped. prismaSystem carries no ALS and always bypasses, so it
-    // never recurses back into this resolver.
-    const session = await prismaSystem.session.findUnique({
-      where: { id: sid },
-      select: { userId: true },
-    });
+    // be tenant-scoped. The lookups come from auth-rows.ts — a per-request
+    // cache shared with getSession(), so when the page has already resolved
+    // who is signed in (it always has), these cost nothing. auth-rows uses
+    // prismaSystem, which carries no ALS and never recurses back here.
+    const session = await sessionRowFor(sid);
     if (!session) return null;
 
-    const user = await prismaSystem.user.findUnique({
-      where: { id: session.userId },
-      select: { schoolId: true },
-    });
+    const user = await userRowFor(session.userId);
     // Impersonation ("view as") stays within one school, so the signed-in
     // user's schoolId is the RLS tenant whether or not a view is active — no
     // need to chase viewingAsUserId here.

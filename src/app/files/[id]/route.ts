@@ -35,12 +35,17 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
     return new Response("Not available for this account.", { status: 403 });
 
   const safeName = f.label.replace(/[^\w. -]/g, "");
+  // School resources (the logo, shared teaching material) may sit in the
+  // browser cache: the sidebar shows the logo on every page, and replacing a
+  // logo creates a NEW row id, so a cached copy can never go stale. Child
+  // work and receipts stay no-store — those must not outlive the session.
+  const cacheable = f.studentId == null && f.invoiceId == null;
   return new Response(new Uint8Array(f.data), {
     status: 200,
     headers: {
       "Content-Type": f.mime,
       "Content-Disposition": `inline; filename="${safeName}.${f.ext}"`,
-      "Cache-Control": "private, no-store",
+      "Cache-Control": cacheable ? "private, max-age=3600" : "private, no-store",
     },
   });
 }

@@ -2,7 +2,7 @@ import Link from "next/link";
 import { PageHead, StatCard, Pill } from "@/components/ui";
 import { requireRole } from "@/lib/auth";
 import { prisma } from "@/lib/db";
-import { evidenceFor } from "@/lib/evidence";
+import { evidenceForStudents } from "@/lib/evidence";
 import { ledgerFor } from "@/lib/billing";
 import { dueSoonForStudents, dueLabel } from "@/lib/due";
 import { threadStudentIds, unreadForFamily } from "@/lib/messages";
@@ -28,9 +28,10 @@ export default async function ParentHomePage() {
     unreadForFamily(await threadStudentIds(user)),
   ]);
 
+  const evMap = await evidenceForStudents(kids.map((k) => k.id));
   const perChild = await Promise.all(
     kids.map(async (k) => {
-      const e = await evidenceFor(k.id);
+      const e = evMap.get(k.id)!;
       const graded = e.submissions.filter((s) => s.status === "graded" && s.score != null);
       let earned = 0;
       let possible = 0;

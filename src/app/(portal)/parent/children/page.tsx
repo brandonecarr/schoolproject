@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { requireRole } from "@/lib/auth";
 import { prisma } from "@/lib/db";
-import { evidenceFor } from "@/lib/evidence";
+import { evidenceForStudents } from "@/lib/evidence";
 import { fmt } from "@/lib/dates";
 import { Pill, Notice } from "@/components/ui";
 import { ConfirmSubmit } from "@/components/ConfirmSubmit";
@@ -25,9 +25,10 @@ export default async function ParentChildrenPage({
     await prisma.student.findMany({ where: { id: { in: ids } } })
   ).sort((a, b) => ids.indexOf(a.id) - ids.indexOf(b.id));
 
+  const evMap = await evidenceForStudents(kids.map((k) => k.id));
   const blocks = await Promise.all(
     kids.map(async (k) => {
-      const e = await evidenceFor(k.id);
+      const e = evMap.get(k.id)!;
       const kidUser = await prisma.user.findFirst({ where: { role: "student", studentId: k.id } });
       const graded = e.submissions.filter((s) => s.status === "graded");
       const open = e.submissions.filter((s) => s.status === "assigned");

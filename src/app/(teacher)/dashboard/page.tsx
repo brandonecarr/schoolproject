@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { requireTeacher } from "@/lib/auth";
 import { prisma } from "@/lib/db";
-import { evidenceFor } from "@/lib/evidence";
+import { evidenceForStudents } from "@/lib/evidence";
 import { readiness, PROGRAMS, railForState } from "@/lib/rules";
 import { providerStatus } from "@/lib/provider";
 import { today, fmt } from "@/lib/dates";
@@ -27,11 +27,35 @@ export default async function Dashboard({
   const { welcome } = await searchParams;
   const schoolId = school!.id;
 
+  const td = today();
   const students = await prisma.student.findMany({ where: { schoolId }, orderBy: { createdAt: "asc" } });
-  const ev = await Promise.all(students.map(async (s) => ({ s, e: await evidenceFor(s.id) })));
-  const ungraded = await prisma.submission.count({ where: { schoolId, status: "submitted" } });
-  const attToday = await prisma.attendance.count({ where: { schoolId, date: today() } });
-  const invoices = await prisma.invoice.findMany({ where: { schoolId } });
+  // One round of parallel fetches. These were sequential awaits, and with
+  // every query paying its own transaction round-trips, seven-in-a-row was
+  // most of this page's load time.
+  const [ev, ungraded, attToday, invoices, deadlineRows, upcoming, oldestSub] = await Promise.all([
+    evidenceForStudents(students.map((s) => s.id)).then((m) =>
+      students.map((s) => ({ s, e: m.get(s.id)! }))
+    ),
+    prisma.submission.count({ where: { schoolId, status: "submitted" } }),
+    prisma.attendance.count({ where: { schoolId, date: td } }),
+    prisma.invoice.findMany({ where: { schoolId } }),
+    prisma.complianceDeadline.findMany({
+      where: { schoolId },
+      select: { id: true, label: true, dueDate: true, completedAt: true },
+    }),
+    prisma.assignment.findMany({
+      where: { schoolId, dueDate: { gte: td } },
+      orderBy: { dueDate: "asc" },
+      take: 5,
+    }),
+    // Oldest thing waiting on the teacher. "3 waiting" is a number; "oldest 4
+    // days" is the one that makes someone open the queue.
+    prisma.submission.findFirst({
+      where: { schoolId, status: "submitted", submittedAt: { not: null } },
+      orderBy: { submittedAt: "asc" },
+      select: { submittedAt: true },
+    }),
+  ]);
   const m = reimbursementMetrics(invoices);
 
   const avg = Math.round(ev.reduce((a, x) => a + x.e.score, 0) / (ev.length || 1));
@@ -39,23 +63,13 @@ export default async function Dashboard({
   // Triage: least-ready students first — this is a command deck, not a roster.
   const triage = [...ev].sort((a, b) => a.e.score - b.e.score);
 
-  // Coming due soon: the next assignments due, with turn-in progress.
-  const td = today();
   const stall = stalledInvoices(invoices, td);
 
   // Program deadlines close enough to matter. Only overdue + soon surface
   // here — the full list lives on /calendar, and a nudge that fires for a
   // date three months out trains people to ignore it.
-  const dl = classifyDeadlines(
-    await prisma.complianceDeadline.findMany({ where: { schoolId }, select: { id: true, label: true, dueDate: true, completedAt: true } }),
-    td
-  );
+  const dl = classifyDeadlines(deadlineRows, td);
   const dlUrgent = [...dl.overdue, ...dl.soon];
-  const upcoming = await prisma.assignment.findMany({
-    where: { schoolId, dueDate: { gte: td } },
-    orderBy: { dueDate: "asc" },
-    take: 5,
-  });
   const upSubs = upcoming.length
     ? await prisma.submission.findMany({
         where: { schoolId, assignmentId: { in: upcoming.map((a) => a.id) } },
@@ -65,14 +79,6 @@ export default async function Dashboard({
     const mine = upSubs.filter((s) => s.assignmentId === a.id);
     const inHand = mine.filter((s) => s.status === "submitted" || s.status === "graded").length;
     return { a, inHand, total: mine.length, daysLeft: daysBetween(td, a.dueDate) };
-  });
-
-  // Oldest thing waiting on the teacher. "3 waiting" is a number; "oldest 4
-  // days" is the one that makes someone open the queue.
-  const oldestSub = await prisma.submission.findFirst({
-    where: { schoolId, status: "submitted", submittedAt: { not: null } },
-    orderBy: { submittedAt: "asc" },
-    select: { submittedAt: true },
   });
   const oldestDays = oldestSub?.submittedAt ? daysBetween(oldestSub.submittedAt.slice(0, 10), td) : null;
 

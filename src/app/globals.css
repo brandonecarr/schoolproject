@@ -7974,3 +7974,59 @@ a.lp-state:hover {
   font-size: 12.5px;
   color: var(--ink3);
 }
+
+/* ==========================================================================
+   NAVIGATION SKELETON — shown the instant a link is clicked, replaced by the
+   real page when the server render lands.
+   ========================================================================== */
+.page-skel {
+  animation: skelIn 0.2s ease both;
+}
+@keyframes skelIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+.page-skel-eyebrow,
+.page-skel-title,
+.page-skel-line,
+.page-skel-card {
+  border-radius: 10px;
+  background: linear-gradient(100deg, var(--line) 40%, var(--surface2) 50%, var(--line) 60%);
+  background-size: 200% 100%;
+  animation: skelShimmer 1.2s linear infinite;
+}
+.page-skel-eyebrow {
+  width: 90px;
+  height: 12px;
+  margin-bottom: 10px;
+}
+.page-skel-title {
+  width: 260px;
+  height: 30px;
+  margin-bottom: 10px;
+}
+.page-skel-line {
+  width: min(560px, 80%);
+  height: 14px;
+  margin-bottom: 22px;
+}
+.page-skel-card {
+  height: 180px;
+  border-radius: var(--radius-sm);
+  margin-bottom: 14px;
+}
+.page-skel-card.short {
+  height: 100px;
+}
+@keyframes skelShimmer {
+  from {
+    background-position: 200% 0;
+  }
+  to {
+    background-position: -200% 0;
+  }
+}

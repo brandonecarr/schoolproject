@@ -12,14 +12,15 @@ import { ViewAsBanner } from "@/components/ViewAsBanner";
 import { unreadForStaff } from "@/lib/messages";
 import { unreadCountFor } from "@/lib/notify";
 import { parsePins, TEACHER_NAV } from "@/lib/nav";
-import { brandForSchool } from "@/lib/packet-read";
 
 export default async function TeacherLayout({ children }: { children: React.ReactNode }) {
   const { user, school, actor } = await requireTeacher();
-  const [messagesUnread, notificationsUnread, brand] = await Promise.all([
+  // This layout runs on EVERY navigation, so it must stay light. The logo is
+  // a URL to the (cacheable) file route, never bytes pulled through the
+  // database here — that cost a school fetch plus the image on every click.
+  const [messagesUnread, notificationsUnread] = await Promise.all([
     school ? unreadForStaff(school.id) : Promise.resolve(0),
     unreadCountFor(user.id),
-    school ? brandForSchool(school.id) : Promise.resolve(null),
   ]);
   const subline = [school?.name, school?.railLabel].filter(Boolean).join(" · ");
 
@@ -32,7 +33,7 @@ export default async function TeacherLayout({ children }: { children: React.Reac
         nav={TEACHER_NAV}
         schoolName={school?.name ?? ""}
         subline={subline}
-        logoSrc={brand?.logo ?? null}
+        logoSrc={school?.logoFileId ? `/files/${school.logoFileId}` : null}
         userName={user.name}
         pins={parsePins(user.pinnedNav)}
         pinnable

@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { requireTeacher } from "@/lib/auth";
 import { prisma } from "@/lib/db";
-import { evidenceFor } from "@/lib/evidence";
+import { evidenceForStudents } from "@/lib/evidence";
 import { readiness, PROGRAMS, RAILS, programOptions } from "@/lib/rules";
 import { FundingSelect } from "@/components/FundingSelect";
 import { VerificationChip } from "@/components/VerificationNote";
@@ -23,7 +23,8 @@ export default async function StudentsPage({
     where: { schoolId: school!.id },
     orderBy: { createdAt: "asc" },
   });
-  const rows = await Promise.all(students.map(async (s) => ({ s, e: await evidenceFor(s.id) })));
+  const evMap = await evidenceForStudents(students.map((s) => s.id));
+  const rows = students.map((s) => ({ s, e: evMap.get(s.id)! }));
 
   const onEsa = students.filter((x) => x.esaProgram).length;
   // Name the actual programme when the roster is on one, rather than a generic

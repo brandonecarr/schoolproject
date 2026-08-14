@@ -9,9 +9,11 @@
 //    proxy.ts — the Next 16 docs say proxy is for optimistic checks, not auth.
 
 import "server-only";
+import { cache } from "react";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { prisma, prismaSystem } from "@/lib/db";
+import { sessionRowFor, userRowFor } from "@/lib/auth-rows";
 import { railForState, type Rail } from "@/lib/rules";
 import { currentHostKind } from "@/lib/tenant-server";
 // Prisma 7's generator names row types `<Model>Model`; alias to the plain names.
@@ -93,7 +95,12 @@ export type TenantSession = Session & { user: User & { schoolId: string } };
 // longer binds the RLS tenant — that is pulled from the request cookie at query
 // time by the db.ts extension, because enterWith does not survive the RSC
 // render. Auth reads here go through prismaSystem (bypass).
-export async function getSession(): Promise<Session | null> {
+// cache(): the layout and the page it wraps BOTH gate with requireX, which
+// means without this every navigation resolved the same session twice —
+// six identical system queries where three suffice. React's request-scoped
+// memo collapses them; a Server Action mutating the session gets a fresh
+// resolution on the next request, which is when it matters.
+export const getSession = cache(async (): Promise<Session | null> => {
   const jar = await cookies();
   const sid = jar.get(SESSION_COOKIE)?.value;
   if (!sid) return null;
@@ -103,15 +110,17 @@ export async function getSession(): Promise<Session | null> {
   // the db.ts extension (see request-tenant.ts). enterWith would not survive
   // the render anyway.
   return resolveSession(sid);
-}
+});
 
 // System context: this IS the authentication step — nothing is scoped until it
 // answers who is asking.
 async function resolveSession(sid: string): Promise<Session | null> {
-  const session = await prismaSystem.session.findUnique({ where: { id: sid } });
+  // Shared with resolveRequestTenant via the per-request cache in
+  // auth-rows.ts — see the header there.
+  const session = await sessionRowFor(sid);
   if (!session) return null;
 
-  const signedIn = await prismaSystem.user.findUnique({ where: { id: session.userId } });
+  const signedIn = await userRowFor(session.userId);
   if (!signedIn) return null;
 
   // Impersonation. The swap happens HERE, once, so that every downstream role

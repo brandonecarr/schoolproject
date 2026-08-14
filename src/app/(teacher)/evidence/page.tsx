@@ -1,6 +1,6 @@
 import { requireTeacher } from "@/lib/auth";
 import { prisma } from "@/lib/db";
-import { evidenceFor } from "@/lib/evidence";
+import { evidenceForStudents } from "@/lib/evidence";
 import { readiness, PROGRAMS } from "@/lib/rules";
 import { periodStart, today, fmt } from "@/lib/dates";
 import { EvidenceBar } from "@/components/EvidenceBar";
@@ -16,7 +16,8 @@ export default async function EvidenceBoardPage() {
     where: { schoolId: school!.id },
     orderBy: { createdAt: "asc" },
   });
-  const rows = await Promise.all(students.map(async (s) => ({ s, e: await evidenceFor(s.id) })));
+  const evMap = await evidenceForStudents(students.map((s) => s.id));
+  const rows = students.map((s) => ({ s, e: evMap.get(s.id)! }));
 
   return (
     <>

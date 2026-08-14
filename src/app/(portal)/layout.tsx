@@ -18,27 +18,24 @@ import { prisma } from "@/lib/db";
 import { threadStudentIds, unreadForFamily } from "@/lib/messages";
 import { unreadCountFor } from "@/lib/notify";
 import { navForRole } from "@/lib/nav";
-import { brandForSchool } from "@/lib/packet-read";
 
 export default async function PortalLayout({ children }: { children: React.ReactNode }) {
-  const { user, actor } = await requireUser();
+  // The session already carries the school row — re-fetching it here cost a
+  // query on every navigation, and pulling the logo BYTES cost another.
+  const { user, school, actor } = await requireUser();
   const isStudent = user.role === "student";
 
-  const [messagesUnread, notificationsUnread, brand, school] = await Promise.all([
-    unreadForFamily(await threadStudentIds(user)),
+  const kidIds = await threadStudentIds(user);
+  const [messagesUnread, notificationsUnread, children_] = await Promise.all([
+    unreadForFamily(kidIds),
     unreadCountFor(user.id),
-    user.schoolId ? brandForSchool(user.schoolId) : Promise.resolve(null),
-    user.schoolId
-      ? prisma.school.findUnique({ where: { id: user.schoolId }, select: { name: true } })
-      : Promise.resolve(null),
+    // "Parent of Ivy, Grade 2" reads better than "Parent" and is the one place
+    // a parent of several children can see which one the portal is showing.
+    prisma.student.findMany({
+      where: { id: { in: kidIds } },
+      select: { name: true, grade: true },
+    }),
   ]);
-
-  // "Parent of Ivy, Grade 2" reads better than "Parent" and is the one place a
-  // parent of several children can see which one the portal is showing.
-  const children_ = await prisma.student.findMany({
-    where: { id: { in: await threadStudentIds(user) } },
-    select: { name: true, grade: true },
-  });
   const first = children_[0];
   const roleLabel = isStudent
     ? first
@@ -59,7 +56,7 @@ export default async function PortalLayout({ children }: { children: React.React
         nav={navForRole(user.role, first?.name, children_.length)}
         schoolName={school?.name ?? ""}
         subline={school?.name ?? ""}
-        logoSrc={brand?.logo ?? null}
+        logoSrc={school?.logoFileId ? `/files/${school.logoFileId}` : null}
         userName={user.name}
         messagesUnread={messagesUnread}
         notificationsUnread={notificationsUnread}
