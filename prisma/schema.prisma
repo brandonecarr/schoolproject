@@ -480,6 +480,12 @@ model FileRec {
   mime       String
   bytes      Int
   data       Bytes
+  /// Set ONLY on images uploaded for email blasts. A parent's mail client
+  /// fetches images with no session, so /blast-img/[token] serves any file
+  /// carrying a token with no auth — the long random token IS the credential.
+  /// Everything else (work samples, receipts, logos) stays null and keeps the
+  /// authenticated /files/[id] path.
+  publicToken String? @unique
   capturedAt String // ISO timestamp
   createdAt  DateTime @default(now())
 }

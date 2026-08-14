@@ -13,9 +13,63 @@
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/db";
 import { requireTeacher, logAudit } from "@/lib/auth";
-import { sendEmail, emailConfigured, looksLikeEmail } from "@/lib/email";
+import { sendEmail, emailConfigured, looksLikeEmail, appUrl } from "@/lib/email";
 import { parseBlocks, blocksToHtml, blocksToText } from "@/lib/email-blocks";
 import { accentOf } from "@/lib/branding";
+import { originFor } from "@/lib/tenant-server";
+import { newTokenValue } from "@/lib/tokens";
+
+const BLAST_IMAGE_TYPES: Record<string, string> = {
+  "image/png": "png",
+  "image/jpeg": "jpg",
+  "image/webp": "webp",
+  "image/gif": "gif",
+};
+const BLAST_IMAGE_MAX = 4 * 1024 * 1024;
+
+/**
+ * Upload an image for the builder. Called directly from the client (not as a
+ * form action), so it RETURNS rather than redirects: the absolute URL the
+ * image block should carry, or an error message to show inline.
+ *
+ * The URL must be absolute and publicly fetchable — it ends up in an <img>
+ * tag inside a parent's inbox, where relative paths and session cookies mean
+ * nothing. Hence the publicToken (see /blast-img/[token]).
+ */
+export async function uploadBlastImage(
+  formData: FormData
+): Promise<{ url: string } | { error: string }> {
+  const { user, school } = await requireTeacher();
+  const schoolId = school!.id;
+
+  const file = formData.get("file") as File | null;
+  if (!file || file.size === 0) return { error: "No file arrived — try again." };
+  const ext = BLAST_IMAGE_TYPES[file.type];
+  if (!ext) return { error: "Use a PNG, JPEG, WebP or GIF image." };
+  if (file.size > BLAST_IMAGE_MAX) return { error: "Keep images under 4 MB." };
+
+  const buf = Buffer.from(await file.arrayBuffer());
+  const publicToken = newTokenValue();
+  await prisma.fileRec.create({
+    data: {
+      schoolId,
+      // Null: builder artwork is school comms material, not a record about a
+      // child — same footing as the school logo.
+      studentId: null,
+      label: file.name.replace(/\.[^.]*$/, "").slice(0, 80) || "Blast image",
+      ext,
+      mime: file.type,
+      bytes: buf.length,
+      data: buf,
+      publicToken,
+      capturedAt: new Date().toISOString(),
+    },
+  });
+  await logAudit(user.id, "blast_image_uploaded", `${buf.length} bytes`);
+
+  const base = originFor(school!.slug) || appUrl();
+  return { url: `${base}/blast-img/${publicToken}` };
+}
 
 export async function sendSchoolBlast(formData: FormData) {
   const { user, school } = await requireTeacher();

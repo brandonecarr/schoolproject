@@ -10,11 +10,17 @@
 // ergonomics, not enforcement.
 
 import { useMemo, useRef, useState } from "react";
-import { blocksToHtml, MAX_BLOCKS, type EmailBlock, type BlastBrand } from "@/lib/email-blocks";
+import {
+  blocksToHtml,
+  MAX_BLOCKS,
+  type Align,
+  type EmailBlock,
+  type BlastBrand,
+} from "@/lib/email-blocks";
 import { SidePanel, SideSection, SideKV } from "@/components/SidePanel";
 import { useShallowParams } from "@/components/use-shallow-params";
 import { parseBlocks } from "@/lib/email-blocks";
-import { sendSchoolBlast } from "./actions";
+import { sendSchoolBlast, uploadBlastImage } from "./actions";
 
 type EditorBlock = { uid: number; block: EmailBlock };
 type ParentRow = { id: string; name: string; reachable: boolean; studentIds: string[] };
@@ -141,7 +147,7 @@ export function BuilderView({
                   dragKind.current = null;
                   setDropAt(null);
                 }}
-                onClick={() => insert(fresh(p.kind), rows.length)}
+                onClick={() => insert(fresh(p.kind), Number.MAX_SAFE_INTEGER)}
               >
                 <span className="blast-chip-grip" aria-hidden>
                   ⋮⋮
@@ -189,6 +195,9 @@ export function BuilderView({
                     <span className="blast-block-kind">
                       {PALETTE.find((p) => p.kind === r.block.kind)?.label}
                     </span>
+                    {r.block.kind !== "divider" && r.block.kind !== "spacer" && (
+                      <AlignPicker block={r.block} onChange={(b) => patch(r.uid, b)} />
+                    )}
                     <span className="sp" />
                     <button
                       type="button"
@@ -364,27 +373,165 @@ function BlockEditor({ block, onChange }: { block: EmailBlock; onChange: (b: Ema
         </div>
       );
     case "image":
-      return (
-        <div className="blast-fields2">
-          <input
-            className="blast-field"
-            value={block.url}
-            maxLength={2000}
-            placeholder="Image address (https://…)"
-            onChange={(e) => onChange({ ...block, url: e.target.value })}
-          />
-          <input
-            className="blast-field"
-            value={block.alt}
-            maxLength={200}
-            placeholder="Describe the image (for screen readers)"
-            onChange={(e) => onChange({ ...block, alt: e.target.value })}
-          />
-        </div>
-      );
+      return <ImageEditor block={block} onChange={onChange} />;
     default:
       return null;
   }
+}
+
+// --- Alignment ---------------------------------------------------------------
+
+type Alignable = Extract<EmailBlock, { align?: Align }>;
+
+const ALIGN_ICONS: Record<"left" | Align, React.ReactNode> = {
+  left: (
+    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" aria-hidden>
+      <path d="M3 6h18M3 12h10M3 18h14" />
+    </svg>
+  ),
+  center: (
+    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" aria-hidden>
+      <path d="M3 6h18M7 12h10M5 18h14" />
+    </svg>
+  ),
+  right: (
+    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" aria-hidden>
+      <path d="M3 6h18M11 12h10M7 18h14" />
+    </svg>
+  ),
+};
+
+function AlignPicker({
+  block,
+  onChange,
+}: {
+  block: Alignable;
+  onChange: (b: EmailBlock) => void;
+}) {
+  const current: "left" | Align = block.align ?? "left";
+  const set = (a: "left" | Align) => {
+    // Left is the default and is stored as absence — see lib/email-blocks.
+    const { align: _drop, ...rest } = block;
+    void _drop;
+    onChange(a === "left" ? (rest as EmailBlock) : ({ ...rest, align: a } as EmailBlock));
+  };
+  return (
+    <span className="blast-align" role="group" aria-label="Alignment">
+      {(["left", "center", "right"] as const).map((a) => (
+        <button
+          key={a}
+          type="button"
+          className={current === a ? "blast-tool on" : "blast-tool"}
+          aria-pressed={current === a}
+          aria-label={`Align ${a}`}
+          title={`Align ${a}`}
+          onClick={() => set(a)}
+        >
+          {ALIGN_ICONS[a]}
+        </button>
+      ))}
+    </span>
+  );
+}
+
+// --- Image upload ------------------------------------------------------------
+
+type ImageBlock = Extract<EmailBlock, { kind: "image" }>;
+
+/** Downscale before upload: an inbox image never needs more than ~1200px,
+ *  and a phone photo is 8MB the teacher shouldn't have to think about. GIFs
+ *  pass through untouched — redrawing one keeps a single frame. */
+async function prepareImage(f: File): Promise<File> {
+  if (f.type === "image/gif") return f;
+  const bmp = await createImageBitmap(f).catch(() => null);
+  if (!bmp) return f;
+  const MAX_EDGE = 1200;
+  const scale = Math.min(1, MAX_EDGE / Math.max(bmp.width, bmp.height));
+  if (scale === 1 && f.size <= 600 * 1024) {
+    bmp.close();
+    return f;
+  }
+  const canvas = document.createElement("canvas");
+  canvas.width = Math.max(1, Math.round(bmp.width * scale));
+  canvas.height = Math.max(1, Math.round(bmp.height * scale));
+  canvas.getContext("2d")?.drawImage(bmp, 0, 0, canvas.width, canvas.height);
+  bmp.close();
+  // PNG keeps transparency; everything else re-encodes as JPEG.
+  const keepPng = f.type === "image/png";
+  const type = keepPng ? "image/png" : "image/jpeg";
+  const blob = await new Promise<Blob | null>((res) => canvas.toBlob(res, type, 0.85));
+  if (!blob) return f;
+  const name = f.name.replace(/\.[^.]*$/, "") + (keepPng ? ".png" : ".jpg");
+  return new File([blob], name, { type });
+}
+
+function ImageEditor({
+  block,
+  onChange,
+}: {
+  block: ImageBlock;
+  onChange: (b: EmailBlock) => void;
+}) {
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+  const fileRef = useRef<HTMLInputElement>(null);
+
+  const pick = async (f: File | undefined) => {
+    if (!f || busy) return;
+    setErr(null);
+    setBusy(true);
+    try {
+      const prepared = await prepareImage(f);
+      const fd = new FormData();
+      fd.set("file", prepared, prepared.name);
+      const res = await uploadBlastImage(fd);
+      if ("error" in res) setErr(res.error);
+      else onChange({ ...block, url: res.url });
+    } catch {
+      setErr("Upload failed — try again.");
+    }
+    setBusy(false);
+    if (fileRef.current) fileRef.current.value = "";
+  };
+
+  return (
+    <div className="blast-fields2">
+      <div className="blast-upload">
+        <input
+          ref={fileRef}
+          type="file"
+          accept="image/png,image/jpeg,image/webp,image/gif"
+          className="blast-upload-input"
+          aria-label="Choose an image file"
+          onChange={(e) => pick(e.target.files?.[0])}
+        />
+        <button
+          type="button"
+          className="btn ghost sm"
+          disabled={busy}
+          onClick={() => fileRef.current?.click()}
+        >
+          {busy ? "Uploading…" : block.url ? "Replace image" : "Upload from your computer"}
+        </button>
+        <span className="blast-upload-or">or paste a web address below</span>
+      </div>
+      {err && <span className="blast-upload-err">{err}</span>}
+      <input
+        className="blast-field"
+        value={block.url}
+        maxLength={2000}
+        placeholder="Image address (https://…)"
+        onChange={(e) => onChange({ ...block, url: e.target.value })}
+      />
+      <input
+        className="blast-field"
+        value={block.alt}
+        maxLength={200}
+        placeholder="Describe the image (for screen readers)"
+        onChange={(e) => onChange({ ...block, alt: e.target.value })}
+      />
+    </div>
+  );
 }
 
 // --- History -----------------------------------------------------------------

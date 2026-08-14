@@ -10,11 +10,15 @@
 // lib/email.ts renderEmail); this HTML path exists only for announcements a
 // teacher composed on purpose.
 
+/** Left is the default and is stored as ABSENCE of the field — a block only
+ *  carries `align` when it deviates, so old stored blasts parse unchanged. */
+export type Align = "center" | "right";
+
 export type EmailBlock =
-  | { kind: "heading"; text: string }
-  | { kind: "text"; text: string }
-  | { kind: "button"; label: string; url: string }
-  | { kind: "image"; url: string; alt: string }
+  | { kind: "heading"; text: string; align?: Align }
+  | { kind: "text"; text: string; align?: Align }
+  | { kind: "button"; label: string; url: string; align?: Align }
+  | { kind: "image"; url: string; alt: string; align?: Align }
   | { kind: "divider" }
   | { kind: "spacer" };
 
@@ -53,15 +57,21 @@ export function parseBlocks(json: string): EmailBlock[] {
       const v = (b as Record<string, unknown>)[k];
       return typeof v === "string" ? v.slice(0, max) : "";
     };
-    if (kind === "heading" && str("text", 200).trim()) out.push({ kind, text: str("text", 200) });
-    else if (kind === "text" && str("text", 4000).trim()) out.push({ kind, text: str("text", 4000) });
+    const rawAlign = (b as { align?: unknown }).align;
+    const align: Align | undefined =
+      rawAlign === "center" || rawAlign === "right" ? rawAlign : undefined;
+    const aligned = align ? { align } : {};
+    if (kind === "heading" && str("text", 200).trim())
+      out.push({ kind, text: str("text", 200), ...aligned });
+    else if (kind === "text" && str("text", 4000).trim())
+      out.push({ kind, text: str("text", 4000), ...aligned });
     else if (kind === "button") {
       const url = safeUrl(str("url", 2000));
       const label = str("label", 120).trim();
-      if (url && label) out.push({ kind, label, url });
+      if (url && label) out.push({ kind, label, url, ...aligned });
     } else if (kind === "image") {
       const url = safeUrl(str("url", 2000));
-      if (url) out.push({ kind, url, alt: str("alt", 200) });
+      if (url) out.push({ kind, url, alt: str("alt", 200), ...aligned });
     } else if (kind === "divider" || kind === "spacer") out.push({ kind });
   }
   return out;
@@ -89,21 +99,33 @@ function para(text: string): string {
 export function blocksToHtml(blocks: EmailBlock[], brand: BlastBrand): string {
   const accent = brand.accentColor || DEFAULT_ACCENT;
   const school = escapeHtml(brand.schoolName);
+  // Alignment, the email-client way: text gets text-align, but buttons and
+  // images sit inside a full-width table whose cell carries the HTML `align`
+  // attribute — the one mechanism Outlook's Word engine actually honours.
+  const textAlign = (a?: Align) => (a ? `text-align:${a};` : "");
+  const cell = (a: Align | undefined, inner: string) =>
+    a
+      ? `<table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr><td align="${a}">${inner}</td></tr></table>`
+      : inner;
   const body = blocks
     .map((b) => {
       switch (b.kind) {
         case "heading":
-          return `<h2 style="margin:24px 0 8px;font-size:22px;line-height:1.3;color:#1a1d29;">${para(b.text)}</h2>`;
+          return `<h2 style="margin:24px 0 8px;font-size:22px;line-height:1.3;color:#1a1d29;${textAlign(b.align)}">${para(b.text)}</h2>`;
         case "text":
-          return `<p style="margin:12px 0;font-size:15px;line-height:1.6;color:#3a3f4e;">${para(b.text)}</p>`;
+          return `<p style="margin:12px 0;font-size:15px;line-height:1.6;color:#3a3f4e;${textAlign(b.align)}">${para(b.text)}</p>`;
         case "button":
-          return (
+          return cell(
+            b.align,
             `<table role="presentation" cellpadding="0" cellspacing="0" style="margin:20px 0;"><tr><td style="border-radius:10px;background:${accent};">` +
-            `<a href="${escapeHtml(b.url)}" style="display:inline-block;padding:12px 22px;font-size:15px;font-weight:600;color:#ffffff;text-decoration:none;">${escapeHtml(b.label)}</a>` +
-            `</td></tr></table>`
+              `<a href="${escapeHtml(b.url)}" style="display:inline-block;padding:12px 22px;font-size:15px;font-weight:600;color:#ffffff;text-decoration:none;">${escapeHtml(b.label)}</a>` +
+              `</td></tr></table>`
           );
         case "image":
-          return `<img src="${escapeHtml(b.url)}" alt="${escapeHtml(b.alt)}" style="display:block;max-width:100%;border-radius:10px;margin:16px 0;" />`;
+          return cell(
+            b.align,
+            `<img src="${escapeHtml(b.url)}" alt="${escapeHtml(b.alt)}" style="display:inline-block;max-width:100%;border-radius:10px;margin:16px 0;" />`
+          );
         case "divider":
           return `<hr style="border:none;border-top:1px solid #e5e2da;margin:22px 0;" />`;
         case "spacer":

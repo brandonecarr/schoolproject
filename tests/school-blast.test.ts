@@ -58,6 +58,23 @@ describe("parseBlocks is a real boundary", () => {
     expect(out).toEqual([{ kind: "button", label: "ok", url: "https://example.com" }]);
   });
 
+  it("alignment: center/right survive, left is stored as absence, junk drops", () => {
+    const out = parseBlocks(
+      JSON.stringify([
+        { kind: "heading", text: "a", align: "center" },
+        { kind: "text", text: "b", align: "right" },
+        { kind: "text", text: "c", align: "left" },
+        { kind: "button", label: "d", url: "https://e.com", align: "justify" },
+      ])
+    );
+    expect(out).toEqual([
+      { kind: "heading", text: "a", align: "center" },
+      { kind: "text", text: "b", align: "right" },
+      { kind: "text", text: "c" },
+      { kind: "button", label: "d", url: "https://e.com" },
+    ]);
+  });
+
   it("caps the list at MAX_BLOCKS", () => {
     const many = Array.from({ length: MAX_BLOCKS + 10 }, () => ({ kind: "divider" }));
     expect(parseBlocks(JSON.stringify(many))).toHaveLength(MAX_BLOCKS);
@@ -104,6 +121,25 @@ describe("blocksToHtml", () => {
   it("multiline text becomes <br>, not raw newlines lost to HTML collapse", () => {
     const html = blocksToHtml([{ kind: "text", text: "one\ntwo" }], brand);
     expect(html).toContain("one<br>two");
+  });
+
+  it("alignment: text-align for prose, td align for buttons and images (the Outlook-safe way)", () => {
+    const html = blocksToHtml(
+      [
+        { kind: "heading", text: "h", align: "center" },
+        { kind: "text", text: "t", align: "right" },
+        { kind: "button", label: "b", url: "https://e.com", align: "center" },
+        { kind: "image", url: "https://e.com/i.png", alt: "", align: "right" },
+        { kind: "text", text: "plain" },
+      ],
+      brand
+    );
+    expect(html).toContain("text-align:center;");
+    expect(html).toContain("text-align:right;");
+    expect(html).toContain('<td align="center">');
+    expect(html).toContain('<td align="right">');
+    // The unaligned block carries no alignment at all.
+    expect(html).toContain('color:#3a3f4e;">plain</p>');
   });
 });
 
@@ -152,6 +188,37 @@ describe("the send action", () => {
     expect(action).toContain("schoolBlast.create");
     expect(action).toContain("blocksJson: JSON.stringify(blocks)");
     expect(action).toContain("logAudit");
+  });
+});
+
+describe("image uploads", () => {
+  const action = read("src/app/(teacher)/email/actions.ts");
+  const route = read("src/app/blast-img/[token]/route.ts");
+
+  it("the upload action is teacher-gated, image-only, and size-capped", () => {
+    const fn = action.slice(action.indexOf("export async function uploadBlastImage"));
+    const body = fn.slice(0, fn.indexOf("export async function sendSchoolBlast"));
+    expect(body).toContain("requireTeacher()");
+    expect(body).toContain("BLAST_IMAGE_TYPES[file.type]");
+    expect(body).toContain("BLAST_IMAGE_MAX");
+    // Not child data: the retention purge is scoped away from these.
+    expect(body).toContain("studentId: null");
+    // The token comes from the token generator, never from the client.
+    expect(body).toContain("newTokenValue()");
+  });
+
+  it("the public route serves ONLY token-carrying image rows, cacheably", () => {
+    // Lookup is by publicToken alone — a plain FileRec id can never resolve.
+    expect(route).toContain("where: { publicToken: token }");
+    expect(route).toContain("IMAGE_MIMES.has(f.mime)");
+    expect(route).toContain("immutable");
+    // No session machinery: mail clients can't sign in.
+    expect(route).not.toContain("getSession");
+  });
+
+  it("the URL handed to the block is absolute — it must work inside an inbox", () => {
+    expect(action).toMatch(/originFor\(school!\.slug\) \|\| appUrl\(\)/);
+    expect(action).toContain("/blast-img/${publicToken}");
   });
 });
 
