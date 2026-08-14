@@ -41,14 +41,27 @@ export async function saveAttendance(formData: FormData) {
   const { user, school } = await requireTeacher();
   const schoolId = school!.id;
   const date = String(formData.get("date") || today());
-  const students = await prisma.student.findMany({ where: { schoolId } });
-
-  for (const s of students) {
-    const status = String(formData.get(`s_${s.id}`) || "present");
-    const row = await prisma.attendance.findFirst({ where: { studentId: s.id, date } });
-    if (row) await prisma.attendance.update({ where: { id: row.id }, data: { status } });
-    else await prisma.attendance.create({ data: { schoolId, studentId: s.id, date, status, note: "" } });
-  }
+  // One read for the whole day, then every write in parallel — this was two
+  // sequential queries PER STUDENT, which made "Save attendance" crawl.
+  const [students, existing] = await Promise.all([
+    prisma.student.findMany({ where: { schoolId } }),
+    prisma.attendance.findMany({ where: { schoolId, date } }),
+  ]);
+  const byStudent = new Map(existing.map((r) => [r.studentId, r]));
+  await Promise.all(
+    students.map((s) => {
+      const status = String(formData.get(`s_${s.id}`) || "present");
+      const row = byStudent.get(s.id);
+      if (row) {
+        return row.status === status
+          ? Promise.resolve(null) // unchanged — no write at all
+          : prisma.attendance.update({ where: { id: row.id }, data: { status } });
+      }
+      return prisma.attendance.create({
+        data: { schoolId, studentId: s.id, date, status, note: "" },
+      });
+    })
+  );
   await logAudit(user.id, "attendance_saved", date);
   revalidatePath("/attendance");
   revalidatePath("/dashboard");
@@ -213,63 +226,62 @@ export async function saveGrade(formData: FormData) {
     },
   });
 
-  // Every score write is auditable, wherever it came from.
-  if (sub.score !== score) {
-    await prisma.gradeChange.create({
-      data: {
-        schoolId: school!.id,
-        submissionId: id,
-        studentId: sub.studentId,
-        assignmentId: sub.assignmentId,
-        oldScore: sub.score,
-        newScore: score,
-        changedById: user.id,
-        changedByName: user.name,
-        reason: "Graded in the grading queue",
-        at: new Date().toISOString(),
-      },
-    });
-  }
-
-  // Standards mastery accrues automatically from graded work.
-  await recordOutcomesForSubmission({
-    schoolId: school!.id,
-    studentId: sub.studentId,
-    assignmentId: asg.id,
-    submissionId: id,
-    score,
-    possible: asg.points,
-  });
-
-  // A mastery path may now have work to hand this student.
-  await runMasteryPaths({
-    schoolId: school!.id,
-    studentId: sub.studentId,
-    assignmentId: asg.id,
-    score,
-    possible: asg.points,
-  });
-
-  // Tell the family it's been marked. Parents and students read this in
-  // different places, so each gets a link that works for them.
+  // Everything downstream of the grade write is independent bookkeeping —
+  // the change record, standards mastery, mastery paths, family
+  // notifications and the audit entry — so it runs as ONE parallel round.
+  // Sequentially this was a dozen-plus transactions and most of the button's
+  // five-second wait.
   const gradedNote = {
     schoolId: school!.id,
     type: "graded" as const,
     title: `${asg.title} was graded`,
     body: `Scored ${score} out of ${asg.points}.`,
   };
-  await notifyUsers(
-    await parentUserIdsFor(sub.studentId, school!.id),
-    { ...gradedNote, linkPath: "/parent/feed" },
-    user.id
-  );
-  await notifyUsers(
-    await studentUserIdFor(sub.studentId),
-    { ...gradedNote, linkPath: "/student/work" },
-    user.id
-  );
-
-  await logAudit(user.id, "graded", id);
+  await Promise.all([
+    // Every score write is auditable, wherever it came from.
+    sub.score !== score
+      ? prisma.gradeChange.create({
+          data: {
+            schoolId: school!.id,
+            submissionId: id,
+            studentId: sub.studentId,
+            assignmentId: sub.assignmentId,
+            oldScore: sub.score,
+            newScore: score,
+            changedById: user.id,
+            changedByName: user.name,
+            reason: "Graded in the grading queue",
+            at: new Date().toISOString(),
+          },
+        })
+      : Promise.resolve(null),
+    // Standards mastery accrues automatically from graded work.
+    recordOutcomesForSubmission({
+      schoolId: school!.id,
+      studentId: sub.studentId,
+      assignmentId: asg.id,
+      submissionId: id,
+      score,
+      possible: asg.points,
+    }),
+    // A mastery path may now have work to hand this student.
+    runMasteryPaths({
+      schoolId: school!.id,
+      studentId: sub.studentId,
+      assignmentId: asg.id,
+      score,
+      possible: asg.points,
+    }),
+    // Tell the family it's been marked. Parents and students read this in
+    // different places, so each gets a link that works for them.
+    parentUserIdsFor(sub.studentId, school!.id).then((ids) =>
+      notifyUsers(ids, { ...gradedNote, linkPath: "/parent/feed" }, user.id)
+    ),
+    studentUserIdFor(sub.studentId).then((ids) =>
+      notifyUsers(ids, { ...gradedNote, linkPath: "/student/work" }, user.id)
+    ),
+    logAudit(user.id, "graded", id),
+  ]);
   revalidatePath("/grading");
   revalidatePath("/dashboard");
   revalidatePath("/student");
@@ -285,33 +297,33 @@ export async function returnSubmission(formData: FormData) {
   const id = String(formData.get("id"));
   const sub = await prisma.submission.findFirst({ where: { id, schoolId: school!.id } });
   if (!sub) redirect("/grading");
-  await prisma.submission.update({
-    where: { id },
-    data: {
-      status: "returned",
-      returnedAt: new Date().toISOString(),
-      revisionNote: String(formData.get("note") || "").slice(0, 500),
-    },
-  });
-  const rAsg = await prisma.assignment.findUnique({ where: { id: sub.assignmentId } });
+  // The status write, the title lookup for the notification, and the family
+  // audience resolve together — see saveGrade for why sequential awaits are
+  // what make these buttons feel slow.
+  const [, rAsg, parentIds, studentIds] = await Promise.all([
+    prisma.submission.update({
+      where: { id },
+      data: {
+        status: "returned",
+        returnedAt: new Date().toISOString(),
+        revisionNote: String(formData.get("note") || "").slice(0, 500),
+      },
+    }),
+    prisma.assignment.findUnique({ where: { id: sub.assignmentId } }),
+    parentUserIdsFor(sub.studentId, school!.id),
+    studentUserIdFor(sub.studentId),
+  ]);
   const returnedNote = {
     schoolId: school!.id,
     type: "returned" as const,
     title: `${rAsg?.title ?? "Work"} needs changes`,
     body: String(formData.get("note") || "Your teacher sent this back for revision."),
   };
-  await notifyUsers(
-    await parentUserIdsFor(sub.studentId, school!.id),
-    { ...returnedNote, linkPath: "/parent/feed" },
-    user.id
-  );
-  await notifyUsers(
-    await studentUserIdFor(sub.studentId),
-    { ...returnedNote, linkPath: "/student/work" },
-    user.id
-  );
-
-  await logAudit(user.id, "submission_returned", id);
+  await Promise.all([
+    notifyUsers(parentIds, { ...returnedNote, linkPath: "/parent/feed" }, user.id),
+    notifyUsers(studentIds, { ...returnedNote, linkPath: "/student/work" }, user.id),
+    logAudit(user.id, "submission_returned", id),
+  ]);
   revalidatePath("/grading");
   revalidatePath("/student");
   redirect("/grading?returned=1");
@@ -1227,60 +1239,68 @@ export async function saveGradebook(formData: FormData) {
   const asgIds = [...new Set(subs.map((s) => s.assignmentId))];
   const assignments = await prisma.assignment.findMany({ where: { id: { in: asgIds } } });
 
-  let changed = 0;
-  for (const e of edits) {
-    if (e.raw === "") continue; // blank = unchanged
+  // Work out the real changes first, then run every cell's writes in
+  // parallel — this was four-plus sequential queries PER EDITED CELL, which
+  // made a bulk gradebook save scale with how much you'd typed.
+  const changes = edits.flatMap((e) => {
+    if (e.raw === "") return []; // blank = unchanged
     const sub = subs.find((s) => s.id === e.submissionId);
-    if (!sub) continue;
+    if (!sub) return [];
     const asg = assignments.find((a) => a.id === sub.assignmentId);
-    if (!asg) continue;
-
+    if (!asg) return [];
     const next = clamp(Math.round(Number(e.raw)), 0, asg.points);
-    if (Number.isNaN(next)) continue;
-    if (sub.score === next && sub.status === "graded") continue; // no-op
+    if (Number.isNaN(next)) return [];
+    if (sub.score === next && sub.status === "graded") return []; // no-op
+    return [{ sub, asg, next }];
+  });
 
-    await prisma.submission.update({
-      where: { id: sub.id },
-      data: {
-        score: next,
-        status: "graded",
-        gradedAt: now,
-        returnedAt: null,
-        revisionNote: "",
-      },
-    });
-    await prisma.gradeChange.create({
-      data: {
-        schoolId,
-        submissionId: sub.id,
-        studentId: sub.studentId,
-        assignmentId: sub.assignmentId,
-        oldScore: sub.score,
-        newScore: next,
-        changedById: user.id,
-        changedByName: user.name,
-        reason,
-        at: now,
-      },
-    });
-    // Keep standards mastery in step with the corrected grade.
-    await recordOutcomesForSubmission({
-      schoolId,
-      studentId: sub.studentId,
-      assignmentId: sub.assignmentId,
-      submissionId: sub.id,
-      score: next,
-      possible: asg.points,
-    });
-    await runMasteryPaths({
-      schoolId,
-      studentId: sub.studentId,
-      assignmentId: sub.assignmentId,
-      score: next,
-      possible: asg.points,
-    });
-    changed++;
-  }
+  await Promise.all(
+    changes.map(({ sub, asg, next }) =>
+      Promise.all([
+        prisma.submission.update({
+          where: { id: sub.id },
+          data: {
+            score: next,
+            status: "graded",
+            gradedAt: now,
+            returnedAt: null,
+            revisionNote: "",
+          },
+        }),
+        prisma.gradeChange.create({
+          data: {
+            schoolId,
+            submissionId: sub.id,
+            studentId: sub.studentId,
+            assignmentId: sub.assignmentId,
+            oldScore: sub.score,
+            newScore: next,
+            changedById: user.id,
+            changedByName: user.name,
+            reason,
+            at: now,
+          },
+        }),
+        // Keep standards mastery in step with the corrected grade.
+        recordOutcomesForSubmission({
+          schoolId,
+          studentId: sub.studentId,
+          assignmentId: sub.assignmentId,
+          submissionId: sub.id,
+          score: next,
+          possible: asg.points,
+        }),
+        runMasteryPaths({
+          schoolId,
+          studentId: sub.studentId,
+          assignmentId: sub.assignmentId,
+          score: next,
+          possible: asg.points,
+        }),
+      ])
+    )
+  );
+  const changed = changes.length;
 
   await logAudit(user.id, "gradebook_saved", `${changed} grade${changed === 1 ? "" : "s"} changed`);
   revalidatePath("/gradebook");

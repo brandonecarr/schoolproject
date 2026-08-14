@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import "./globals.css";
 import { fontVars } from "./fonts";
 import { EnvBanner } from "@/components/EnvBanner";
+import { PendingFeedback } from "@/components/PendingFeedback";
 import { rootDomain } from "@/lib/tenant-config";
 
 // metadataBase resolves the relative URLs Next puts in canonical and OpenGraph
@@ -23,6 +24,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     <html lang="en" className={fontVars}>
       <body>
         <EnvBanner />
+        <PendingFeedback />
         {children}
       </body>
     </html>

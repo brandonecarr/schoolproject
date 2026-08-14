@@ -40,21 +40,29 @@ export async function runMasteryPaths({
   );
   if (fired.length === 0) return 0;
 
-  const trigger = await prisma.assignment.findUnique({ where: { id: assignmentId } });
+  // The trigger, every fired rule's target, and the dedupe check arrive in
+  // one parallel round instead of two-per-rule sequential lookups.
+  const [trigger, nextRows, existingRows, studentUserIds] = await Promise.all([
+    prisma.assignment.findUnique({ where: { id: assignmentId } }),
+    prisma.assignment.findMany({
+      where: { id: { in: fired.map((r) => r.thenAssignmentId) }, schoolId },
+    }),
+    prisma.submission.findMany({
+      where: { studentId, assignmentId: { in: fired.map((r) => r.thenAssignmentId) } },
+      select: { assignmentId: true },
+    }),
+    studentUserIdFor(studentId),
+  ]);
+  const alreadyHas = new Set(existingRows.map((s) => s.assignmentId));
   let created = 0;
 
   for (const rule of fired) {
-    const next = await prisma.assignment.findFirst({
-      where: { id: rule.thenAssignmentId, schoolId },
-    });
+    const next = nextRows.find((a) => a.id === rule.thenAssignmentId);
     if (!next) continue;
 
     // Never hand the same student the same work twice — a regrade re-runs the
     // rules, and the student may already have it (or already have done it).
-    const existing = await prisma.submission.findFirst({
-      where: { studentId, assignmentId: next.id },
-    });
-    if (existing) continue;
+    if (alreadyHas.has(next.id)) continue;
 
     const reason = reasonFor(rule, trigger?.title ?? "earlier work", pct);
     await prisma.submission.create({
@@ -68,7 +76,7 @@ export async function runMasteryPaths({
     });
     created++;
 
-    await notifyUsers(await studentUserIdFor(studentId), {
+    await notifyUsers(studentUserIds, {
       schoolId,
       type: "submitted",
       title: `New work for you: ${next.title}`,

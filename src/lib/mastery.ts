@@ -23,10 +23,14 @@ export async function recordOutcomesForSubmission({
   score: number;
   possible: number;
 }): Promise<number> {
-  const aligns = await prisma.outcomeAlignment.findMany({ where: { assignmentId, schoolId } });
+  // Fetched together: with every query paying its own RLS transaction,
+  // sequential awaits are what make grading feel slow.
+  const [aligns, school] = await Promise.all([
+    prisma.outcomeAlignment.findMany({ where: { assignmentId, schoolId } }),
+    prisma.school.findUnique({ where: { id: schoolId } }),
+  ]);
   if (aligns.length === 0) return 0;
 
-  const school = await prisma.school.findUnique({ where: { id: schoolId } });
   const threshold = school?.masteryThreshold ?? 0.8;
   const pct = possible > 0 ? Math.max(0, Math.min(1, score / possible)) : 0;
   const now = new Date().toISOString();
@@ -34,22 +38,21 @@ export async function recordOutcomesForSubmission({
   // A regrade corrects the existing attempt rather than logging a second one.
   await prisma.outcomeResult.deleteMany({ where: { submissionId, schoolId } });
 
-  for (const a of aligns) {
-    await prisma.outcomeResult.create({
-      data: {
-        schoolId,
-        studentId,
-        outcomeId: a.outcomeId,
-        assignmentId,
-        submissionId,
-        score,
-        possible,
-        mastered: pct >= threshold,
-        source: "graded",
-        recordedAt: now,
-      },
-    });
-  }
+  // One insert for all aligned outcomes, not one per row.
+  await prisma.outcomeResult.createMany({
+    data: aligns.map((a) => ({
+      schoolId,
+      studentId,
+      outcomeId: a.outcomeId,
+      assignmentId,
+      submissionId,
+      score,
+      possible,
+      mastered: pct >= threshold,
+      source: "graded",
+      recordedAt: now,
+    })),
+  });
   return aligns.length;
 }
 

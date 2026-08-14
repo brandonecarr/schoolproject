@@ -208,6 +208,7 @@ export function Annotator({
 
       {draft ? (
         <form
+          data-instant
           onSubmit={(e) => {
             e.preventDefault();
             const body = String(new FormData(e.currentTarget).get("body") || "").trim();
