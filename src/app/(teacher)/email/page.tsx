@@ -25,7 +25,7 @@ export default async function EmailBlastPage({
   const schoolId = school!.id;
   const sp = await searchParams;
 
-  const [students, parents, blasts] = await Promise.all([
+  const [students, parents, blasts, drafts] = await Promise.all([
     prisma.student.findMany({
       where: { schoolId },
       select: { id: true, name: true },
@@ -37,9 +37,14 @@ export default async function EmailBlastPage({
       orderBy: { name: "asc" },
     }),
     prisma.schoolBlast.findMany({
-      where: { schoolId },
-      orderBy: { createdAt: "desc" },
+      where: { schoolId, sentAt: { not: null } },
+      orderBy: { sentAt: "desc" },
       take: 30,
+    }),
+    prisma.schoolBlast.findMany({
+      where: { schoolId, sentAt: null },
+      orderBy: { updatedAt: "desc" },
+      take: 20,
     }),
   ]);
 
@@ -105,7 +110,19 @@ export default async function EmailBlastPage({
         </p>
       )}
 
-      <BuilderView brand={brand} students={students} parents={parentRows} />
+      <BuilderView
+        brand={brand}
+        students={students}
+        parents={parentRows}
+        emailReady={emailConfigured()}
+        drafts={drafts.map((d) => ({
+          id: d.id,
+          subject: d.subject,
+          blocksJson: d.blocksJson,
+          audience: d.audience,
+          updatedAt: d.updatedAt.toISOString(),
+        }))}
+      />
 
       <BlastHistory
         blasts={blasts.map((b) => ({
@@ -115,7 +132,7 @@ export default async function EmailBlastPage({
           audience: b.audience,
           sentCount: b.sentCount,
           sender: senderName.get(b.senderId) ?? "—",
-          createdAt: b.createdAt.toISOString(),
+          createdAt: (b.sentAt ?? b.createdAt).toISOString(),
         }))}
         brand={brand}
       />

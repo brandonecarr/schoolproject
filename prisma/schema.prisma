@@ -1025,8 +1025,16 @@ model SchoolBlast {
   senderId   String
   subject    String
   blocksJson String
-  audience   String // "all" | "students:<n>" — descriptor, for history
+  // Sent rows: "all" | "students:<n>" — a descriptor for history. Draft rows:
+  // "all" | "students:<id,id,...>" — the actual selection, so resuming a
+  // draft restores who it was aimed at.
+  audience   String
   sentCount  Int      @default(0)
+  /// Null = DRAFT: work in progress, visible only in the composer's draft
+  /// list. Sending a draft sets this on the same row — a draft becomes its
+  /// own history entry rather than leaving a duplicate behind.
+  sentAt     DateTime?
+  updatedAt  DateTime @default(now()) @updatedAt
   createdAt  DateTime @default(now())
 
   @@index([schoolId, createdAt])

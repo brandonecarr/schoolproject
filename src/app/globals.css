@@ -7888,6 +7888,46 @@ a.lp-state:hover {
   border-top: 1px solid var(--line);
 }
 
+/* Test send + drafts */
+.blast-test {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.blast-test-to {
+  flex: 1;
+  min-width: 180px;
+  max-width: 320px;
+  margin: 0;
+}
+.blast-inline-msg {
+  margin: 8px 0 0;
+  font-size: 13px;
+  color: var(--ink2);
+}
+.blast-draft {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 10px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  margin-top: 8px;
+  background: var(--surface);
+}
+.blast-draft.open {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+.blast-draft-main {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  flex: 1;
+  min-width: 0;
+}
+
 /* Preview — the rendered email itself */
 .blast-preview {
   position: sticky;

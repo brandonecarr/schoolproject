@@ -71,6 +71,87 @@ export async function uploadBlastImage(
   return { url: `${base}/blast-img/${publicToken}` };
 }
 
+/**
+ * Save (or update) a draft. Called directly from the client so the builder
+ * keeps its state — no redirect, just the row id back so the next save
+ * updates the same draft instead of multiplying copies.
+ *
+ * A draft's audience column stores the actual selection
+ * ("all" | "students:<id,id>"), so resuming restores who it was aimed at.
+ */
+export async function saveBlastDraft(input: {
+  id?: string;
+  subject: string;
+  blocksJson: string;
+  audience: string;
+}): Promise<{ id: string } | { error: string }> {
+  const { user, school } = await requireTeacher();
+  const schoolId = school!.id;
+
+  const subject = String(input.subject || "").trim().slice(0, 160);
+  const blocks = parseBlocks(String(input.blocksJson || ""));
+  if (!subject && blocks.length === 0) return { error: "Nothing to save yet." };
+  const audience = /^(all|students:[\w,-]*)$/.test(String(input.audience)) ? input.audience : "all";
+
+  const data = { subject, blocksJson: JSON.stringify(blocks), audience };
+  if (input.id) {
+    // Only a DRAFT may be overwritten — a sent row is history and immutable.
+    const updated = await prisma.schoolBlast.updateMany({
+      where: { id: input.id, schoolId, sentAt: null },
+      data,
+    });
+    if (updated.count > 0) return { id: input.id };
+  }
+  const row = await prisma.schoolBlast.create({
+    data: { ...data, schoolId, senderId: user.id, sentCount: 0 },
+  });
+  return { id: row.id };
+}
+
+export async function deleteBlastDraft(id: string): Promise<{ ok: boolean }> {
+  const { school } = await requireTeacher();
+  // sentAt null in the filter: this can only ever remove a draft, never a
+  // row from the send log.
+  const del = await prisma.schoolBlast.deleteMany({
+    where: { id, schoolId: school!.id, sentAt: null },
+  });
+  return { ok: del.count > 0 };
+}
+
+/**
+ * Send the current design to ONE address the teacher typed — themselves,
+ * usually — so they can see it in a real inbox before it goes to families.
+ * Deliberately outside the audience machinery: no emailAlerts filter, no
+ * confirmation checkbox, no history row. The subject is prefixed so a test
+ * can never be mistaken for the real thing.
+ */
+export async function sendTestBlast(input: {
+  to: string;
+  subject: string;
+  blocksJson: string;
+}): Promise<{ sent: true } | { error: string }> {
+  const { user, school } = await requireTeacher();
+
+  if (!emailConfigured())
+    return { error: "Email delivery isn't configured on this deployment." };
+  const to = String(input.to || "").trim().toLowerCase();
+  if (!looksLikeEmail(to)) return { error: "That doesn't look like an email address." };
+  const blocks = parseBlocks(String(input.blocksJson || ""));
+  if (blocks.length === 0) return { error: "Add at least one block first." };
+
+  const subject = String(input.subject || "").trim().slice(0, 150) || "Untitled blast";
+  const brand = { schoolName: school!.name, accentColor: accentOf(school) };
+  const r = await sendEmail({
+    to,
+    subject: `[Test] ${subject}`,
+    text: blocksToText(blocks, brand),
+    html: blocksToHtml(blocks, brand),
+  });
+  if (!r.sent) return { error: "The email provider refused the send — try again shortly." };
+  await logAudit(user.id, "blast_test_sent", to);
+  return { sent: true };
+}
+
 export async function sendSchoolBlast(formData: FormData) {
   const { user, school } = await requireTeacher();
   const schoolId = school!.id;
@@ -79,6 +160,7 @@ export async function sendSchoolBlast(formData: FormData) {
   const blocks = parseBlocks(String(formData.get("blocks") || ""));
   const audience = String(formData.get("audience") || "all");
   const studentIds = formData.getAll("students").map(String);
+  const draftId = String(formData.get("draftId") || "");
 
   if (!subject) redirect("/email?error=subject");
   if (blocks.length === 0) redirect("/email?error=blocks");
@@ -125,16 +207,25 @@ export async function sendSchoolBlast(formData: FormData) {
     if (r.sent) sent++;
   }
 
-  await prisma.schoolBlast.create({
-    data: {
-      schoolId,
-      senderId: user.id,
-      subject,
-      blocksJson: JSON.stringify(blocks),
-      audience: audience === "students" ? `students:${wanted.size}` : "all",
-      sentCount: sent,
-    },
-  });
+  // If this design came from a draft, that row BECOMES the history entry —
+  // otherwise the send log would show the blast and a stale twin of it.
+  const record = {
+    senderId: user.id,
+    subject,
+    blocksJson: JSON.stringify(blocks),
+    audience: audience === "students" ? `students:${wanted.size}` : "all",
+    sentCount: sent,
+    sentAt: new Date(),
+  };
+  const converted = draftId
+    ? await prisma.schoolBlast.updateMany({
+        where: { id: draftId, schoolId, sentAt: null },
+        data: record,
+      })
+    : { count: 0 };
+  if (converted.count === 0) {
+    await prisma.schoolBlast.create({ data: { schoolId, ...record } });
+  }
   await logAudit(user.id, "email_blast_sent", subject);
 
   redirect(`/email?sent=${sent}&of=${recipients.length}`);

@@ -180,14 +180,66 @@ describe("the send action", () => {
   });
 
   it("refuses when email is unconfigured rather than logging a fake send", () => {
-    expect(action.indexOf("emailConfigured()")).toBeGreaterThan(-1);
-    expect(action.indexOf("emailConfigured()")).toBeLessThan(action.indexOf("schoolBlast.create"));
+    const send = action.slice(action.indexOf("export async function sendSchoolBlast"));
+    expect(send.indexOf("emailConfigured()")).toBeGreaterThan(-1);
+    expect(send.indexOf("emailConfigured()")).toBeLessThan(send.indexOf("schoolBlast.create"));
   });
 
   it("logs the blast with the exact blocks and an audit entry", () => {
     expect(action).toContain("schoolBlast.create");
     expect(action).toContain("blocksJson: JSON.stringify(blocks)");
     expect(action).toContain("logAudit");
+  });
+});
+
+describe("drafts", () => {
+  const action = read("src/app/(teacher)/email/actions.ts");
+
+  it("saving updates only DRAFT rows — a sent row is immutable history", () => {
+    const fn = action.slice(action.indexOf("export async function saveBlastDraft"));
+    const body = fn.slice(0, fn.indexOf("export async function deleteBlastDraft"));
+    expect(body).toContain("requireTeacher()");
+    expect(body).toMatch(/where: \{ id: input\.id, schoolId, sentAt: null \}/);
+    // Drafts store re-validated blocks, never the raw client JSON.
+    expect(body).toContain("JSON.stringify(blocks)");
+  });
+
+  it("deletion is scoped to the school AND to sentAt null — the log can't be deleted", () => {
+    const fn = action.slice(action.indexOf("export async function deleteBlastDraft"));
+    const body = fn.slice(0, fn.indexOf("export async function sendTestBlast"));
+    expect(body).toMatch(/schoolId: school!\.id, sentAt: null/);
+  });
+
+  it("sending a draft converts THAT row — no duplicate left behind", () => {
+    const fn = action.slice(action.indexOf("export async function sendSchoolBlast"));
+    expect(fn).toMatch(/where: \{ id: draftId, schoolId, sentAt: null \}/);
+    expect(fn).toContain("sentAt: new Date()");
+    // A stale draft id still results in a history row.
+    expect(fn).toContain("converted.count === 0");
+  });
+
+  it("the page splits the lists on sentAt", () => {
+    const page = read("src/app/(teacher)/email/page.tsx");
+    expect(page).toContain("sentAt: { not: null }");
+    expect(page).toContain("sentAt: null");
+  });
+});
+
+describe("test sends", () => {
+  const action = read("src/app/(teacher)/email/actions.ts");
+  const fn = action.slice(action.indexOf("export async function sendTestBlast"));
+  const body = fn.slice(0, fn.indexOf("export async function sendSchoolBlast"));
+
+  it("teacher-gated, address-checked, and unmistakably labelled", () => {
+    expect(body).toContain("requireTeacher()");
+    expect(body).toContain("looksLikeEmail(to)");
+    expect(body).toContain("`[Test] ${subject}`");
+  });
+
+  it("never touches the send log or the audience machinery", () => {
+    expect(body).not.toContain("schoolBlast.create");
+    expect(body).not.toContain("emailAlerts");
+    expect(body).not.toContain("confirm");
   });
 });
 

@@ -10,6 +10,7 @@
 // ergonomics, not enforcement.
 
 import { useMemo, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 import {
   blocksToHtml,
   MAX_BLOCKS,
@@ -20,11 +21,24 @@ import {
 import { SidePanel, SideSection, SideKV } from "@/components/SidePanel";
 import { useShallowParams } from "@/components/use-shallow-params";
 import { parseBlocks } from "@/lib/email-blocks";
-import { sendSchoolBlast, uploadBlastImage } from "./actions";
+import {
+  sendSchoolBlast,
+  uploadBlastImage,
+  saveBlastDraft,
+  deleteBlastDraft,
+  sendTestBlast,
+} from "./actions";
 
 type EditorBlock = { uid: number; block: EmailBlock };
 type ParentRow = { id: string; name: string; reachable: boolean; studentIds: string[] };
 type StudentRow = { id: string; name: string };
+type DraftRow = {
+  id: string;
+  subject: string;
+  blocksJson: string;
+  audience: string;
+  updatedAt: string;
+};
 
 const PALETTE: { kind: EmailBlock["kind"]; label: string; hint: string }[] = [
   { kind: "heading", label: "Heading", hint: "A section title" },
@@ -56,15 +70,29 @@ export function BuilderView({
   brand,
   students,
   parents,
+  drafts,
+  emailReady,
 }: {
   brand: BlastBrand;
   students: StudentRow[];
   parents: ParentRow[];
+  drafts: DraftRow[];
+  emailReady: boolean;
 }) {
+  const router = useRouter();
   const [rows, setRows] = useState<EditorBlock[]>([]);
+  const [subject, setSubject] = useState("");
   const [audience, setAudience] = useState<"all" | "students">("all");
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [armed, setArmed] = useState(false);
+  // Draft bookkeeping: which row a save should update, and transient status.
+  const [draftId, setDraftId] = useState<string | null>(null);
+  const [draftMsg, setDraftMsg] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
+  // Test send.
+  const [testTo, setTestTo] = useState("");
+  const [testMsg, setTestMsg] = useState<string | null>(null);
+  const [testing, setTesting] = useState(false);
   // Where a drag would land: an index into rows (insert before), or null.
   const [dropAt, setDropAt] = useState<number | null>(null);
   const dragFrom = useRef<number | null>(null); // reordering an existing block
@@ -126,6 +154,63 @@ export function BuilderView({
   };
 
   const canSend = rows.length > 0 && recipients.length > 0 && armed;
+
+  const audienceDescriptor = () =>
+    audience === "students" ? `students:${[...selected].join(",")}` : "all";
+
+  const saveDraft = async () => {
+    if (saving) return;
+    setSaving(true);
+    setDraftMsg(null);
+    const res = await saveBlastDraft({
+      id: draftId ?? undefined,
+      subject,
+      blocksJson: JSON.stringify(blocks),
+      audience: audienceDescriptor(),
+    });
+    setSaving(false);
+    if ("error" in res) {
+      setDraftMsg(res.error);
+    } else {
+      setDraftId(res.id);
+      setDraftMsg("Saved — it'll be here when you come back.");
+      router.refresh();
+    }
+  };
+
+  const resumeDraft = (d: DraftRow) => {
+    setRows(parseBlocks(d.blocksJson).map((b) => ({ uid: nextUid++, block: b })));
+    setSubject(d.subject);
+    setDraftId(d.id);
+    if (d.audience.startsWith("students:")) {
+      setAudience("students");
+      setSelected(new Set(d.audience.slice("students:".length).split(",").filter(Boolean)));
+    } else {
+      setAudience("all");
+      setSelected(new Set());
+    }
+    setArmed(false);
+    setDraftMsg(null);
+  };
+
+  const removeDraft = async (id: string) => {
+    await deleteBlastDraft(id);
+    if (draftId === id) setDraftId(null);
+    router.refresh();
+  };
+
+  const runTest = async () => {
+    if (testing) return;
+    setTesting(true);
+    setTestMsg(null);
+    const res = await sendTestBlast({
+      to: testTo,
+      subject,
+      blocksJson: JSON.stringify(blocks),
+    });
+    setTesting(false);
+    setTestMsg("error" in res ? res.error : `Test sent to ${testTo.trim()} — check that inbox.`);
+  };
 
   return (
     <div className="blast-grid">
@@ -239,6 +324,7 @@ export function BuilderView({
         <form action={sendSchoolBlast} className="card" style={{ marginTop: 12 }}>
           <input type="hidden" name="blocks" value={JSON.stringify(blocks)} />
           <input type="hidden" name="audience" value={audience} />
+          {draftId && <input type="hidden" name="draftId" value={draftId} />}
           {audience === "students" &&
             [...selected].map((id) => <input key={id} type="hidden" name="students" value={id} />)}
 
@@ -249,6 +335,8 @@ export function BuilderView({
             required
             maxLength={160}
             placeholder="Field trip forms due Friday"
+            value={subject}
+            onChange={(e) => setSubject(e.target.value)}
           />
 
           <div className="blast-seclabel" style={{ marginTop: 14 }}>
@@ -320,6 +408,77 @@ export function BuilderView({
             audience.
           </p>
         </form>
+
+        <div className="card" style={{ marginTop: 12 }}>
+          <div className="blast-seclabel">Before you send</div>
+          <div className="blast-test">
+            <input
+              className="blast-field blast-test-to"
+              type="email"
+              value={testTo}
+              placeholder="you@example.com"
+              aria-label="Address for a test email"
+              onChange={(e) => setTestTo(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  e.preventDefault();
+                  runTest();
+                }
+              }}
+            />
+            <button
+              type="button"
+              className="btn ghost sm"
+              disabled={testing || !emailReady}
+              title={emailReady ? undefined : "Email delivery isn't configured here"}
+              onClick={runTest}
+            >
+              {testing ? "Sending…" : "Send a test"}
+            </button>
+            <span className="sp" />
+            <button type="button" className="btn ghost sm" disabled={saving} onClick={saveDraft}>
+              {saving ? "Saving…" : draftId ? "Update draft" : "Save as draft"}
+            </button>
+          </div>
+          {testMsg && <p className="blast-inline-msg">{testMsg}</p>}
+          {draftMsg && <p className="blast-inline-msg">{draftMsg}</p>}
+          <p className="small muted" style={{ margin: "8px 0 0" }}>
+            A test goes to that one address with a{" "}
+            <strong>[Test]</strong> subject prefix — nothing is logged and no parent sees it.
+            Drafts wait below until you finish them.
+          </p>
+        </div>
+
+        {drafts.length > 0 && (
+          <div className="card" style={{ marginTop: 12 }}>
+            <div className="blast-seclabel">Drafts</div>
+            {drafts.map((d) => (
+              <div key={d.id} className={draftId === d.id ? "blast-draft open" : "blast-draft"}>
+                <div className="blast-draft-main">
+                  <span className="blast-row-subj">{d.subject || "Untitled"}</span>
+                  <span className="blast-row-meta">
+                    {parseBlocks(d.blocksJson).length} block
+                    {parseBlocks(d.blocksJson).length === 1 ? "" : "s"} · saved{" "}
+                    {when(d.updatedAt)}
+                    {draftId === d.id ? " · editing now" : ""}
+                  </span>
+                </div>
+                <button type="button" className="btn ghost sm" onClick={() => resumeDraft(d)}>
+                  Resume
+                </button>
+                <button
+                  type="button"
+                  className="blast-tool"
+                  aria-label="Delete draft"
+                  title="Delete draft"
+                  onClick={() => removeDraft(d.id)}
+                >
+                  ✕
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
 
       <div className="blast-preview card">
