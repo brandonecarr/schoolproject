@@ -9,7 +9,14 @@
 //   STRIPE_SECRET_KEY        sk_live_... / sk_test_...
 //   STRIPE_PRICE_ID          price_... for the $149/mo school subscription
 //   STRIPE_PRICE_ID_FAMILY   price_... for the $29/mo homeschool-family plan
+//   STRIPE_PRICE_ID_SEAT        price_... $5/mo per extra student (school, beyond 10)
+//   STRIPE_PRICE_ID_SEAT_FAMILY price_... $10/mo per extra child (family, beyond 2)
 //   STRIPE_WEBHOOK_SECRET    whsec_... for /api/stripe/webhook
+//
+// Seat overage (lib/seats.ts) rides the SAME subscription as a second item
+// whose quantity Cohort keeps equal to the roster's overage — see
+// syncSeatOverage. Absent seat prices, rosters are uncapped and nothing is
+// billed for extra children (fine for dev; in production set them).
 //
 // stripeConfigured() is keyed on the SCHOOL price on purpose: it is the
 // paywall's on/off switch and predates the family tier. The family price is
@@ -40,8 +47,67 @@ export function familyTierOpen(): boolean {
   return !stripeConfigured() || Boolean(process.env.STRIPE_PRICE_ID_FAMILY);
 }
 
+/** The per-extra-child price for a kind, or null when seats aren't billed. */
+export function seatPriceIdFor(kind: "school" | "family"): string | null {
+  return (
+    (kind === "family" ? process.env.STRIPE_PRICE_ID_SEAT_FAMILY : process.env.STRIPE_PRICE_ID_SEAT) ||
+    null
+  );
+}
+
+/**
+ * Keep the subscription's extra-child line equal to `overage`.
+ *
+ * Idempotent and best-effort: called after every roster change. Finds the
+ * subscription's item on the seat price; creates it (quantity N), updates
+ * it, or deletes it when the overage returns to zero. Stripe prorates. A
+ * Stripe outage must never stop a parent adding a child, so this returns
+ * {ok:false} rather than throwing — the next roster change re-syncs, and
+ * the count is derived from the roster, never accumulated.
+ */
+export async function syncSeatOverage(opts: {
+  subscriptionId: string;
+  kind: "school" | "family";
+  overage: number;
+}): Promise<{ ok: boolean; detail?: string }> {
+  const priceId = seatPriceIdFor(opts.kind);
+  if (!stripeConfigured() || !priceId || !opts.subscriptionId) return { ok: true, detail: "not billed" };
+  try {
+    const sub = await stripeCall("GET", `/subscriptions/${encodeURIComponent(opts.subscriptionId)}`);
+    const items = ((sub.items as { data?: { id: string; price?: { id: string }; quantity?: number }[] })?.data ?? []);
+    const seatItem = items.find((it) => it.price?.id === priceId);
+    const q = Math.max(0, Math.floor(opts.overage));
+
+    if (q === 0) {
+      if (seatItem) {
+        await stripeCall("DELETE", `/subscription_items/${seatItem.id}`, { proration_behavior: "create_prorations" });
+      }
+      return { ok: true, detail: "no overage" };
+    }
+    if (!seatItem) {
+      await stripeCall("POST", "/subscription_items", {
+        subscription: opts.subscriptionId,
+        price: priceId,
+        quantity: String(q),
+        proration_behavior: "create_prorations",
+      });
+      return { ok: true, detail: `created ${q}` };
+    }
+    if ((seatItem.quantity ?? 0) !== q) {
+      await stripeCall("POST", `/subscription_items/${seatItem.id}`, {
+        quantity: String(q),
+        proration_behavior: "create_prorations",
+      });
+      return { ok: true, detail: `updated ${q}` };
+    }
+    return { ok: true, detail: "unchanged" };
+  } catch (e) {
+    return { ok: false, detail: e instanceof Error ? e.message : String(e) };
+  }
+}
+
 async function stripeCall(
-  method: "GET" | "POST",
+  method: "GET" | "POST" | "DELETE",
   path: string,
   body?: Record<string, string>,
 ): Promise<Record<string, unknown>> {

@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { requireTeacher } from "@/lib/auth";
-import { copyFor } from "@/lib/kind";
+import { copyFor, isFamily } from "@/lib/kind";
+import { seatPlanFor, overageFor, overageMonthlyUsd, seatNotice } from "@/lib/seats";
 import { prisma } from "@/lib/db";
 import { evidenceForStudents } from "@/lib/evidence";
 import { readiness, PROGRAMS, RAILS, programOptions } from "@/lib/rules";
@@ -84,8 +85,30 @@ export default async function StudentsPage({
         }
       />
 
+      {/* Seat pricing, stated up front: what the plan includes and what one
+          more costs. Computed from the roster (lib/seats.ts) — the same maths
+          the billing sync uses, so the number here is the number on the bill. */}
+      {(() => {
+        const plan = seatPlanFor(school!.kind);
+        const over = overageFor(students.length, school!.kind);
+        const noun = isFamily(school) ? "children" : "students";
+        const one = isFamily(school) ? "child" : "student";
+        const nextNotice = seatNotice(students.length + 1, school!.kind);
+        return (
+          <Notice tone="info">
+            <strong>
+              {Math.min(students.length, plan.included)} of {plan.included} included {noun}
+              {over > 0
+                ? ` · ${over} extra at $${plan.overageUsd}/mo each = $${overageMonthlyUsd(students.length, school!.kind)}/mo`
+                : ""}
+            </strong>
+            {nextNotice ? ` — ${nextNotice}` : ` — the next ${one} you add is included in your plan.`}
+          </Notice>
+        );
+      })()}
+
       <details className="card" open={students.length === 0}>
-        <summary style={{ cursor: "pointer", fontWeight: 600 }}>Enroll a student</summary>
+        <summary style={{ cursor: "pointer", fontWeight: 600 }}>{isFamily(school) ? "Add a child" : "Enroll a student"}</summary>
         <p className="small muted" style={{ margin: "8px 0 4px", maxWidth: "64ch" }}>
           This creates the child’s <strong>roster record</strong> — their educational file, not a
           login. Once enrolled, they show up in the “Child” list on Invite families. The child’s{" "}

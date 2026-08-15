@@ -91,9 +91,9 @@ export default async function SignupPage({
         )}
         {paywalled && !familyClosed && (
           <p className="small muted" style={{ marginBottom: 12 }}>
-            Next step is secure checkout — <strong>${PRICE_USD[kind]}/month</strong>, flat,{" "}
-            {family ? "all your children" : "any number of students"}, cancel anytime. Your{" "}
-            {copy.org} is created the moment payment completes.
+            Next step is secure checkout — <strong>${PRICE_USD[kind]}/month</strong> for up to{" "}
+            {family ? "2 children, then $10 per extra child" : "10 students, then $5 per extra student"};
+            cancel anytime. Your {copy.org} is created the moment payment completes.
           </p>
         )}
 

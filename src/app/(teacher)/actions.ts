@@ -33,6 +33,7 @@ import { parseTime, generateSlots, withoutClashes } from "@/lib/conferences";
 import { runMasteryPaths } from "@/lib/paths-run";
 import { bandFor, describeBand, isSelfReferential } from "@/lib/paths";
 import { deleteStudentData } from "@/lib/retention";
+import { syncRosterBilling } from "@/lib/roster-billing";
 import { newTokenValue, tokenExpiry } from "@/lib/tokens";
 import { today, periodStart } from "@/lib/dates";
 
@@ -627,6 +628,8 @@ export async function addStudent(formData: FormData) {
     },
   });
   await logAudit(user.id, "student_added", `${name} (${student.id})`);
+  // The plan includes N children; past that, each one is a billed seat.
+  await syncRosterBilling(school!, user.id);
   revalidatePath("/students");
   revalidatePath("/dashboard");
   revalidatePath("/invites");
@@ -672,6 +675,7 @@ export async function importStudents(formData: FormData) {
   }
 
   await logAudit(user.id, "students_imported", `${created} created, ${skipped} skipped`);
+  await syncRosterBilling(school!, user.id);
   revalidatePath("/students");
   revalidatePath("/dashboard");
   redirect(`/students?imported=${created}&skipped=${skipped}`);
@@ -683,6 +687,8 @@ export async function deleteStudent(formData: FormData) {
   const { user, school } = await requireTeacher();
   const studentId = String(formData.get("studentId"));
   await deleteStudentData(studentId, school!.id, user.id);
+  // Fewer children may mean fewer billed seats — sync down as well as up.
+  await syncRosterBilling(school!, user.id);
   revalidatePath("/students");
   revalidatePath("/dashboard");
   redirect("/students?deleted=1");

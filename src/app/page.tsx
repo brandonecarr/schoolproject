@@ -469,7 +469,7 @@ export default async function Home() {
                 <p className="lp-tiersub">Everything, for every enrolled student.</p>
                 <div className="lp-price">$149</div>
                 <div className="lp-pricenote">
-                  per month, flat — any number of students. Billed monthly, cancel anytime.
+                  per month for up to 10 students, then $5 per extra student. Billed monthly, cancel anytime.
                 </div>
                 <div className="lp-hair" />
                 <ul>
@@ -496,7 +496,7 @@ export default async function Home() {
                 <p className="lp-tiersub">Your records, your receipts, your claim packets.</p>
                 <div className="lp-price">$29</div>
                 <div className="lp-pricenote">
-                  per month, flat — all your children. Billed monthly, cancel anytime.
+                  per month for up to 2 children, then $10 per extra child. Billed monthly, cancel anytime.
                 </div>
                 <div className="lp-hair" />
                 <ul>
