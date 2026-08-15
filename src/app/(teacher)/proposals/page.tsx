@@ -10,7 +10,7 @@
 // and if a rule turns out to have changed under us, the dismissed pile is the
 // first place to look for why we missed it.
 
-import { requireTeacher } from "@/lib/auth";
+import { requireSchoolTeacher } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { sourceById } from "@/lib/sources";
 import { Pill, Notice } from "@/components/ui";
@@ -38,7 +38,7 @@ function when(iso: Date | string): string {
 }
 
 export default async function ProposalsPage() {
-  await requireTeacher();
+  await requireSchoolTeacher();
 
   const all = await prisma.ruleProposal.findMany({ orderBy: { createdAt: "desc" }, take: 100 });
   const open = all.filter((p) => p.material && (p.status === "open" || p.status === "pr_opened"));

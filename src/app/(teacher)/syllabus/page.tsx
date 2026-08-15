@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { requireTeacher } from "@/lib/auth";
+import { requireSchoolTeacher } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { fmt } from "@/lib/dates";
 import { typeMeta } from "@/lib/lms";
@@ -11,7 +11,7 @@ export const metadata = { title: "Syllabus — Cohort" };
 // Assembled, never authored — the syllabus is a view of the courses, modules,
 // and assignments that already exist, so it can't drift from what's being taught.
 export default async function SyllabusPage() {
-  const { school } = await requireTeacher();
+  const { school } = await requireSchoolTeacher();
   const schoolId = school!.id;
 
   const [courses, modules, items, pages, assignments] = await Promise.all([

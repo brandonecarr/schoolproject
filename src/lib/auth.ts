@@ -228,6 +228,21 @@ export async function requireTeacher(): Promise<TenantSession> {
 }
 
 /**
+ * A teacher at a SCHOOL — not a homeschooling family. The family kind is a
+ * one-teacher tenant that passes requireTeacher() everywhere by design; this
+ * is the gate for the surfaces that make no sense for a household (invoicing
+ * as a provider, tuition, staff messaging, classroom authoring). A family
+ * that types the URL is sent home rather than shown a broken page.
+ * tests/family.test.ts scans every (teacher) route and fails the build if a
+ * school-only page still uses the plain gate.
+ */
+export async function requireSchoolTeacher(): Promise<TenantSession> {
+  const session = await requireTeacher();
+  if (session.school?.kind === "family") redirect("/dashboard");
+  return session;
+}
+
+/**
  * The platform-operator gate for /admin — the one surface that reads across
  * schools. The flag is set only by scripts/grant-admin.mjs, never by any UI
  * or action, so the set of people who can pass this gate is exactly the set

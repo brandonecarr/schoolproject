@@ -29,7 +29,17 @@ function preview(name: string): string {
     .slice(0, 63);
 }
 
-export function SlugField({ root }: { root: string }) {
+export function SlugField({
+  root,
+  label = "Your school's web address",
+  help = "Where you and your families sign in. Permanent — keep it short.",
+  placeholder = "cedar-grove",
+}: {
+  root: string;
+  label?: string;
+  help?: string;
+  placeholder?: string;
+}) {
   const [slug, setSlug] = useState("");
   const [touched, setTouched] = useState(false);
   const box = useRef<HTMLDivElement>(null);
@@ -53,7 +63,7 @@ export function SlugField({ root }: { root: string }) {
 
   return (
     <div ref={box}>
-      <label htmlFor="slug">Your school&apos;s web address</label>
+      <label htmlFor="slug">{label}</label>
       <div className="su-slug">
         <input
           id="slug"
@@ -63,7 +73,7 @@ export function SlugField({ root }: { root: string }) {
             setTouched(true);
             setSlug(preview(e.target.value));
           }}
-          placeholder="cedar-grove"
+          placeholder={placeholder}
           spellCheck={false}
           autoCapitalize="off"
           autoCorrect="off"
@@ -72,7 +82,7 @@ export function SlugField({ root }: { root: string }) {
         <span className="su-root">.{root || "your-domain"}</span>
       </div>
       <p className="small muted" id="slughelp" style={{ margin: "6px 0 0" }}>
-        Where you and your families sign in. Permanent — keep it short.
+        {help}
       </p>
     </div>
   );

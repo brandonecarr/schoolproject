@@ -8,7 +8,7 @@
 // documented conversation with a family is exactly the engagement evidence some
 // ESA programs look for, so it carries through to the student's printed record.
 
-import { requireTeacher } from "@/lib/auth";
+import { requireSchoolTeacher } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { fmt, today } from "@/lib/dates";
 import { formatSpan, sortSlots, isBooked } from "@/lib/conferences";
@@ -25,7 +25,7 @@ export default async function ConferencesPage({
 }: {
   searchParams: Promise<{ added?: string; skipped?: string; saved?: string; error?: string }>;
 }) {
-  const { school } = await requireTeacher();
+  const { school } = await requireSchoolTeacher();
   const sp = await searchParams;
 
   const slots = sortSlots(

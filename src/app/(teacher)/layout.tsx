@@ -11,7 +11,8 @@ import { TopBar } from "@/components/TopBar";
 import { ViewAsBanner } from "@/components/ViewAsBanner";
 import { unreadForStaff } from "@/lib/messages";
 import { unreadCountFor } from "@/lib/notify";
-import { parsePins, TEACHER_NAV } from "@/lib/nav";
+import { parsePins, navForKind } from "@/lib/nav";
+import { copyFor } from "@/lib/kind";
 
 export default async function TeacherLayout({ children }: { children: React.ReactNode }) {
   const { user, school, actor } = await requireTeacher();
@@ -22,7 +23,11 @@ export default async function TeacherLayout({ children }: { children: React.Reac
     school ? unreadForStaff(school.id) : Promise.resolve(0),
     unreadCountFor(user.id),
   ]);
-  const subline = [school?.name, school?.railLabel].filter(Boolean).join(" · ");
+  // A family sees "Homeschool" where a school sees its ESA rail; the nav is
+  // the records+claims subset. Both read school.kind — no extra query.
+  const copy = copyFor(school);
+  const nav = navForKind(school?.kind);
+  const subline = [school?.name, copy.subline ?? school?.railLabel].filter(Boolean).join(" · ");
 
   return (
     <div className="shell" data-role="teacher" data-style="soft">
@@ -30,12 +35,12 @@ export default async function TeacherLayout({ children }: { children: React.Reac
         Skip to content
       </a>
       <Sidebar
-        nav={TEACHER_NAV}
+        nav={nav}
         schoolName={school?.name ?? ""}
         subline={subline}
         logoSrc={school?.logoFileId ? `/files/${school.logoFileId}` : null}
         userName={user.name}
-        pins={parsePins(user.pinnedNav)}
+        pins={parsePins(user.pinnedNav, nav)}
         pinnable
         messagesUnread={messagesUnread}
         notificationsUnread={notificationsUnread}
@@ -44,7 +49,7 @@ export default async function TeacherLayout({ children }: { children: React.Reac
         {actor && <ViewAsBanner name={user.name} role={user.role} />}
         <TopBar
           userName={user.name}
-          roleLabel={user.role === "owner" ? "Lead teacher · Owner" : "Teacher"}
+          roleLabel={user.role === "owner" ? copy.ownerLabel : "Teacher"}
           notificationsHref="/notifications"
           messagesHref="/messages"
           settingsHref="/settings"

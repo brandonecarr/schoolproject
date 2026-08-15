@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { requireTeacher } from "@/lib/auth";
+import { requireSchoolTeacher } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { threadFor } from "@/lib/messages";
 import { MessageThread } from "@/components/MessageThread";
@@ -10,7 +10,7 @@ export const dynamic = "force-dynamic";
 export const metadata = { title: "Message thread — Cohort" };
 
 export default async function TeacherThreadPage({ params }: { params: Promise<{ id: string }> }) {
-  const { user, school } = await requireTeacher();
+  const { user, school } = await requireSchoolTeacher();
   const { id } = await params;
 
   const student = await prisma.student.findFirst({ where: { id, schoolId: school!.id } });

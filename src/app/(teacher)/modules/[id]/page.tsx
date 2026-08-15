@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { requireTeacher } from "@/lib/auth";
+import { requireSchoolTeacher } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { fmt, today } from "@/lib/dates";
 import { Notice, Pill } from "@/components/ui";
@@ -25,7 +25,7 @@ export default async function ModuleDetail({
   params: Promise<{ id: string }>;
   searchParams: Promise<{ saved?: string; added?: string; err?: string }>;
 }) {
-  const { school } = await requireTeacher();
+  const { school } = await requireSchoolTeacher();
   const { id } = await params;
   const sp = await searchParams;
 

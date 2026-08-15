@@ -17,19 +17,28 @@ import { hashPassword, newSessionId } from "@/lib/password";
 import { SESSION_COOKIE, SESSION_COOKIE_OPTIONS } from "@/lib/auth";
 import { appUrl } from "@/lib/email";
 import { deploymentEnv } from "@/lib/environment";
-import { stripeConfigured, createCheckoutSession } from "@/lib/stripe";
+import { stripeConfigured, createCheckoutSession, priceIdFor } from "@/lib/stripe";
 import { provisionSchool } from "@/lib/provision";
+import { parseKind } from "@/lib/kind";
 
 export async function signup(formData: FormData) {
+  // Which plan. Whitelisted server-side like everything else here — the
+  // form's value is a suggestion; the URL carries it back on every error so
+  // the chooser stays where the person left it.
+  const kind = parseKind(formData.get("kind"));
+  const back = kind === "family" ? "/signup?kind=family" : "/signup";
+  const err = (code: string) => `${back}${back.includes("?") ? "&" : "?"}error=${code}`;
+
   const schoolName = String(formData.get("schoolName") || "").trim();
   const state = String(formData.get("state") || "").trim().toUpperCase().slice(0, 2);
-  const esaAmount = Number(formData.get("esaAmount")) || 0;
+  // A family doesn't invoice per student, so the ESA amount is not asked.
+  const esaAmount = kind === "family" ? 0 : Number(formData.get("esaAmount")) || 0;
   const name = String(formData.get("name") || "").trim();
   const email = String(formData.get("email") || "").trim().toLowerCase();
   const password = String(formData.get("password") || "");
 
   if (!schoolName || !state || !name || !email || !password) {
-    redirect("/signup?error=1");
+    redirect(err("1"));
   }
 
   // THE WEB ADDRESS. Whatever the form sent is re-derived here rather than
@@ -37,7 +46,7 @@ export async function signup(formData: FormData) {
   // slug becomes a hostname. Empty means the browser ran no JavaScript, and
   // then the school's name is a perfectly good source.
   const asked = slugify(String(formData.get("slug") || ""));
-  if (formData.get("slug") && !asked) redirect("/signup?error=slugbad");
+  if (formData.get("slug") && !asked) redirect(err("slugbad"));
 
   // System: slug uniqueness is global by definition, and creating the school
   // cannot be scoped to a tenant that does not exist yet.
@@ -47,18 +56,25 @@ export async function signup(formData: FormData) {
     // Someone typed this one, so it is not ours to quietly renumber into
     // oak-hill-2. Either they get the address they chose or they are told.
     slug = isUsableSlug(asked) && !taken.includes(asked) ? asked : null;
-    if (!slug) redirect("/signup?error=slug");
+    if (!slug) redirect(err("slug"));
   } else {
     slug = availableSlug(schoolName, taken);
-    if (!slug) redirect("/signup?error=slugbad");
+    if (!slug) redirect(err("slugbad"));
   }
 
   // ---- The paywall ---------------------------------------------------------
   if (stripeConfigured()) {
+    // The family plan has its own price. No price configured for it means
+    // the family door is closed — refuse plainly rather than billing the
+    // school rate or provisioning free.
+    const priceId = priceIdFor(kind);
+    if (!priceId) redirect(err("familybilling"));
+
     // Hash NOW: the raw password's life ends inside this request. The intent
     // row waits with everything fulfillment needs and nothing more.
     const intent = await prismaSystem.signupIntent.create({
       data: {
+        kind,
         schoolName,
         slug,
         state,
@@ -73,8 +89,9 @@ export async function signup(formData: FormData) {
     const session = await createCheckoutSession({
       intentId: intent.id,
       email,
+      priceId,
       successUrl: `${base}/signup/complete?session_id={CHECKOUT_SESSION_ID}`,
-      cancelUrl: `${base}/signup?canceled=1`,
+      cancelUrl: `${base}${back}${back.includes("?") ? "&" : "?"}canceled=1`,
     });
     await prismaSystem.signupIntent.update({
       where: { id: intent.id },
@@ -89,9 +106,10 @@ export async function signup(formData: FormData) {
   // billing is down. Refuse loudly instead. Everywhere else — local dev,
   // previews, the smoke test — direct provisioning is the point.
   if (deploymentEnv() === "production") {
-    redirect("/signup?error=billing");
+    redirect(err("billing"));
   }
   const provisioned = await provisionSchool({
+    kind,
     schoolName,
     slug,
     state,

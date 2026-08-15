@@ -38,6 +38,8 @@ export const RESERVED_SLUGS = new Set([
   "pricing", "legal", "privacy", "terms", "security", "login", "signup", "signin",
   "auth", "account", "accounts", "billing", "pay", "payments", "invoice", "invoices",
   "cohort", "school", "schools", "go", "link", "links", "share", "public",
+  // The family tier: a household must not claim the generic words for itself.
+  "family", "families", "home", "homeschool", "homeschooling", "parent", "parents",
 ]);
 
 /** Slugs must survive being a DNS label: lowercase, alphanumeric and hyphens,

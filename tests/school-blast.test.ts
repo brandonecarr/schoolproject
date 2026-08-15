@@ -163,7 +163,7 @@ describe("the send action", () => {
   const action = read("src/app/(teacher)/email/actions.ts");
 
   it("gates on requireTeacher and re-parses blocks server-side", () => {
-    expect(action).toContain("requireTeacher()");
+    expect(action).toContain("requireSchoolTeacher()");
     expect(action).toContain("parseBlocks(");
   });
 
@@ -198,7 +198,7 @@ describe("drafts", () => {
   it("saving updates only DRAFT rows — a sent row is immutable history", () => {
     const fn = action.slice(action.indexOf("export async function saveBlastDraft"));
     const body = fn.slice(0, fn.indexOf("export async function deleteBlastDraft"));
-    expect(body).toContain("requireTeacher()");
+    expect(body).toContain("requireSchoolTeacher()");
     expect(body).toMatch(/where: \{ id: input\.id, schoolId, sentAt: null \}/);
     // Drafts store re-validated blocks, never the raw client JSON.
     expect(body).toContain("JSON.stringify(blocks)");
@@ -231,7 +231,7 @@ describe("test sends", () => {
   const body = fn.slice(0, fn.indexOf("export async function sendSchoolBlast"));
 
   it("teacher-gated, address-checked, and unmistakably labelled", () => {
-    expect(body).toContain("requireTeacher()");
+    expect(body).toContain("requireSchoolTeacher()");
     expect(body).toContain("looksLikeEmail(to)");
     expect(body).toContain("`[Test] ${subject}`");
   });
@@ -250,7 +250,7 @@ describe("image uploads", () => {
   it("the upload action is teacher-gated, image-only, and size-capped", () => {
     const fn = action.slice(action.indexOf("export async function uploadBlastImage"));
     const body = fn.slice(0, fn.indexOf("export async function sendSchoolBlast"));
-    expect(body).toContain("requireTeacher()");
+    expect(body).toContain("requireSchoolTeacher()");
     expect(body).toContain("BLAST_IMAGE_TYPES[file.type]");
     expect(body).toContain("BLAST_IMAGE_MAX");
     // Not child data: the retention purge is scoped away from these.

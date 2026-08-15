@@ -6,9 +6,15 @@
 // signup falls back to direct creation — which is what local dev, preview
 // deployments and the smoke test want.
 //
-//   STRIPE_SECRET_KEY      sk_live_... / sk_test_...
-//   STRIPE_PRICE_ID        price_... for the $149/mo founding subscription
-//   STRIPE_WEBHOOK_SECRET  whsec_... for /api/stripe/webhook
+//   STRIPE_SECRET_KEY        sk_live_... / sk_test_...
+//   STRIPE_PRICE_ID          price_... for the $149/mo school subscription
+//   STRIPE_PRICE_ID_FAMILY   price_... for the $29/mo homeschool-family plan
+//   STRIPE_WEBHOOK_SECRET    whsec_... for /api/stripe/webhook
+//
+// stripeConfigured() is keyed on the SCHOOL price on purpose: it is the
+// paywall's on/off switch and predates the family tier. The family price is
+// additive — absent, the family option is closed (never billed at the school
+// price, never provisioned free in production) while schools keep working.
 //
 // Money boundary, stated once: this bills COHORT'S subscription. It has
 // nothing to do with ESA funds, which Cohort never touches.
@@ -19,6 +25,19 @@ const API = "https://api.stripe.com/v1";
 
 export function stripeConfigured(): boolean {
   return Boolean(process.env.STRIPE_SECRET_KEY && process.env.STRIPE_PRICE_ID);
+}
+
+/** The Stripe price for an account kind, or null when that kind has none. */
+export function priceIdFor(kind: "school" | "family"): string | null {
+  if (kind === "family") return process.env.STRIPE_PRICE_ID_FAMILY || null;
+  return process.env.STRIPE_PRICE_ID || null;
+}
+
+/** Can a family sign up right now? True with no paywall at all (dev/preview),
+ *  or when the family price exists. Used to hide the option, not just to
+ *  refuse it. */
+export function familyTierOpen(): boolean {
+  return !stripeConfigured() || Boolean(process.env.STRIPE_PRICE_ID_FAMILY);
 }
 
 async function stripeCall(
@@ -48,10 +67,12 @@ export async function createCheckoutSession(opts: {
   email: string;
   successUrl: string;
   cancelUrl: string;
+  /** Which plan. Defaults to the school price so existing callers are unchanged. */
+  priceId?: string;
 }): Promise<{ id: string; url: string }> {
   const s = await stripeCall("POST", "/checkout/sessions", {
     mode: "subscription",
-    "line_items[0][price]": process.env.STRIPE_PRICE_ID!,
+    "line_items[0][price]": opts.priceId ?? process.env.STRIPE_PRICE_ID!,
     "line_items[0][quantity]": "1",
     customer_email: opts.email,
     client_reference_id: opts.intentId,

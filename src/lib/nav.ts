@@ -95,6 +95,54 @@ export const TEACHER_NAV: NavGroup[] = [
 ];
 
 /**
+ * The HOMESCHOOL FAMILY console — a one-teacher tenant that keeps records and
+ * files ESA expense claims, and never invoices, messages other families, or
+ * authors a curriculum for a classroom. Records + claims, nothing else: every
+ * item left out is support load a solo parent shouldn't carry. Everything here
+ * is also in TEACHER_NAV, so a family reaches only routes a school has too.
+ */
+export const FAMILY_NAV: NavGroup[] = [
+  {
+    group: "Today",
+    items: [
+      { href: "/dashboard", label: "Dashboard", icon: "dashboard" },
+      { href: "/notifications", label: "Notifications", icon: "messages" },
+      { href: "/attendance", label: "Attendance", icon: "attendance" },
+      { href: "/observations", label: "Observations", icon: "observations" },
+    ],
+  },
+  {
+    group: "Records",
+    items: [
+      { href: "/students", label: "Children", icon: "students" },
+      { href: "/outcomes", label: "Standards", icon: "evidence" },
+      { href: "/mastery", label: "Mastery board", icon: "evidence" },
+      { href: "/reports", label: "Records & exports", icon: "evidence" },
+      { href: "/calendar", label: "Calendar", icon: "attendance" },
+    ],
+  },
+  {
+    group: "Money",
+    items: [
+      { href: "/evidence", label: "Evidence board", icon: "evidence" },
+      { href: "/claims", label: "ESA claims", icon: "invoices" },
+    ],
+  },
+  {
+    group: "Admin",
+    items: [
+      { href: "/settings", label: "Settings", icon: "settings" },
+      { href: "/audit", label: "Audit log", icon: "audit" },
+    ],
+  },
+];
+
+/** The console nav for a school kind — see lib/kind.ts. */
+export function navForKind(kind: string | null | undefined): NavGroup[] {
+  return kind === "family" ? FAMILY_NAV : TEACHER_NAV;
+}
+
+/**
  * The family navigations.
  *
  * These used to live inside the TopNav component, which was a horizontal bar
@@ -164,6 +212,13 @@ export function navForRole(role: string, childName?: string, childCount = 1): Na
 
 /** What a teacher touches on an ordinary morning, before they change it. */
 export const DEFAULT_PINS = ["/dashboard", "/attendance", "/grading"];
+/** A homeschool parent's morning: log the day, and the claim in progress. */
+export const DEFAULT_PINS_FAMILY = ["/dashboard", "/attendance", "/claims"];
+
+/** The right defaults for a nav — FAMILY_NAV has no grading queue. */
+export function defaultPinsFor(nav: NavGroup[]): string[] {
+  return nav === FAMILY_NAV ? DEFAULT_PINS_FAMILY : DEFAULT_PINS;
+}
 
 /** Keep the pinned row short enough to stay a shortcut rather than a second nav. */
 export const MAX_PINS = 8;
@@ -210,13 +265,14 @@ export function groupForPath(pathname: string, nav: NavGroup[] = TEACHER_NAV): s
 /** Read the stored JSON, discarding anything that is no longer a real nav item.
  *  A removed feature must not leave a dead shortcut behind. */
 export function parsePins(json: string | null | undefined, nav: NavGroup[] = TEACHER_NAV): string[] {
+  const defaults = defaultPinsFor(nav);
   let raw: unknown;
   try {
     raw = json ? JSON.parse(json) : null;
   } catch {
-    return [...DEFAULT_PINS];
+    return [...defaults];
   }
-  if (!Array.isArray(raw)) return [...DEFAULT_PINS];
+  if (!Array.isArray(raw)) return [...defaults];
   const known = new Set(allItems(nav).map((i) => i.href));
   const out: string[] = [];
   for (const x of raw) {

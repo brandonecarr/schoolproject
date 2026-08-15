@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { requireTeacher } from "@/lib/auth";
+import { requireSchoolTeacher } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { fmt } from "@/lib/dates";
 import { Notice, Pill } from "@/components/ui";
@@ -15,7 +15,7 @@ export default async function PagesIndex({
 }: {
   searchParams: Promise<{ deleted?: string; err?: string }>;
 }) {
-  const { school } = await requireTeacher();
+  const { school } = await requireSchoolTeacher();
   const sp = await searchParams;
 
   const [pages, courses] = await Promise.all([

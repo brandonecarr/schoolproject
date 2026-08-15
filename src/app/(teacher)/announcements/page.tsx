@@ -5,7 +5,7 @@
 // is built around the two questions a teacher actually has afterwards: did it
 // go out, and did anyone read it.
 
-import { requireTeacher } from "@/lib/auth";
+import { requireSchoolTeacher } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { AUDIENCES } from "@/lib/announcements";
 import { Markdown } from "@/components/Markdown";
@@ -26,7 +26,7 @@ export default async function AnnouncementsPage({
 }: {
   searchParams: Promise<{ published?: string; saved?: string; deleted?: string; error?: string }>;
 }) {
-  const { school } = await requireTeacher();
+  const { school } = await requireSchoolTeacher();
   const sp = await searchParams;
 
   const items = await prisma.announcement.findMany({

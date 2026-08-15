@@ -1,4 +1,4 @@
-import { requireTeacher } from "@/lib/auth";
+import { requireSchoolTeacher } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { fmt } from "@/lib/dates";
 import { Pill } from "@/components/ui";
@@ -24,7 +24,7 @@ export default async function GradingPage({
 }: {
   searchParams: Promise<{ graded?: string; returned?: string }>;
 }) {
-  const { school } = await requireTeacher();
+  const { school } = await requireSchoolTeacher();
   const schoolId = school!.id;
   const sp = await searchParams;
 

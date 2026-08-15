@@ -12,7 +12,7 @@
 
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/db";
-import { requireTeacher, logAudit } from "@/lib/auth";
+import { requireSchoolTeacher, logAudit } from "@/lib/auth";
 import { sendEmail, emailConfigured, looksLikeEmail, appUrl } from "@/lib/email";
 import { parseBlocks, blocksToHtml, blocksToText } from "@/lib/email-blocks";
 import { accentOf } from "@/lib/branding";
@@ -39,7 +39,7 @@ const BLAST_IMAGE_MAX = 4 * 1024 * 1024;
 export async function uploadBlastImage(
   formData: FormData
 ): Promise<{ url: string } | { error: string }> {
-  const { user, school } = await requireTeacher();
+  const { user, school } = await requireSchoolTeacher();
   const schoolId = school!.id;
 
   const file = formData.get("file") as File | null;
@@ -85,7 +85,7 @@ export async function saveBlastDraft(input: {
   blocksJson: string;
   audience: string;
 }): Promise<{ id: string } | { error: string }> {
-  const { user, school } = await requireTeacher();
+  const { user, school } = await requireSchoolTeacher();
   const schoolId = school!.id;
 
   const subject = String(input.subject || "").trim().slice(0, 160);
@@ -109,7 +109,7 @@ export async function saveBlastDraft(input: {
 }
 
 export async function deleteBlastDraft(id: string): Promise<{ ok: boolean }> {
-  const { school } = await requireTeacher();
+  const { school } = await requireSchoolTeacher();
   // sentAt null in the filter: this can only ever remove a draft, never a
   // row from the send log.
   const del = await prisma.schoolBlast.deleteMany({
@@ -130,7 +130,7 @@ export async function sendTestBlast(input: {
   subject: string;
   blocksJson: string;
 }): Promise<{ sent: true } | { error: string }> {
-  const { user, school } = await requireTeacher();
+  const { user, school } = await requireSchoolTeacher();
 
   if (!emailConfigured())
     return { error: "Email delivery isn't configured on this deployment." };
@@ -153,7 +153,7 @@ export async function sendTestBlast(input: {
 }
 
 export async function sendSchoolBlast(formData: FormData) {
-  const { user, school } = await requireTeacher();
+  const { user, school } = await requireSchoolTeacher();
   const schoolId = school!.id;
 
   const subject = String(formData.get("subject") || "").trim().slice(0, 160);

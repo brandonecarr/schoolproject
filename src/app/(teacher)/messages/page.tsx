@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { requireTeacher } from "@/lib/auth";
+import { requireSchoolTeacher } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { Pill, Avatar } from "@/components/ui";
 
@@ -10,7 +10,7 @@ const timeOf = (d: Date) =>
   new Date(d).toLocaleString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
 
 export default async function MessagesInboxPage() {
-  const { school } = await requireTeacher();
+  const { school } = await requireSchoolTeacher();
   const schoolId = school!.id;
 
   const students = await prisma.student.findMany({ where: { schoolId }, orderBy: { createdAt: "asc" } });

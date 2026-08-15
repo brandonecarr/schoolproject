@@ -13,8 +13,11 @@ import { availableSlug } from "@/lib/tenant";
 import { originFor } from "@/lib/tenant-server";
 import { logAudit } from "@/lib/auth";
 import { sendEmail, appUrl } from "@/lib/email";
+import type { SchoolKind } from "@/lib/kind";
 
 export type ProvisionInput = {
+  /** "school" (default) or "family" — see lib/kind.ts. */
+  kind?: SchoolKind;
   schoolName: string;
   slug: string;
   state: string;
@@ -35,13 +38,19 @@ export type Provisioned = {
 export async function provisionSchool(input: ProvisionInput): Promise<Provisioned> {
   // prismaSystem: signup builds a brand-new tenant from nothing; these
   // creates precede any session or request tenant.
+  const kind: SchoolKind = input.kind ?? "school";
   const school = await prismaSystem.school.create({
     data: {
+      kind,
       name: input.schoolName,
       slug: input.slug,
       state: input.state,
       esaAmount: input.esaAmount,
       address: "",
+      // A family's records back ESA claims that can be audited years later,
+      // so the default retention window is five school years rather than
+      // two. Still the family's to change in Settings.
+      ...(kind === "family" ? { retentionDays: 1825 } : {}),
       stripeCustomerId: input.stripeCustomerId ?? "",
       stripeSubscriptionId: input.stripeSubscriptionId ?? "",
       subscriptionStatus: input.stripeSubscriptionId ? "active" : "",
@@ -57,13 +66,38 @@ export async function provisionSchool(input: ProvisionInput): Promise<Provisione
     },
   });
 
-  await logAudit(owner.id, "school_created", `${input.schoolName} (${input.state})`);
+  await logAudit(owner.id, "school_created", `${input.schoolName} (${input.state}, ${kind})`);
 
   // The welcome email: transactional, and mostly a delivery vehicle for the
   // one fact worth keeping — the school's permanent address. Best-effort by
   // design: sendEmail never throws and fails closed when unconfigured, so a
   // mail outage can never break signup itself.
   const schoolOrigin = originFor(input.slug);
+  const steps =
+    kind === "family"
+      ? [
+          `That address is permanent — it's where you and your kids sign in,`,
+          `so bookmark it.`,
+          ``,
+          `Good first steps, in order:`,
+          `  1. Add your children (Children -> Add).`,
+          `  2. Set your instructional days (Calendar).`,
+          `  3. Log attendance and observations as you go — they're the`,
+          `     evidence behind every claim.`,
+          `  4. The next time you buy something with ESA funds, open ESA claims,`,
+          `     attach the receipt, print the packet, and upload it to your`,
+          `     state portal.`,
+        ]
+      : [
+          `That address is permanent — it's where you and your families sign in,`,
+          `so bookmark it and use it in your invitations.`,
+          ``,
+          `Good first steps, in order:`,
+          `  1. Add your students (Students -> Add, or import a CSV).`,
+          `  2. Publish your term dates (Calendar) — they set the instructional-day`,
+          `     count every ESA invoice claims.`,
+          `  3. Take attendance. It's the single biggest input to getting paid.`,
+        ];
   await sendEmail({
     to: input.email,
     subject: `Welcome to Cohort — ${input.schoolName} is set up`,
@@ -72,14 +106,7 @@ export async function provisionSchool(input: ProvisionInput): Promise<Provisione
       ``,
       `  ${schoolOrigin || appUrl()}`,
       ``,
-      `That address is permanent — it's where you and your families sign in,`,
-      `so bookmark it and use it in your invitations.`,
-      ``,
-      `Good first steps, in order:`,
-      `  1. Add your students (Students -> Add, or import a CSV).`,
-      `  2. Publish your term dates (Calendar) — they set the instructional-day`,
-      `     count every ESA invoice claims.`,
-      `  3. Take attendance. It's the single biggest input to getting paid.`,
+      ...steps,
       ``,
       `Reply to this email and it reaches the founder.`,
       ``,
@@ -152,6 +179,7 @@ export async function fulfillSignupIntent(
   }
 
   const provisioned = await provisionSchool({
+    kind: intent.kind === "family" ? "family" : "school",
     schoolName: intent.schoolName,
     slug,
     state: intent.state,

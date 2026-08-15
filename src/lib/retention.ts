@@ -59,6 +59,7 @@ export async function purgeSchool(school: { id: string; retentionDays: number })
       schoolId: school.id,
       studentId: { not: null },
       invoiceId: null,
+      claimId: null,
       capturedAt: { lt: cutoffIso },
     },
   });
@@ -132,6 +133,15 @@ export async function deleteStudentData(
           .count
       : 0;
   const invoices = await prisma.invoice.deleteMany({ where: { studentId, schoolId } });
+  // Same shape for a homeschool family's expense claims: receipts hang off
+  // the claim (studentId null), so they go with it — receipts BEFORE claims.
+  const claimIds = (
+    await prisma.expenseClaim.findMany({ where: { studentId, schoolId }, select: { id: true } })
+  ).map((c) => c.id);
+  if (claimIds.length > 0) {
+    await prisma.fileRec.deleteMany({ where: { schoolId, claimId: { in: claimIds } } });
+  }
+  await prisma.expenseClaim.deleteMany({ where: { studentId, schoolId } });
   const payments = await prisma.payment.deleteMany({ where: { studentId, schoolId } });
   const logins = await prisma.user.deleteMany({ where: { studentId, schoolId, role: "student" } });
 

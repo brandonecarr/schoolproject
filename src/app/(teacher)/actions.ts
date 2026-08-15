@@ -8,7 +8,7 @@
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/db";
-import { requireTeacher, logAudit } from "@/lib/auth";
+import { requireTeacher, requireSchoolTeacher, logAudit } from "@/lib/auth";
 import { parseAccent } from "@/lib/branding";
 import { administratorFor, looksLikeProviderId } from "@/lib/provider";
 import { evidenceFor } from "@/lib/evidence";
@@ -28,7 +28,7 @@ import { recordOutcomesForSubmission, masteryForStudent } from "@/lib/mastery";
 import { notifyUsers, parentUserIdsFor, studentUserIdFor, familyUserIdsByRole } from "@/lib/notify";
 import { excerpt } from "@/lib/announcements";
 import { clamp01, isAnnotatable } from "@/lib/annotate";
-import { parsePins, togglePin } from "@/lib/nav";
+import { parsePins, togglePin, navForKind } from "@/lib/nav";
 import { parseTime, generateSlots, withoutClashes } from "@/lib/conferences";
 import { runMasteryPaths } from "@/lib/paths-run";
 import { bandFor, describeBand, isSelfReferential } from "@/lib/paths";
@@ -86,7 +86,7 @@ export async function addObservation(formData: FormData) {
 
 // --- Courses ---
 export async function addCourse(formData: FormData) {
-  const { school } = await requireTeacher();
+  const { school } = await requireSchoolTeacher();
   await prisma.course.create({
     data: {
       schoolId: school!.id,
@@ -104,7 +104,7 @@ export async function addCourse(formData: FormData) {
 // attached resource file, and the resubmission flag. Fan-out creates one
 // Submission ("assigned") per targeted student.
 export async function addAssignment(formData: FormData) {
-  const { user, school } = await requireTeacher();
+  const { user, school } = await requireSchoolTeacher();
   const schoolId = school!.id;
 
   const type = String(formData.get("type") || "written");
@@ -184,7 +184,7 @@ export async function addAssignment(formData: FormData) {
 const clamp = (n: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, n));
 
 export async function saveGrade(formData: FormData) {
-  const { user, school } = await requireTeacher();
+  const { user, school } = await requireSchoolTeacher();
   const id = String(formData.get("id"));
   const sub = await prisma.submission.findFirst({ where: { id, schoolId: school!.id } });
   if (!sub) redirect("/grading");
@@ -293,7 +293,7 @@ export async function saveGrade(formData: FormData) {
 // Send a submission back for revision with a note. The student sees the note and
 // can turn it in again (their earlier response is preserved as the starting point).
 export async function returnSubmission(formData: FormData) {
-  const { user, school } = await requireTeacher();
+  const { user, school } = await requireSchoolTeacher();
   const id = String(formData.get("id"));
   const sub = await prisma.submission.findFirst({ where: { id, schoolId: school!.id } });
   if (!sub) redirect("/grading");
@@ -333,7 +333,7 @@ export async function returnSubmission(formData: FormData) {
 // AI drafts the narrative; a human reviews and submits. Nothing is transmitted
 // anywhere (COHORT-HANDOFF §4.1).
 export async function buildInvoices() {
-  const { user, school, rail } = await requireTeacher();
+  const { user, school, rail } = await requireSchoolTeacher();
   const schoolId = school!.id;
   const start = periodStart();
   const end = today();
@@ -396,7 +396,7 @@ export async function buildInvoices() {
 }
 
 export async function saveNarrative(formData: FormData) {
-  const { user, school } = await requireTeacher();
+  const { user, school } = await requireSchoolTeacher();
   const id = String(formData.get("id"));
   const inv = await prisma.invoice.findFirst({ where: { id, schoolId: school!.id } });
   if (!inv) redirect("/invoices");
@@ -412,7 +412,7 @@ export async function saveNarrative(formData: FormData) {
 // Move an invoice forward through the reimbursement lifecycle:
 //   draft → submitted → approved → paid   (and resubmit: rejected → submitted)
 export async function setInvoiceStatus(formData: FormData) {
-  const { user, school } = await requireTeacher();
+  const { user, school } = await requireSchoolTeacher();
   const id = String(formData.get("id"));
   const status = String(formData.get("status"));
   const inv = await prisma.invoice.findFirst({ where: { id, schoolId: school!.id } });
@@ -462,7 +462,7 @@ export async function setInvoiceStatus(formData: FormData) {
 // we're trying to learn, so collapsing a real rejection into "Other" would throw
 // away the only ground truth we get.
 export async function rejectInvoice(formData: FormData) {
-  const { user, school } = await requireTeacher();
+  const { user, school } = await requireSchoolTeacher();
   const id = String(formData.get("id"));
   const filed = String(formData.get("reason") || "").trim();
   const verbatim = String(formData.get("reasonRaw") || "").trim();
@@ -507,7 +507,7 @@ export async function rejectInvoice(formData: FormData) {
 // "regenerate documentation" step of the rejection rework loop. Leaves the
 // status alone (the teacher resubmits after reviewing the fresh draft).
 export async function regenerateNarrative(formData: FormData) {
-  const { user, school, rail } = await requireTeacher();
+  const { user, school, rail } = await requireSchoolTeacher();
   const id = String(formData.get("id"));
   const inv = await prisma.invoice.findFirst({ where: { id, schoolId: school!.id } });
   if (!inv) redirect("/invoices");
@@ -540,7 +540,7 @@ export async function regenerateNarrative(formData: FormData) {
 // password (replaces the old shared demo1234). Verifiable consent is preserved:
 // the parent still creates the child's login themselves from their portal.
 export async function createParentInvite(formData: FormData) {
-  const { user, school } = await requireTeacher();
+  const { user, school } = await requireSchoolTeacher();
   const email = String(formData.get("email") || "").trim().toLowerCase();
   // Scoped to THIS school. The same parent may already have an account at a
   // different school — that is not a clash, and blocking it would leave the
@@ -584,7 +584,7 @@ export async function generateResetLink(formData: FormData) {
 
 // --- Tuition ---
 export async function recordPayment(formData: FormData) {
-  const { user, school } = await requireTeacher();
+  const { user, school } = await requireSchoolTeacher();
   await prisma.payment.create({
     data: {
       schoolId: school!.id,
@@ -753,7 +753,7 @@ export async function deleteSample(formData: FormData) {
 
 // --- Mastery paths ---
 export async function addPathRule(formData: FormData) {
-  const { user, school } = await requireTeacher();
+  const { user, school } = await requireSchoolTeacher();
   const assignmentId = String(formData.get("assignmentId"));
   const thenAssignmentId = String(formData.get("thenAssignmentId"));
   if (!assignmentId || !thenAssignmentId) redirect("/paths?err=missing");
@@ -780,7 +780,7 @@ export async function addPathRule(formData: FormData) {
 }
 
 export async function deletePathRule(formData: FormData) {
-  const { user, school } = await requireTeacher();
+  const { user, school } = await requireSchoolTeacher();
   const id = String(formData.get("id"));
   const r = await prisma.pathRule.findFirst({ where: { id, schoolId: school!.id } });
   if (r) {
@@ -793,7 +793,7 @@ export async function deletePathRule(formData: FormData) {
 
 // --- Item banks (reusable questions) ---
 export async function createItemBank(formData: FormData) {
-  const { user, school } = await requireTeacher();
+  const { user, school } = await requireSchoolTeacher();
   const name = String(formData.get("name") || "").trim();
   if (!name) redirect("/banks?err=name");
   const bank = await prisma.itemBank.create({
@@ -810,7 +810,7 @@ export async function createItemBank(formData: FormData) {
 }
 
 export async function updateItemBank(formData: FormData) {
-  const { user, school } = await requireTeacher();
+  const { user, school } = await requireSchoolTeacher();
   const id = String(formData.get("id"));
   const bank = await prisma.itemBank.findFirst({ where: { id, schoolId: school!.id } });
   if (!bank) redirect("/banks");
@@ -828,7 +828,7 @@ export async function updateItemBank(formData: FormData) {
 }
 
 export async function deleteItemBank(formData: FormData) {
-  const { user, school } = await requireTeacher();
+  const { user, school } = await requireSchoolTeacher();
   const id = String(formData.get("id"));
   const bank = await prisma.itemBank.findFirst({ where: { id, schoolId: school!.id } });
   if (bank) {
@@ -841,7 +841,7 @@ export async function deleteItemBank(formData: FormData) {
 
 // --- Pages (teaching content) ---
 export async function createPage(formData: FormData) {
-  const { user, school } = await requireTeacher();
+  const { user, school } = await requireSchoolTeacher();
   const title = String(formData.get("title") || "").trim();
   if (!title) redirect("/pages?err=title");
   const courseId = String(formData.get("courseId") || "");
@@ -861,7 +861,7 @@ export async function createPage(formData: FormData) {
 }
 
 export async function updatePage(formData: FormData) {
-  const { user, school } = await requireTeacher();
+  const { user, school } = await requireSchoolTeacher();
   const id = String(formData.get("id"));
   const page = await prisma.page.findFirst({ where: { id, schoolId: school!.id } });
   if (!page) redirect("/pages");
@@ -883,7 +883,7 @@ export async function updatePage(formData: FormData) {
 }
 
 export async function deletePage(formData: FormData) {
-  const { user, school } = await requireTeacher();
+  const { user, school } = await requireSchoolTeacher();
   const id = String(formData.get("id"));
   const page = await prisma.page.findFirst({ where: { id, schoolId: school!.id } });
   if (page) {
@@ -899,7 +899,7 @@ export async function deletePage(formData: FormData) {
 
 // --- Modules (sequenced curriculum) ---
 export async function createModule(formData: FormData) {
-  const { user, school } = await requireTeacher();
+  const { user, school } = await requireSchoolTeacher();
   const name = String(formData.get("name") || "").trim();
   if (!name) redirect("/modules?err=name");
   const courseId = String(formData.get("courseId") || "");
@@ -922,7 +922,7 @@ export async function createModule(formData: FormData) {
 }
 
 export async function updateModule(formData: FormData) {
-  const { user, school } = await requireTeacher();
+  const { user, school } = await requireSchoolTeacher();
   const id = String(formData.get("id"));
   const m = await prisma.module.findFirst({ where: { id, schoolId: school!.id } });
   if (!m) redirect("/modules");
@@ -949,7 +949,7 @@ export async function updateModule(formData: FormData) {
 }
 
 export async function deleteModule(formData: FormData) {
-  const { user, school } = await requireTeacher();
+  const { user, school } = await requireSchoolTeacher();
   const id = String(formData.get("id"));
   const m = await prisma.module.findFirst({ where: { id, schoolId: school!.id } });
   if (m) {
@@ -971,7 +971,7 @@ export async function deleteModule(formData: FormData) {
 }
 
 export async function moveModule(formData: FormData) {
-  const { school } = await requireTeacher();
+  const { school } = await requireSchoolTeacher();
   const id = String(formData.get("id"));
   const dir = String(formData.get("dir")); // up | down
   const all = await prisma.module.findMany({
@@ -996,7 +996,7 @@ export async function moveModule(formData: FormData) {
 
 // --- Module items ---
 export async function addModuleItem(formData: FormData) {
-  const { user, school } = await requireTeacher();
+  const { user, school } = await requireSchoolTeacher();
   const moduleId = String(formData.get("moduleId"));
   const m = await prisma.module.findFirst({ where: { id: moduleId, schoolId: school!.id } });
   if (!m) redirect("/modules");
@@ -1030,7 +1030,7 @@ export async function addModuleItem(formData: FormData) {
 }
 
 export async function removeModuleItem(formData: FormData) {
-  const { school } = await requireTeacher();
+  const { school } = await requireSchoolTeacher();
   const id = String(formData.get("id"));
   const it = await prisma.moduleItem.findFirst({ where: { id, schoolId: school!.id } });
   if (it) {
@@ -1044,7 +1044,7 @@ export async function removeModuleItem(formData: FormData) {
 }
 
 export async function moveModuleItem(formData: FormData) {
-  const { school } = await requireTeacher();
+  const { school } = await requireSchoolTeacher();
   const id = String(formData.get("id"));
   const dir = String(formData.get("dir"));
   const it = await prisma.moduleItem.findFirst({ where: { id, schoolId: school!.id } });
@@ -1219,7 +1219,7 @@ export async function deleteProgressReport(formData: FormData) {
 // A blank cell means "leave this alone", never "erase the grade" — a bulk form
 // must not be able to wipe a term's marks by accident.
 export async function saveGradebook(formData: FormData) {
-  const { user, school } = await requireTeacher();
+  const { user, school } = await requireSchoolTeacher();
   const schoolId = school!.id;
   const reason = String(formData.get("reason") || "").trim().slice(0, 200);
   const now = new Date().toISOString();
@@ -1391,7 +1391,7 @@ export async function importOutcomePack(formData: FormData) {
 
 // Replace the set of standards an existing assignment demonstrates.
 export async function setAssignmentOutcomes(formData: FormData) {
-  const { user, school } = await requireTeacher();
+  const { user, school } = await requireSchoolTeacher();
   const assignmentId = String(formData.get("assignmentId"));
   const a = await prisma.assignment.findFirst({ where: { id: assignmentId, schoolId: school!.id } });
   if (!a) redirect("/assignments");
@@ -1443,7 +1443,7 @@ export async function recordOutcomeResult(formData: FormData) {
 // A worksheet is built once, then printed (worksheets/[id]/print) or assigned
 // digitally (spawns a quiz-type Assignment from the same items).
 export async function createWorksheet(formData: FormData) {
-  const { user, school } = await requireTeacher();
+  const { user, school } = await requireSchoolTeacher();
   const ws = await prisma.worksheet.create({
     data: {
       schoolId: school!.id,
@@ -1459,7 +1459,7 @@ export async function createWorksheet(formData: FormData) {
 }
 
 export async function deleteWorksheet(formData: FormData) {
-  const { user, school } = await requireTeacher();
+  const { user, school } = await requireSchoolTeacher();
   const id = String(formData.get("id"));
   const ws = await prisma.worksheet.findFirst({ where: { id, schoolId: school!.id } });
   if (ws) {
@@ -1472,7 +1472,7 @@ export async function deleteWorksheet(formData: FormData) {
 
 // Turn a worksheet into a live, digital quiz assignment and fan it out.
 export async function assignWorksheet(formData: FormData) {
-  const { user, school } = await requireTeacher();
+  const { user, school } = await requireSchoolTeacher();
   const schoolId = school!.id;
   const id = String(formData.get("worksheetId"));
   const ws = await prisma.worksheet.findFirst({ where: { id, schoolId } });
@@ -1517,7 +1517,7 @@ export async function assignWorksheet(formData: FormData) {
 // record exists so a source that keeps producing rejected proposals can be
 // spotted and re-pointed.
 export async function decideProposal(formData: FormData) {
-  const { user } = await requireTeacher();
+  const { user } = await requireSchoolTeacher();
   const id = String(formData.get("id"));
   const decision = String(formData.get("decision"));
   if (decision !== "accepted" && decision !== "rejected") redirect("/proposals");
@@ -1681,7 +1681,7 @@ export async function removeDeadline(formData: FormData) {
 const AUDIENCE_VALUES = new Set(["all", "parents", "students"]);
 
 export async function saveAnnouncement(formData: FormData) {
-  const { user, school } = await requireTeacher();
+  const { user, school } = await requireSchoolTeacher();
   const id = String(formData.get("id") || "").trim();
   const title = String(formData.get("title") || "").trim();
   const body = String(formData.get("body") || "").trim();
@@ -1769,7 +1769,7 @@ async function announce(
 }
 
 export async function deleteAnnouncement(formData: FormData) {
-  const { user, school } = await requireTeacher();
+  const { user, school } = await requireSchoolTeacher();
   const id = String(formData.get("id"));
   const a = await prisma.announcement.findFirst({ where: { id, schoolId: school!.id } });
   if (!a) redirect("/announcements");
@@ -1781,7 +1781,7 @@ export async function deleteAnnouncement(formData: FormData) {
 }
 
 export async function togglePinAnnouncement(formData: FormData) {
-  const { user, school } = await requireTeacher();
+  const { user, school } = await requireSchoolTeacher();
   const id = String(formData.get("id"));
   const a = await prisma.announcement.findFirst({ where: { id, schoolId: school!.id } });
   if (!a) redirect("/announcements");
@@ -1872,9 +1872,11 @@ export async function deleteAnnotation(id: string): Promise<{ ok: boolean }> {
 // record of, and filling the audit log with it would bury the entries that
 // matter.
 export async function toggleNavPin(formData: FormData) {
-  const { user } = await requireTeacher();
+  const { user, school } = await requireTeacher();
   const href = String(formData.get("href") || "");
-  const next = togglePin(parsePins(user.pinnedNav), href);
+  // Pins resolve against the nav this account actually has.
+  const nav = navForKind(school?.kind);
+  const next = togglePin(parsePins(user.pinnedNav, nav), href, nav);
   await prisma.user.update({
     where: { id: user.id },
     data: { pinnedNav: JSON.stringify(next) },
@@ -1886,7 +1888,7 @@ export async function toggleNavPin(formData: FormData) {
 
 // --- Parent-teacher conferences ---
 export async function publishConferenceSlots(formData: FormData) {
-  const { user, school } = await requireTeacher();
+  const { user, school } = await requireSchoolTeacher();
   const date = String(formData.get("date") || "").trim();
   const start = parseTime(String(formData.get("start") || ""));
   const end = parseTime(String(formData.get("end") || ""));
@@ -1926,7 +1928,7 @@ export async function publishConferenceSlots(formData: FormData) {
 }
 
 export async function deleteConferenceSlot(formData: FormData) {
-  const { user, school } = await requireTeacher();
+  const { user, school } = await requireSchoolTeacher();
   const id = String(formData.get("id"));
   const slot = await prisma.conferenceSlot.findFirst({ where: { id, schoolId: school!.id } });
   if (!slot) redirect("/conferences");
@@ -1942,7 +1944,7 @@ export async function deleteConferenceSlot(formData: FormData) {
 // The teacher's note after the conference happened. This is the bit that turns
 // a calendar entry into evidence, so it shows on the student's printed record.
 export async function saveConferenceNote(formData: FormData) {
-  const { user, school } = await requireTeacher();
+  const { user, school } = await requireSchoolTeacher();
   const id = String(formData.get("id"));
   const slot = await prisma.conferenceSlot.findFirst({ where: { id, schoolId: school!.id } });
   if (!slot) redirect("/conferences");
@@ -1984,7 +1986,7 @@ const RECEIPT_TYPES: Record<string, string> = {
  * invoiceId set (which also scopes it to staff in the /files route).
  */
 export async function uploadReceipt(formData: FormData) {
-  const { user, school } = await requireTeacher();
+  const { user, school } = await requireSchoolTeacher();
   const schoolId = school!.id;
   const invoiceId = String(formData.get("invoiceId") || "");
   const back = `/invoices/${invoiceId}`;
@@ -2027,7 +2029,7 @@ export async function uploadReceipt(formData: FormData) {
 /** Remove a receipt. The where-clause requires invoiceId to be set, so this
  *  action can only ever delete receipts — never a work sample or the logo. */
 export async function removeReceipt(formData: FormData) {
-  const { user, school } = await requireTeacher();
+  const { user, school } = await requireSchoolTeacher();
   const fileId = String(formData.get("fileId") || "");
   const invoiceId = String(formData.get("invoiceId") || "");
   const removed = await prisma.fileRec.deleteMany({

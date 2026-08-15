@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { requireTeacher } from "@/lib/auth";
+import { requireSchoolTeacher } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { today, fmt } from "@/lib/dates";
 import { typeMeta, parseItems } from "@/lib/lms";
@@ -15,7 +15,7 @@ export default async function AssignmentsPage({
 }: {
   searchParams: Promise<{ course?: string; created?: string; aligned?: string }>;
 }) {
-  const { school } = await requireTeacher();
+  const { school } = await requireSchoolTeacher();
   const schoolId = school!.id;
   const sp = await searchParams;
 

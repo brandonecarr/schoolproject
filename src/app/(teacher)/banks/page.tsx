@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { requireTeacher } from "@/lib/auth";
+import { requireSchoolTeacher } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { Notice } from "@/components/ui";
 import { parseItems, quizMax, ITEM_KIND_LABEL } from "@/lib/lms";
@@ -14,7 +14,7 @@ export default async function BanksPage({
 }: {
   searchParams: Promise<{ created?: string; saved?: string; deleted?: string; err?: string }>;
 }) {
-  const { school } = await requireTeacher();
+  const { school } = await requireSchoolTeacher();
   const sp = await searchParams;
 
   const banks = await prisma.itemBank.findMany({

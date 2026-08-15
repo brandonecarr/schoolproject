@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { requireTeacher } from "@/lib/auth";
+import { requireSchoolTeacher } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { fmt, today } from "@/lib/dates";
 import { Pill, Notice, StatCard } from "@/components/ui";
@@ -25,7 +25,7 @@ export default async function InvoicesPage({
 }: {
   searchParams: Promise<{ built?: string; skipped?: string }>;
 }) {
-  const { school, rail } = await requireTeacher();
+  const { school, rail } = await requireSchoolTeacher();
   // Evidence behind the rail's rules — one grouped query, not one per invoice.
   const vidx = await verificationCounts(school!.id);
   const railV = rail ? railVerification(vidx, rail.id) : null;

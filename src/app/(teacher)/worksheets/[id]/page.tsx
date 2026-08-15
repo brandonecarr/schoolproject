@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { requireTeacher } from "@/lib/auth";
+import { requireSchoolTeacher } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { today } from "@/lib/dates";
 import { parseItems, quizMax, ITEM_KIND_LABEL } from "@/lib/lms";
@@ -15,7 +15,7 @@ export default async function WorksheetDetail({
 }: {
   params: Promise<{ id: string }>;
 }) {
-  const { school } = await requireTeacher();
+  const { school } = await requireSchoolTeacher();
   const { id } = await params;
   const ws = await prisma.worksheet.findFirst({ where: { id, schoolId: school!.id } });
   if (!ws) notFound();

@@ -101,6 +101,14 @@ model School {
   stripeSubscriptionId String @default("")
   subscriptionStatus   String @default("")
 
+  // --- Account kind ---------------------------------------------------------
+  // "school": a microschool/co-op that invoices an ESA program as a provider.
+  // "family": one homeschooling household — its own tenant, its own kids as
+  // the roster — that files EXPENSE CLAIMS from its state wallet rather than
+  // invoicing. Read at three choke points (nav, route guard, dashboard); the
+  // whole engine underneath is shared. Never changes after signup.
+  kind      String   @default("school")
+
   createdAt DateTime @default(now())
 }
 
@@ -475,6 +483,11 @@ model FileRec {
   /// a financial record kept for reimbursement audit, not child activity.
   /// Right-to-deletion still removes them via their invoice (retention.ts).
   invoiceId  String?
+  /// Set when this file is the RECEIPT behind a homeschool family's expense
+  /// claim — the same footing as an invoice receipt: studentId null (a
+  /// financial record, not child activity), kept out of the retention purge,
+  /// removed with its claim by right-to-deletion.
+  claimId    String?
   label      String
   ext        String
   mime       String
@@ -1009,6 +1022,9 @@ model SignupIntent {
   passwordHash    String
   stripeSessionId String    @default("")
   consumedAt      DateTime?
+  /// Which account kind was chosen at signup — carried through checkout so
+  /// fulfillment provisions the right thing.
+  kind            String    @default("school")
   schoolId        String?
   createdAt       DateTime  @default(now())
 
@@ -1038,4 +1054,40 @@ model SchoolBlast {
   createdAt  DateTime @default(now())
 
   @@index([schoolId, createdAt])
+}
+
+// A homeschool family's ESA EXPENSE CLAIM: one purchase, for one child, that
+// the parent files for reimbursement (or documents a direct-pay for) in their
+// state wallet. Deliberately NOT an Invoice — an invoice is a school billing a
+// period of tuition per student; a claim is a receipt with an educational
+// purpose behind it. Same status vocabulary on purpose, so the pure metric
+// helpers in lib/metrics.ts serve both without counting one as the other.
+// Cohort prepares the packet; the family submits it in the portal themselves.
+model ExpenseClaim {
+  id              String   @id @default(cuid())
+  schoolId        String
+  studentId       String // the child whose ESA wallet pays
+  title           String // "Math-U-See Gamma set"
+  vendor          String   @default("")
+  purchaseDate    String // YYYY-MM-DD
+  amount          Float
+  category        String // key into CLAIM_CATEGORIES (lib/claims.ts)
+  purpose         String   @default("")
+  purposeSource   String   @default("template") // template | ai | edited
+  // The evidence window shown in the packet — the weeks around the purchase.
+  windowStart     String // YYYY-MM-DD
+  windowEnd       String // YYYY-MM-DD
+  evidenceScore   Int      @default(0)
+  railId          String?
+  status          String   @default("draft") // draft | submitted | approved | paid | rejected
+  portalRef       String   @default("") // the wallet's order / claim number
+  submittedAt     String? // ISO
+  approvedAt      String?
+  paidAt          String?
+  rejectedAt      String?
+  rejectionReason String   @default("")
+  rejectionCount  Int      @default(0)
+  createdAt       DateTime @default(now())
+
+  @@index([schoolId, studentId])
 }

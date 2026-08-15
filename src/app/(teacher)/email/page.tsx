@@ -6,7 +6,7 @@
 // it, and sends. Every send is logged with the exact blocks, so history shows
 // what actually left the building.
 
-import { requireTeacher } from "@/lib/auth";
+import { requireSchoolTeacher } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { emailConfigured, looksLikeEmail } from "@/lib/email";
 import { accentOf } from "@/lib/branding";
@@ -21,7 +21,7 @@ export default async function EmailBlastPage({
 }: {
   searchParams: Promise<{ sent?: string; of?: string; error?: string }>;
 }) {
-  const { school } = await requireTeacher();
+  const { school } = await requireSchoolTeacher();
   const schoolId = school!.id;
   const sp = await searchParams;
 

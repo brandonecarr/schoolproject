@@ -1,5 +1,5 @@
 import { notFound } from "next/navigation";
-import { requireTeacher } from "@/lib/auth";
+import { requireSchoolTeacher } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { evidenceFor } from "@/lib/evidence";
 import { readiness, RAILS } from "@/lib/rules";
@@ -71,7 +71,7 @@ export default async function InvoicePacketPage({
   params: Promise<{ id: string }>;
   searchParams: Promise<{ regenerated?: string; receipt?: string }>;
 }) {
-  const { school, rail: sessionRail } = await requireTeacher();
+  const { school, rail: sessionRail } = await requireSchoolTeacher();
   const { id } = await params;
   const { regenerated, receipt } = await searchParams;
 

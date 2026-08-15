@@ -11,7 +11,7 @@
 // never once changed is not a healthy source — it is probably a marketing page
 // while the real rules live in a PDF behind it.
 
-import { requireTeacher } from "@/lib/auth";
+import { requireSchoolTeacher } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { SOURCES } from "@/lib/sources";
 import { PROGRAMS, RAILS } from "@/lib/rules";
@@ -49,7 +49,7 @@ function ago(iso: string | null): string {
 }
 
 export default async function SourcesPage() {
-  await requireTeacher();
+  await requireSchoolTeacher();
 
   const states = await prisma.watchState.findMany();
   const byId = new Map(states.map((s) => [s.sourceId, s]));

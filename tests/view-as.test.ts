@@ -64,9 +64,10 @@ describe("teacher actions are blocked structurally, not by a guard", () => {
     // runs. If an action ever resolves its session another way, that reasoning
     // stops holding and this test says so.
     for (const fn of functions(src).filter((f) => f.exported)) {
-      expect(fn.body.includes("requireTeacher()"), `${fn.name} does not call requireTeacher()`).toBe(
-        true
-      );
+      // requireSchoolTeacher() calls requireTeacher() first, so either gate
+      // carries the impersonation refusal.
+      const gated = fn.body.includes("requireTeacher()") || fn.body.includes("requireSchoolTeacher()");
+      expect(gated, `${fn.name} does not call requireTeacher()/requireSchoolTeacher()`).toBe(true);
     }
   });
 });

@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { requireTeacher } from "@/lib/auth";
+import { requireSchoolTeacher } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { Pill, Notice } from "@/components/ui";
 import { tokenUsable } from "@/lib/tokens";
@@ -14,7 +14,7 @@ export default async function InvitesPage({
 }: {
   searchParams: Promise<{ invite?: string; reset?: string; exists?: string }>;
 }) {
-  const { school } = await requireTeacher();
+  const { school } = await requireSchoolTeacher();
   const schoolId = school!.id;
   const sp = await searchParams;
 

@@ -23,7 +23,7 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
   // invoice-attached receipt: that is the school's claim paperwork, not shared
   // material, so it stays staff-only even though its studentId is null.
   const isSchoolResource =
-    f.studentId == null && f.invoiceId == null && user.schoolId === f.schoolId;
+    f.studentId == null && f.invoiceId == null && f.claimId == null && user.schoolId === f.schoolId;
   let isFamily = false;
   if (user.role === "parent") {
     const ids: string[] = user.studentIdsJson ? JSON.parse(user.studentIdsJson) : [];
@@ -39,7 +39,7 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
   // browser cache: the sidebar shows the logo on every page, and replacing a
   // logo creates a NEW row id, so a cached copy can never go stale. Child
   // work and receipts stay no-store — those must not outlive the session.
-  const cacheable = f.studentId == null && f.invoiceId == null;
+  const cacheable = f.studentId == null && f.invoiceId == null && f.claimId == null;
   return new Response(new Uint8Array(f.data), {
     status: 200,
     headers: {

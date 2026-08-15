@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { requireTeacher } from "@/lib/auth";
+import { requireSchoolTeacher } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { today, fmt } from "@/lib/dates";
 import { Notice } from "@/components/ui";
@@ -23,7 +23,7 @@ export default async function GradebookPage({
 }: {
   searchParams: Promise<{ course?: string; saved?: string }>;
 }) {
-  const { school } = await requireTeacher();
+  const { school } = await requireSchoolTeacher();
   const schoolId = school!.id;
   const sp = await searchParams;
   const td = today();

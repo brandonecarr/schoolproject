@@ -451,15 +451,16 @@ export default async function Home() {
           <section className="lp-wrap lp-section" id="pricing">
             <div className="lp-centerhead">
               <div className="lp-eyebrow">Pricing</div>
-              <h2 className="lp-h2">The first cohort pays one flat rate</h2>
+              <h2 className="lp-h2">Two ways in: a school, or a family</h2>
               <p>
                 At launch, Cohort will be priced per child — because that&apos;s how you&apos;re
-                funded. While it&apos;s early, it&apos;s simpler than that: everything, every
-                student, one rate, locked for your first twelve months.
+                funded. While it&apos;s early, it&apos;s simpler than that: one flat rate for a
+                school, one for a homeschooling household, each locked for your first twelve
+                months.
               </p>
             </div>
 
-            <div className="lp-tiers lp-tiers-1">
+            <div className="lp-tiers lp-tiers-2">
               <article className="lp-tier featured">
                 <div className="lp-tierhead">
                   <h3>The first cohort</h3>
@@ -479,7 +480,7 @@ export default async function Home() {
                   <li>Rate locked for your first 12 months</li>
                   <li>A direct line to the founder while it&apos;s early</li>
                 </ul>
-                <Link className="lp-pill lp-pill-full" href="/signup">
+                <Link className="lp-pill lp-pill-full" href="/signup?kind=school">
                   Start your school
                 </Link>
                 <div className="lp-pricenote" style={{ textAlign: "center", marginTop: 10 }}>
@@ -487,6 +488,32 @@ export default async function Home() {
                 </div>
               </article>
 
+              <article className="lp-tier">
+                <div className="lp-tierhead">
+                  <h3>Homeschool family</h3>
+                  <span className="lp-expect">ESA parents</span>
+                </div>
+                <p className="lp-tiersub">Your records, your receipts, your claim packets.</p>
+                <div className="lp-price">$29</div>
+                <div className="lp-pricenote">
+                  per month, flat — all your children. Billed monthly, cancel anytime.
+                </div>
+                <div className="lp-hair" />
+                <ul>
+                  <li>Log attendance and observations in a minute a day</li>
+                  <li>Snap a receipt, tie it to a child and a purpose</li>
+                  <li>Claim packets with the evidence a reviewer asks for</li>
+                  <li>Rejection tracking so the second try lands</li>
+                  <li>Program deadline reminders for your state</li>
+                  <li>Portfolio and printable records for each child</li>
+                </ul>
+                <Link className="lp-pill lp-pill-full" href="/signup?kind=family">
+                  Start your homeschool
+                </Link>
+                <div className="lp-pricenote" style={{ textAlign: "center", marginTop: 10 }}>
+                  You submit every claim yourself, in your state&apos;s portal.
+                </div>
+              </article>
             </div>
 
             <p className="lp-placeholder">

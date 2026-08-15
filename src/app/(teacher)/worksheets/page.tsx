@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { requireTeacher } from "@/lib/auth";
+import { requireSchoolTeacher } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { fmt } from "@/lib/dates";
 import { parseItems, quizMax } from "@/lib/lms";
@@ -10,7 +10,7 @@ export const dynamic = "force-dynamic";
 export const metadata = { title: "Worksheets — Cohort" };
 
 export default async function WorksheetsPage() {
-  const { school } = await requireTeacher();
+  const { school } = await requireSchoolTeacher();
   const [list, bankRows] = await Promise.all([
     prisma.worksheet.findMany({ where: { schoolId: school!.id }, orderBy: { createdAt: "desc" } }),
     prisma.itemBank.findMany({ where: { schoolId: school!.id }, orderBy: { name: "asc" } }),

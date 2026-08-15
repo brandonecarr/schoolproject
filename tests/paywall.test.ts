@@ -37,7 +37,8 @@ describe("the gate", () => {
     const fallback = signupAction.slice(signupAction.indexOf("// ---- No Stripe configured"));
     const guard = fallback.slice(0, fallback.indexOf("provisionSchool"));
     expect(guard).toContain('deploymentEnv() === "production"');
-    expect(guard).toContain("error=billing");
+    // err("billing") → "/signup?error=billing" (or ...&kind=family&error=billing).
+    expect(guard).toContain('err("billing")');
     // The signup page has words for it.
     expect(read("src/app/signup/page.tsx")).toContain("billing:");
   });

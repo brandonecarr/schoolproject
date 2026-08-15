@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { requireTeacher } from "@/lib/auth";
+import { requireSchoolTeacher } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { addCourse } from "../actions";
 
@@ -7,7 +7,7 @@ export const dynamic = "force-dynamic";
 export const metadata = { title: "Courses — Cohort" };
 
 export default async function CoursesPage() {
-  const { school } = await requireTeacher();
+  const { school } = await requireSchoolTeacher();
   const schoolId = school!.id;
   const courses = await prisma.course.findMany({ where: { schoolId }, orderBy: { createdAt: "asc" } });
   const counts = await prisma.assignment.groupBy({

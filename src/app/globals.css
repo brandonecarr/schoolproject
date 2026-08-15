@@ -8061,3 +8061,44 @@ a.lp-state:hover {
     transform: rotate(360deg);
   }
 }
+
+/* ==========================================================================
+   SIGNUP — account-kind chooser (school vs homeschool family)
+   ========================================================================== */
+.su-kind {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  margin: 4px 0 16px;
+}
+.su-kind a {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding: 12px 14px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  color: var(--ink2);
+  text-decoration: none;
+  font-size: 12.5px;
+  line-height: 1.4;
+  transition: border-color 0.12s ease, background 0.12s ease;
+}
+.su-kind a strong {
+  color: var(--ink);
+  font-size: 13.5px;
+}
+.su-kind a:hover {
+  border-color: var(--accent);
+}
+.su-kind a.on {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+  box-shadow: inset 0 0 0 1px var(--accent);
+}
+@media (max-width: 520px) {
+  .su-kind {
+    grid-template-columns: 1fr;
+  }
+}

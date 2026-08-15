@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { requireTeacher } from "@/lib/auth";
+import { requireSchoolTeacher } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { Notice } from "@/components/ui";
 import { describeBand } from "@/lib/paths";
@@ -14,7 +14,7 @@ export default async function PathsPage({
 }: {
   searchParams: Promise<{ added?: string; deleted?: string; err?: string }>;
 }) {
-  const { school } = await requireTeacher();
+  const { school } = await requireSchoolTeacher();
   const sp = await searchParams;
 
   const [rules, assignments, autoAssigned] = await Promise.all([

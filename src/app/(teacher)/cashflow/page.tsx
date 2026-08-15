@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { requireTeacher } from "@/lib/auth";
+import { requireSchoolTeacher } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { forecast, tuitionSplit, addDays } from "@/lib/billing";
 import { fmt } from "@/lib/dates";
@@ -11,7 +11,7 @@ export const dynamic = "force-dynamic";
 export const metadata = { title: "Cash flow — Cohort" };
 
 export default async function CashflowPage() {
-  const { school, rail } = await requireTeacher();
+  const { school, rail } = await requireSchoolTeacher();
   const vidx = await verificationCounts(school!.id);
   const schoolId = school!.id;
 

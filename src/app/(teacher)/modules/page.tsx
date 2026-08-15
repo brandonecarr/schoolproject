@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { requireTeacher } from "@/lib/auth";
+import { requireSchoolTeacher } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { Notice, Pill } from "@/components/ui";
 import { KIND_ICON } from "@/lib/modules";
@@ -13,7 +13,7 @@ export default async function ModulesIndex({
 }: {
   searchParams: Promise<{ deleted?: string; err?: string }>;
 }) {
-  const { school } = await requireTeacher();
+  const { school } = await requireSchoolTeacher();
   const sp = await searchParams;
 
   const [modules, items, courses] = await Promise.all([

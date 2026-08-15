@@ -172,6 +172,93 @@ Write the educational purpose statement.`;
   return { text, source: "template" };
 }
 
+// --- ESA expense claim purpose statement (homeschool family) ---------------
+
+export type ClaimContext = {
+  family: { name: string; state: string };
+  child: { name: string; grade: string };
+  rail: { label: string; requires: { label: string }[] } | null;
+  claim: { title: string; vendor: string; category: string; amount: number; purchaseDate: string };
+  window: { start: string; end: string };
+  attendance: { status: string }[];
+  observations: { date: string; text: string }[];
+  submissions: { status: string; assignmentTitle: string; score: number | null; points: number }[];
+  standards?: { code: string; title: string; pct: number; mastered: boolean }[];
+};
+
+/**
+ * The educational-purpose statement behind a family's expense claim: what was
+ * bought, for whom, how it was used in instruction, what the child did with
+ * it, how progress was seen. Drafted from logged facts only — a human reads
+ * and approves before anything goes to the portal. Same rules as
+ * purposeNarrative: never invent, plain prose, no padding.
+ */
+export async function claimNarrative(ctx: ClaimContext): Promise<NarrativeResult> {
+  const { family, child, rail, claim, window, attendance, observations, submissions, standards = [] } = ctx;
+  const present = attendance.filter((a) => a.status === "present").length;
+  const graded = submissions.filter((s) => s.status === "graded");
+
+  const facts = [
+    `Family: ${family.name} (${family.state}), homeschooling`,
+    `Child: ${child.name}, grade ${child.grade}`,
+    `Purchase: "${claim.title}"${claim.vendor ? ` from ${claim.vendor}` : ""}, $${claim.amount.toFixed(2)}, on ${fmtDate(claim.purchaseDate)}, category ${claim.category}`,
+    `Records window: ${fmtDate(window.start)} – ${fmtDate(window.end)}`,
+    `Instructional days logged in the window: ${present} present of ${attendance.length}`,
+    `Parent-teacher observations in the window:`,
+    ...observations.map((o) => `  - ${fmtDate(o.date)}: ${o.text}`),
+    ...(graded.length
+      ? [`Work assessed in the window:`, ...graded.map((s) => `  - "${s.assignmentTitle}" ${s.score}/${s.points}`)]
+      : []),
+    ...(standards.length
+      ? [
+          `Standards assessed (${standards.filter((s) => s.mastered).length} of ${standards.length} mastered):`,
+          ...standards.map((s) => `  - ${s.code} ${s.title}: ${Math.round(s.pct * 100)}%${s.mastered ? " (mastered)" : ""}`),
+        ]
+      : []),
+  ].join("\n");
+
+  const system = `You write educational-purpose statements that accompany a homeschooling family's Education Savings Account expense reimbursement claim.
+
+Rules:
+- Use ONLY the facts provided. Never invent an activity, date, score, or observation.
+- Write 90-150 words in plain administrative prose, first person plural ("we") is acceptable. No marketing language.
+- Structure: what was purchased and for which child; how it was used in instruction during the records window; what the child did; how progress was seen.
+- If the records are thin, say plainly what was logged rather than padding.
+- Never assert that the expense is eligible or approved — that is the program's decision.
+- Output the statement only. No preamble, no headings.`;
+
+  const user = `Program: ${rail ? rail.label : "ESA"}. Required elements: ${
+    rail ? rail.requires.map((r) => r.label).join("; ") : "receipt, educational purpose, the child it serves"
+  }.
+
+FACTS:
+${facts}
+
+Write the educational purpose statement.`;
+
+  const out = await callClaude(system, user);
+  if (out) return { text: out, source: "ai" };
+
+  // Deterministic fallback
+  const text =
+    `We purchased "${claim.title}"${claim.vendor ? ` from ${claim.vendor}` : ""} on ${fmtDate(claim.purchaseDate)} ` +
+    `for ${child.name} (grade ${child.grade}), for use in our home instruction. ` +
+    `Between ${fmtDate(window.start)} and ${fmtDate(window.end)} we logged ${present} instructional day${present === 1 ? "" : "s"}` +
+    (observations.length ? `, including this observation on ${fmtDate(observations[0].date)}: ${observations[0].text} ` : ". ") +
+    (graded.length
+      ? `Work assessed in that time included ${graded
+          .slice(0, 2)
+          .map((s) => `"${s.assignmentTitle}" (${s.score}/${s.points})`)
+          .join(" and ")}. `
+      : "") +
+    (standards.length
+      ? `Against the standards assessed, ${child.name} demonstrated mastery of ${standards.filter((s) => s.mastered).length} of ${standards.length}. `
+      : "") +
+    `The item was used for the instruction and practice described above.`;
+
+  return { text, source: "template" };
+}
+
 // --- Progress report (period narrative for a family) -------------------------
 //
 // Longer and more considered than the weekly note: this is the report a parent

@@ -213,7 +213,9 @@ describe("choosing the school's address at signup", () => {
     // the name ourselves and wrong when a person typed it — they would land on
     // an address they did not choose and never notice.
     expect(actions).toMatch(/!taken\.includes\(asked\) \? asked : null/);
-    expect(actions).toContain('redirect("/signup?error=slug")');
+    // The redirect keeps the chosen account kind in the URL (err() builds it),
+    // so the assertion is on the error code, not a bare path.
+    expect(actions).toContain('redirect(err("slug"))');
   });
 
   it("still works with no JavaScript, by deriving from the school name", () => {
