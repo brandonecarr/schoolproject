@@ -36,6 +36,14 @@ status "states index 200" 200 "$(curl -s -o /dev/null -w '%{http_code}' "${CONNE
 status "state page 200" 200 "$(curl -s -o /dev/null -w '%{http_code}' "${CONNECT[@]}" "$BASE/states/arizona")"
 status "find page 200" 200 "$(curl -s -o /dev/null -w '%{http_code}' "${CONNECT[@]}" "$BASE/find")"
 status "signup page 200" 200 "$(curl -s -o /dev/null -w '%{http_code}' "${CONNECT[@]}" "$BASE/signup")"
+# Family tier: both tiers on the landing, family chooser renders, and the
+# family signup page shows no ESA-amount field.
+check "landing has family tier" 'href="/signup?kind=family"' "$H"
+check "landing states family price" '\$29' "$H"
+FS=$(curl -s "${CONNECT[@]}" "$BASE/signup?kind=family")
+check "family signup renders chooser" 'A homeschooling family' "$FS"
+check "family signup asks family name" 'Family name' "$FS"
+if echo "$FS" | grep -q 'id="esaAmount"'; then bad "family signup must not ask ESA amount"; else ok "family signup omits ESA amount"; fi
 check "robots blocks console" "Disallow: /cohort-admin" "$(curl -s "${CONNECT[@]}" "$BASE/robots.txt")"
 status "sitemap 200" 200 "$(curl -s -o /dev/null -w '%{http_code}' "${CONNECT[@]}" "$BASE/sitemap.xml")"
 R=$(curl -s -o /dev/null -w '%{redirect_url}' "${CONNECT[@]}" "$BASE/dashboard")

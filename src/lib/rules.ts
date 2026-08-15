@@ -167,6 +167,11 @@ export type Program = {
    *  Only listed where public writing actually names the obligation; a state
    *  with none listed has none we could ground, not none at all. */
   obligations?: ProgramObligation[];
+  /** How the program treats a HOMESCHOOLING family — a plain ⚑ note, never a
+   *  yes/no (a "false" is a claim too, and one we can't stand behind). Only
+   *  set where public writing grounds it; states without a note say so in the
+   *  UI rather than guessing from `kind`. Every note ends with the ⚑ line. */
+  homeEducation?: string;
 };
 
 export type ProgramObligation = {
@@ -187,7 +192,7 @@ export type ProgramObligation = {
 // more than one billable program lists the others in `alsoRuns` rather than
 // getting a second entry; splitting those out needs a data migration first.
 export const PROGRAMS: Record<string, Program> = {
-  AL: { rail: "classwallet", program: "CHOOSE Act", label: "Alabama CHOOSE Act", kind: "esa", amount: 7000, live: true, alsoRuns: ["CHOOSE Act home education award (~$2,000)"] },
+  AL: { rail: "classwallet", program: "CHOOSE Act", label: "Alabama CHOOSE Act", kind: "esa", amount: 7000, live: true, alsoRuns: ["CHOOSE Act home education award (~$2,000)"], homeEducation: "The CHOOSE Act runs a separate home-education award (about $2,000 per student) alongside the participating-school award; home educators apply on that track. ⚑ Confirm in your award letter or program portal." },
   AK: { rail: "statedirect", program: "Correspondence school allotment", label: "Alaska correspondence allotment", kind: "allotment", amount: 2700, live: true, limited: "Students enrolled in a district correspondence program" },
   AZ: { rail: "classwallet", program: "Empowerment Scholarship Account", label: "Arizona ESA", kind: "esa", amount: 7400, live: true,
     obligations: [
@@ -203,9 +208,8 @@ export const PROGRAMS: Record<string, Program> = {
         hint:
           "Renewal contracts issued by May 1; the family submits by June 30 (Ariz. Admin. Code R7-2-1506). Confirm each family's dates in their portal. ⚑",
       },
-    ],
-  },
-  AR: { rail: "classwallet", program: "Education Freedom Account", label: "Arkansas EFA", kind: "esa", amount: 7600, live: true },
+    ], homeEducation: "Arizona's ESA is universal and parent-directed — a homeschooling family holds the account and pays vendors or seeks reimbursement through the state's wallet. ⚑ Confirm in your award letter or program portal." },
+  AR: { rail: "classwallet", program: "Education Freedom Account", label: "Arkansas EFA", kind: "esa", amount: 7600, live: true, homeEducation: "The Education Freedom Account is universal from 2025-26 and open to home-educated students; the family directs the account. ⚑ Confirm in your award letter or program portal." },
   FL: { rail: "stepup", program: "Personalized Education Program", label: "Florida PEP", kind: "esa", amount: 8000, live: true, alsoRuns: ["Family Empowerment Scholarship (FES-EO / FES-UA)"],
     obligations: [
       {
@@ -214,8 +218,7 @@ export const PROGRAMS: Record<string, Program> = {
         hint:
           "PEP families submit an SLP to their scholarship organisation annually — a late initial SLP has cost students the year's funding (May 31 for 2026-27, per FLDOE). Confirm this year's date in the portal. ⚑",
       },
-    ],
-  },
+    ], homeEducation: "PEP (Personalized Education Program) is Florida's home-education track by design — the family directs the funds and reports through Step Up's platform. ⚑ Confirm in your award letter or program portal." },
   GA: { rail: "odyssey", program: "Georgia Promise Scholarship", label: "Georgia Promise Scholarship", kind: "esa", amount: 6500, live: true, limited: "Students zoned to a low-performing public school" },
   ID: { rail: "statedirect", program: "Parental Choice Tax Credit", label: "Idaho Parental Choice Tax Credit", kind: "taxcredit", amount: 5000, live: true },
   IN: { rail: "classwallet", program: "Education Scholarship Account", label: "Indiana ESA", kind: "esa", amount: 7500, live: true, limited: "Students with a disability or service plan" },
@@ -224,7 +227,7 @@ export const PROGRAMS: Record<string, Program> = {
   MS: { rail: "statedirect", program: "Education Scholarship Account", label: "Mississippi ESA", kind: "esa", amount: 7000, live: true, limited: "Students with an IEP" },
   MO: { rail: "statedirect", program: "MOScholars", label: "Missouri MOScholars", kind: "taxcredit", amount: 6400, live: true },
   MT: { rail: "statedirect", program: "Education Savings Account", label: "Montana ESA", kind: "esa", amount: 8000, live: true, limited: "Students with a disability" },
-  NH: { rail: "statedirect", program: "Education Freedom Account", label: "New Hampshire EFA", kind: "esa", amount: 5200, live: true },
+  NH: { rail: "statedirect", program: "Education Freedom Account", label: "New Hampshire EFA", kind: "esa", amount: 5200, live: true, homeEducation: "The Education Freedom Account is family-directed and open to home-educated students who meet the income rules. ⚑ Confirm in your award letter or program portal." },
   NC: { rail: "classwallet", program: "ESA+", label: "North Carolina ESA+", kind: "esa", amount: 9000, live: true, limited: "Students with a disability", alsoRuns: ["Opportunity Scholarship (private school tuition)"] },
   // Ohio's ACE enrichment ESA wound down (final claims October 2025), so the
   // billable Ohio program is now the EdChoice voucher. Caught by the source
@@ -238,8 +241,8 @@ export const PROGRAMS: Record<string, Program> = {
   // Accounts in October 2025, and it is now funding students — the `live: false`
   // written yesterday from pre-launch reporting was already stale.
   TX: { rail: "odyssey", program: "Texas Education Freedom Accounts (TEFA)", label: "Texas Education Freedom Accounts", kind: "esa", amount: 10500, live: true, alsoRuns: ["Special-needs award (~$30,000)"] },
-  UT: { rail: "ace", program: "Utah Fits All Scholarship", label: "Utah Fits All", kind: "esa", amount: 8000, live: true },
-  WV: { rail: "studentfirst", program: "Hope Scholarship", label: "West Virginia Hope Scholarship", kind: "esa", amount: 5200, live: true },
+  UT: { rail: "ace", program: "Utah Fits All Scholarship", label: "Utah Fits All", kind: "esa", amount: 8000, live: true, homeEducation: "Utah Fits All has an explicit homeschool track; the family manages the scholarship in the program's portal. ⚑ Confirm in your award letter or program portal." },
+  WV: { rail: "studentfirst", program: "Hope Scholarship", label: "West Virginia Hope Scholarship", kind: "esa", amount: 5200, live: true, homeEducation: "The Hope Scholarship is open to homeschooling families, who direct the account within the program's rules. ⚑ Confirm in your award letter or program portal." },
   WY: { rail: "odyssey", program: "Steamboat Legacy Scholarship", label: "Wyoming ESA", kind: "esa", amount: 7000, live: true },
 };
 

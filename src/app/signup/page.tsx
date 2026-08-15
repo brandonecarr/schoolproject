@@ -41,6 +41,9 @@ export default async function SignupPage({
   // Code -> programme label, e.g. AZ -> "Arizona ESA". Only what the note
   // needs; the client component gets no more of the rules table than that.
   const programs = Object.fromEntries(Object.entries(PROGRAMS).map(([c, p]) => [c, p.label]));
+  const homeNotes = Object.fromEntries(
+    Object.entries(PROGRAMS).flatMap(([c, p]) => (p.homeEducation ? [[c, p.homeEducation]] : []))
+  );
 
   return (
     <div className="authplain">
@@ -131,7 +134,7 @@ export default async function SignupPage({
               StateNote answers the real one — "what about mine?" — in one line,
               and only once there is a state to answer about. Still derived
               from PROGRAMS, so it cannot go stale. */}
-          <StateNote programs={programs} />
+          <StateNote programs={programs} family={family} homeNotes={homeNotes} />
 
           <div className="sep" style={{ margin: "18px 0" }} />
           <label htmlFor="name">Your name</label>

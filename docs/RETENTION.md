@@ -24,7 +24,12 @@ reimbursement purposes it was collected for, then deleted automatically.
 | Invite / reset tokens | Email only | Expire (invite 14d, reset 2d); one-time use | Marked used on consumption |
 
 The per-school retention window is set in **Settings → Data retention** and defaults to 730 days
-(~2 school years). The nightly job (`src/lib/retention.ts` → `purgeSchool`) deletes attendance,
+(~2 school years). **Homeschool-family accounts default to 1,825 days (~5 school years)** — ESA
+programs can audit a family's claims years after the fact, so a family's records are kept longer by
+default; the family can shorten it in Settings like any tenant. Expense-claim receipts (`FileRec.claimId`)
+sit on the same footing as invoice receipts: financial records, not child data, kept out of the
+purge and removed with their claim on a right-to-deletion request.
+The nightly job (`src/lib/retention.ts` → `purgeSchool`) deletes attendance,
 observations, submissions, and work samples older than the window and writes an audit entry.
 
 ## Right to deletion

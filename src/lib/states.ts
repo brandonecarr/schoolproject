@@ -43,6 +43,9 @@ export type StatePage = {
   limited: string | null;
   /** Other billable programs the state runs. */
   alsoRuns: string[];
+  /** How the program treats a homeschooling family — a ⚑ note, or null when
+   *  rules.ts has nothing grounded to say. */
+  homeEducation: string | null;
   /** Dated obligations rules.ts can ground — hints only, never dates. */
   obligations: ProgramObligation[];
   /** What the administrator asks for on an invoice, from the rail. */
@@ -86,6 +89,7 @@ export function statePages(): StatePage[] {
         live: p.live,
         limited: p.limited ?? null,
         alsoRuns: p.alsoRuns ?? [],
+        homeEducation: p.homeEducation ?? null,
         obligations: p.obligations ?? [],
         requires: rail ? rail.requires.map((r) => r.label) : [],
         unverified: rail ? rail.verify : true,

@@ -13,6 +13,8 @@ import { currentOrigin } from "@/lib/tenant-server";
 import { reimbursementMetrics, formatPct, stalledInvoices, STALL_DAYS } from "@/lib/metrics";
 import { classifyDeadlines, deadlinePhrase } from "@/lib/deadlines";
 import { OnboardingModal } from "./OnboardingModal";
+import { FamilyDashboard } from "./FamilyDashboard";
+import { isFamily } from "@/lib/kind";
 import { TriageView, DueSoonView } from "./TriageView";
 
 export const dynamic = "force-dynamic";
@@ -26,6 +28,11 @@ export default async function Dashboard({
   const { user, school } = await requireTeacher();
   const { welcome } = await searchParams;
   const schoolId = school!.id;
+
+  // A homeschooling family gets its own front page: claims instead of
+  // invoices, no grading queue, a parent's words. Everything below this line
+  // is the school's.
+  if (isFamily(school)) return <FamilyDashboard user={user} school={school!} />;
 
   const td = today();
   const students = await prisma.student.findMany({ where: { schoolId }, orderBy: { createdAt: "asc" } });

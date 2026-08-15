@@ -121,3 +121,35 @@ describe("the guard itself", () => {
     expect(layout).toContain("copy.ownerLabel");
   });
 });
+
+describe("family dashboard, onboarding, rules notes", () => {
+  const dash = readFileSync(join(ROOT, "src/app/(teacher)/dashboard/page.tsx"), "utf8");
+  const famDash = readFileSync(join(ROOT, "src/app/(teacher)/dashboard/FamilyDashboard.tsx"), "utf8");
+  const onboarding = readFileSync(join(ROOT, "src/app/(teacher)/dashboard/OnboardingModal.tsx"), "utf8");
+  const settings = readFileSync(join(ROOT, "src/app/(teacher)/settings/page.tsx"), "utf8");
+
+  it("the dashboard branches to FamilyDashboard before any school query", () => {
+    expect(dash.indexOf("if (isFamily(school)) return <FamilyDashboard")).toBeLessThan(
+      dash.indexOf("prisma.student.findMany")
+    );
+  });
+  it("the family dashboard reads CLAIMS, not invoices, and has no grading queue / provider nudge", () => {
+    expect(famDash).toContain("prisma.expenseClaim.findMany");
+    expect(famDash).not.toContain("prisma.invoice");
+    expect(famDash).not.toContain("Grading queue");
+    expect(famDash).not.toContain("providerNudge");
+    expect(famDash).toContain("reimbursementMetrics(claims)");
+    // Onboarding line stays owner-only, same contract as the school.
+    expect(famDash).toContain('user.role === "owner" && !school.onboardedAt');
+  });
+  it("onboarding keeps the same field names for both kinds", () => {
+    expect(onboarding).toContain('kind?: "school" | "family"');
+    for (const name of ["contactPhone", "studentEstimate", "gradesServed", "heardFrom", "priorTooling"]) {
+      expect(onboarding).toContain(`name="${name}"`);
+    }
+  });
+  it("settings hides the provider-ID card for a family", () => {
+    expect(settings).toContain("{!family && (");
+    expect(settings.indexOf("{!family && (")).toBeLessThan(settings.indexOf("Your provider ID"));
+  });
+});

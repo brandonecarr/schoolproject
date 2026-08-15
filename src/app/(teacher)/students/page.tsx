@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { requireTeacher } from "@/lib/auth";
+import { copyFor } from "@/lib/kind";
 import { prisma } from "@/lib/db";
 import { evidenceForStudents } from "@/lib/evidence";
 import { readiness, PROGRAMS, RAILS, programOptions } from "@/lib/rules";
@@ -18,6 +19,7 @@ export default async function StudentsPage({
   searchParams: Promise<{ imported?: string; skipped?: string; deleted?: string; added?: string }>;
 }) {
   const { school } = await requireTeacher();
+  const copy = copyFor(school);
   const sp = await searchParams;
   const students = await prisma.student.findMany({
     where: { schoolId: school!.id },
@@ -69,7 +71,7 @@ export default async function StudentsPage({
             {onEsa > 0 ? ` · ${onEsa} on ${esaLabel}` : " · none on an ESA"}
           </>
         }
-        title="Students"
+        title={copy.students}
         actions={
           <>
             <Link className="btn sec" href="/students/import">

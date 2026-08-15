@@ -7,15 +7,24 @@
 
 import { completeOnboarding } from "../actions";
 
-export function OnboardingModal({ schoolName }: { schoolName: string }) {
+export function OnboardingModal({
+  schoolName,
+  kind = "school",
+}: {
+  schoolName: string;
+  kind?: "school" | "family";
+}) {
+  // Same fields, a parent's words. Values (HEARD_FROM / PRIOR_TOOLING) are
+  // unchanged, so the action's allowlists and the onboarding test hold.
+  const fam = kind === "family";
   return (
     <div className="onboard-scrim" role="dialog" aria-modal="true" aria-label="Welcome to Cohort">
       <div className="onboard-card">
         <div className="eyebrow">Welcome to Cohort</div>
         <h2 className="onboard-title">A minute of setup, then the real work</h2>
         <p className="small muted onboard-sub">
-          {schoolName} is live. These five answers help us support you properly — every one is
-          optional, and you can change them later in Settings.
+          {schoolName} is live. These {fam ? "answers" : "five answers"} help us support you properly
+          — every one is optional, and you can change them later in Settings.
         </p>
 
         <form action={completeOnboarding}>
@@ -31,18 +40,18 @@ export function OnboardingModal({ schoolName }: { schoolName: string }) {
               />
             </div>
             <div>
-              <label htmlFor="ob-estimate">Students this year</label>
+              <label htmlFor="ob-estimate">{fam ? "Children you're teaching" : "Students this year"}</label>
               <input
                 id="ob-estimate"
                 name="studentEstimate"
                 type="number"
                 min={1}
                 max={5000}
-                placeholder="12"
+                placeholder={fam ? "2" : "12"}
               />
             </div>
             <div>
-              <label htmlFor="ob-grades">Grades served</label>
+              <label htmlFor="ob-grades">{fam ? "Their grades" : "Grades served"}</label>
               <input id="ob-grades" name="gradesServed" placeholder="K–8" maxLength={60} />
             </div>
             <div>
@@ -50,7 +59,7 @@ export function OnboardingModal({ schoolName }: { schoolName: string }) {
               <select id="ob-heard" name="heardFrom" defaultValue="">
                 <option value="">—</option>
                 <option value="search">Search</option>
-                <option value="referral">Another school referred us</option>
+                <option value="referral">{fam ? "Another family referred us" : "Another school referred us"}</option>
                 <option value="social">Social media</option>
                 <option value="walkthrough">A walkthrough call</option>
                 <option value="conference">A conference or event</option>
@@ -58,13 +67,13 @@ export function OnboardingModal({ schoolName }: { schoolName: string }) {
               </select>
             </div>
             <div className="onboard-wide">
-              <label htmlFor="ob-tooling">What are you running the school on today?</label>
+              <label htmlFor="ob-tooling">{fam ? "How do you keep records today?" : "What are you running the school on today?"}</label>
               <select id="ob-tooling" name="priorTooling" defaultValue="">
                 <option value="">—</option>
                 <option value="spreadsheets">Spreadsheets</option>
                 <option value="paper">Paper and binders</option>
                 <option value="another_tool">Another tool</option>
-                <option value="nothing">Nothing yet — brand new school</option>
+                <option value="nothing">{fam ? "Nothing yet — just starting out" : "Nothing yet — brand new school"}</option>
               </select>
             </div>
           </div>

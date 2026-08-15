@@ -117,3 +117,15 @@ describe("the landing keeps both promises", () => {
     expect(landing).toContain("You submit every claim yourself");
   });
 });
+
+describe("home-education notes in rules.ts", () => {
+  it("every note ends with the ⚑ confirm line — a note, never an eligibility ruling", async () => {
+    const { PROGRAMS } = await import("../src/lib/rules");
+    const noted = Object.entries(PROGRAMS).filter(([, p]) => p.homeEducation);
+    expect(noted.length).toBeGreaterThanOrEqual(5);
+    for (const [code, p] of noted) {
+      expect(p.homeEducation!.endsWith("⚑ Confirm in your award letter or program portal."), code).toBe(true);
+      expect(/eligible|approved|guaranteed/i.test(p.homeEducation!.replace(/⚑.*$/, "")), `${code} asserts eligibility`).toBe(false);
+    }
+  });
+});

@@ -7,6 +7,7 @@ import { accentOf, readableOn, accentIsLegible, logoDataUri, DEFAULT_ACCENT } fr
 import { ADMINISTRATORS, administratorFor, providerStatus, providerSummary } from "@/lib/provider";
 import { railForState } from "@/lib/rules";
 import { today } from "@/lib/dates";
+import { isFamily, copyFor } from "@/lib/kind";
 import { updateRetention, uploadLogo, removeLogo, updateAccent, updateProviderIdentity } from "../actions";
 
 export const dynamic = "force-dynamic";
@@ -34,6 +35,8 @@ export default async function SettingsPage({
   searchParams: Promise<{ saved?: string; logo?: string; provider?: string }>;
 }) {
   const { school } = await requireTeacher();
+  const family = isFamily(school);
+  const copy = copyFor(school);
   const sp = await searchParams;
 
   const logoRec = school!.logoFileId
@@ -75,13 +78,13 @@ export default async function SettingsPage({
       {providerMsg && <Notice tone={providerMsg.tone}>{providerMsg.text}</Notice>}
       <div className="topbar">
         <div>
-          <div className="eyebrow">School</div>
+          <div className="eyebrow">{copy.Org}</div>
           <h1>Settings</h1>
         </div>
       </div>
 
       <div className="card">
-        <div className="eyebrow">School identity on printed documents</div>
+        <div className="eyebrow">{copy.Org} identity on printed documents</div>
         <p className="small muted" style={{ margin: "6px 0 14px", maxWidth: "64ch" }}>
           A reimbursement packet is read by a state reviewer who has never heard of us. It should
           arrive on <em>your</em> letterhead — the school is the one attesting to the record, not the
@@ -194,6 +197,9 @@ export default async function SettingsPage({
           directory sits behind this school's own login. The copy says so in
           those words — a "verified provider" badge here would be a claim about
           public money that nobody at Cohort is in a position to make. */}
+      {/* A homeschooling family is not an approved provider — it files claims
+          from its own wallet — so there is no provider ID to keep. */}
+      {!family && (
       <div className="card" style={{ marginTop: 12 }}>
         <div className="eyebrow">Your provider ID</div>
         <p className="small muted" style={{ margin: "6px 0 14px", maxWidth: "68ch" }}>
@@ -267,6 +273,7 @@ export default async function SettingsPage({
           </div>
         </form>
       </div>
+      )}
 
       <div className="setgrid" style={{ marginTop: 12 }}>
       <div className="card2">

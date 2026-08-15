@@ -15,7 +15,15 @@
 
 import { useEffect, useRef, useState } from "react";
 
-export function StateNote({ programs }: { programs: Record<string, string> }) {
+export function StateNote({
+  programs,
+  family = false,
+  homeNotes = {},
+}: {
+  programs: Record<string, string>;
+  family?: boolean;
+  homeNotes?: Record<string, string>;
+}) {
   const [code, setCode] = useState("");
   const box = useRef<HTMLParagraphElement>(null);
 
@@ -38,7 +46,9 @@ export function StateNote({ programs }: { programs: Record<string, string> }) {
     code.length !== 2
       ? ""
       : label
-        ? `${label} — invoice checks are configured for this program.`
+        ? family
+          ? (homeNotes[code] ?? `${label} — we haven't grounded home-education eligibility for ${code} yet; check your program handbook. Records and claim packets work the same.`)
+          : `${label} — invoice checks are configured for this program.`
         : `No ESA program configured for ${code}. Everything else works the same.`;
 
   return (

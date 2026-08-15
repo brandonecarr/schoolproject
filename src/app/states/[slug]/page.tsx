@@ -141,6 +141,15 @@ export default async function StatePage({ params }: { params: Promise<{ slug: st
           </section>
         )}
 
+        <section className="lp-wrap lp-section">
+          <div className="lp-eyebrow">Homeschooling families</div>
+          <h2>Home education under {s.label}</h2>
+          <p>
+            {s.homeEducation ??
+              `We haven't grounded home-education eligibility for ${s.name} yet — check your program handbook. Cohort's family plan works the same either way: your records, your receipts, your claim packets.`}
+          </p>
+        </section>
+
         {s.alsoRuns.length > 0 && (
           <section className="lp-wrap lp-section">
             <div className="lp-eyebrow">Also in {s.name}</div>

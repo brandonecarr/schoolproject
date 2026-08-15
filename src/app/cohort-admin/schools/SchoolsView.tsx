@@ -16,6 +16,7 @@ export type SchoolRow = {
   name: string;
   slug: string;
   state: string;
+  kind: string;
   providerRail: string;
   joinedIso: string;
   students: number;
@@ -111,6 +112,11 @@ export function SchoolsView({ schools }: { schools: SchoolRow[] }) {
                     <AdmPill tone="info" square>
                       {s.state}
                     </AdmPill>
+                    {s.kind === "family" && (
+                      <AdmPill tone="warn" square>
+                        family
+                      </AdmPill>
+                    )}
                   </div>
                   <div className="adm-cellbody">{s.providerRail || "—"}</div>
                   <div className="adm-cellnum">{s.students}</div>
